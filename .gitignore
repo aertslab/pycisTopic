@@ -1,0 +1,47 @@
+# Generic files to ignore.
+*~
+._*
+*.DS_Store
+.*
+
+# Do not ignore .gitignore
+!/.gitignore
+
+# Ignore the following dirs.
+/fly_brain
+/job_template
+/liver_data
+/old_scripts
+/toy_data
+/lightLDAtest.txt
+
+
+### Python ###
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
