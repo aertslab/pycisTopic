@@ -85,7 +85,7 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 		log.info('Reading fragments from ' + path_to_fragments[sample_id])
 		fragments_df=pr.read_bed(path_to_fragments[sample_id], as_df=True)
 		if fragments_df.loc[:,'Name'][0].find('-')!=-1:
-			log.info('Barcode correction')
+			log.info('Performing barcode correction for ' + path_to_fragments[sample_id])
 			fragments_df.loc[:,'Name'] = [x.rstrip("-1234567890") for x in fragments_df.loc[:,'Name']]
 		fragments_df.loc[:,'Name'] = fragments_df.loc[:,'Name'] + '-' + sample_id
 		fragments_df = fragments_df.loc[fragments_df['Name'].isin(cell_data.index.tolist())]	
