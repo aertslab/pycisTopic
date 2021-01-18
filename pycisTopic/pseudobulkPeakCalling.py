@@ -1,14 +1,17 @@
-import pyranges as pr
-import pyBigWig
-import pandas as pd
-import ray
 import logging
-import sys
+import os
+import pandas as pd
+import pyBigWig
+import pyranges as pr
+import ray
 import subprocess
+import sys
+
 from typing import Optional, Union
 from typing import List, Dict
+
 from .cisTopicClass import *
-import os
+
 
 def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str, pd.DataFrame]],
 					 variable: str,
@@ -301,7 +304,7 @@ def MACS_callPeak_ray(macs_path: str,
 	if not os.path.exists(outdir):
 		os.makedirs(outdir)
 	
-	MACS_peak_calling =MACS_callPeak(macs_path, bed_path, name, outdir, genome_size, input_format=input_format, shift=shift, ext_size=ext_size, keep_dup = keep_dup, q_value = q_value)
+	MACS_peak_calling = MACS_callPeak(macs_path, bed_path, name, outdir, genome_size, input_format=input_format, shift=shift, ext_size=ext_size, keep_dup = keep_dup, q_value = q_value)
 	log.info(name + ' done!')
 	return MACS_peak_calling
 	
