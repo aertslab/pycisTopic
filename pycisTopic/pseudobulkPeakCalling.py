@@ -87,7 +87,6 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 		if fragments_df.loc[:,'Name'][0].find('-')!=-1:
 			log.info('Barcode correction')
 			fragments_df.loc[:,'Name'] = [x.rstrip("-1234567890") for x in fragments_df.loc[:,'Name']]
-			log.info('Barcode correction completed')
 		fragments_df.loc[:,'Name'] = fragments_df.loc[:,'Name'] + '-' + sample_id
 		fragments_df = fragments_df.loc[fragments_df['Name'].isin(cell_data.index.tolist())]	
 		if len(path_to_fragments) > 1:
