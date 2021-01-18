@@ -220,7 +220,7 @@ class cisTopicObject:
         region_names= region_names_list[0]
         cell_names = cell_names_list[0]
         object_id = [project_list[0]]*len(cell_names)
-        cell_names = [cell_names[i] + '_' + object_id[i] for i in range(len(cell_names))]
+        cell_names = [cell_names[i] + '-' + object_id[i] for i in range(len(cell_names))]
         path_to_fragments = [path_to_fragments_list[0]]*len(cell_names)
         
         for i in range(1,len(region_names_list)):
@@ -228,7 +228,7 @@ class cisTopicObject:
             fragment_matrix_to_add=fragment_matrix_list[i]
             cell_names_to_add=cell_names_list[i]
             object_id_to_add = [project_list[i]]*len(cell_names_to_add)
-            cell_names_to_add = [cell_names_to_add[i] + '_' + object_id_to_add[i] for i in range(len(cell_names_to_add))]
+            cell_names_to_add = [cell_names_to_add[i] + '-' + object_id_to_add[i] for i in range(len(cell_names_to_add))]
             cell_names=cell_names+cell_names_to_add
             
             object_id=object_id+object_id_to_add

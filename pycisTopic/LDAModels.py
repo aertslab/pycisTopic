@@ -287,7 +287,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
     Parameters
     ----------
     mallet_path: str
-        Path to the mallet binary, e.g. (e.g. /xxx/Mallet/bin/mallet).
+        Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet).
     num_topics: int
         The number of topics to use in the model.
     corpus: iterable of iterable of (int, int), optional
