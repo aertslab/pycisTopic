@@ -4,6 +4,7 @@ import pandas as pd
 import pyBigWig
 import pyranges as pr
 import ray
+import re
 import subprocess
 import sys
 
@@ -11,6 +12,7 @@ from typing import Optional, Union
 from typing import List, Dict
 
 from .cisTopicClass import *
+from .utils import *
 
 
 def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str, pd.DataFrame]],
@@ -19,6 +21,7 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 					 bed_path: str,
 					 bigwig_path: str,
 					 path_to_fragments: Optional[Dict[str, str]] = None,
+					 sample_id_col: Optional[str] = 'sample_id',
 					 n_cpu: Optional[int] = 1,
 					 normalize_bigwig: Optional[bool] = True,
 					 remove_duplicates: Optional[bool] = True):
@@ -30,7 +33,8 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 	input_data: cisTopicObject or pd.DataFrame
 		A :class:`cisTopicObject` containing the specified `variable` as a column in :class:`cisTopicObject.cell_data` or a cell metadata 
 		:class:`pd.DataFrame` containing barcode as rows, containing the specified `variable` as a column (additional columns are
-		possible) and a sample_id column. Index names must be in the format BARCODE-sample_id (e.g. ATGGTCCTGT-Sample_1)
+		possible) and a `sample_id` column. Index names must contain the BARCODE (e.g. ATGTCGTC-1), additional tags are possible separating with - 
+		(e.g. ATGCTGTGCG-1-Sample_1). The levels in the sample_id column must agree with the keys in the path_to_fragments dictionary.
 	variable: str
 		A character string indicating the column that will be used to create the different group pseudobulk. It must be included in 
 		the cell metadata provided as input_data.
@@ -43,7 +47,9 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 	path_to_fragments: str or dict
 		A dictionary of character strings, with sample name as names indicating the path to the fragments file/s from which pseudobulk profiles have to
 		be created. If a :class:`cisTopicObject` is provided as input it will be ignored, but if a cell metadata :class:`pd.DataFrame` is provided it
-		is necessary to provide it. The keys of the dictionary need to match with the sample_id tag added to the index names of the input data frame. 
+		is necessary to provide it. The keys of the dictionary need to match with the sample_id tag added to the index names of the input data frame.
+	sample_id_col: str
+		Name of the column containing the sample name per barcode in the input :class:`cisTopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
 	n_cpu: int
 		Number of cores to use. Default: 1.	
 	normalize_bigwig: bool
@@ -68,43 +74,33 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 	if isinstance(input_data, cisTopicObject):
 		path_to_fragments = cisTopic_obj.path_to_fragments
 		if path_to_fragments == None:
-			log.error('No fragments path in this cisTopic object. A fragments file is needed for forming pseudobulk profiles.')
-		if len(path_to_fragments) > 1:
-			path_to_project = [cell_data.loc[cell_data['path_to_fragments'] == path_to_fragments[x], 'cisTopic_id'][0] for x in range(len(path_to_fragments))]
-			path_to_fragments = {path_to_project[x]: path_to_fragments[x] for x in range(len(path_to_fragments))}
+			log.error('No path_to_fragments in this cisTopic object.')
 		cell_data = cisTopic_obj.cell_data
 	elif isinstance(input_data, pd.DataFrame):
 		if path_to_fragments == None:
 			log.error('Please, provide path_to_fragments.')
 		cell_data = input_data
-		cell_suffixes = list(set([input_data.index.tolist()[x].split('-')[-1] for x in range(len(input_data.index.tolist()))]))
+	# Check for sample_id column
+	try:
+		sample_ids = list(set(cell_data[sample_id_col]))
+	except ValueError:
+		print('Please, include a sample identification column (e.g. "sample_id") in your cell metadata!')
+		
 	# Get fragments
-	if isinstance(path_to_fragments , dict):
-		fragments_df_dict={}
-		for sample_id in path_to_fragments.keys():
-			if isinstance(input_data, pd.DataFrame):
-				if sample_id not in cell_suffixes:
-					log.error('Check that your cell suffixes match with the keys in your path_to_fragments dictionary')	
-		log.info('Reading fragments from ' + path_to_fragments[sample_id])
-		fragments_df=pr.read_bed(path_to_fragments[sample_id], as_df=True)
-		if fragments_df.loc[:,'Name'][0].find('-')!=-1:
-			log.info('Performing barcode correction for ' + path_to_fragments[sample_id])
-			fragments_df.loc[:,'Name'] = [x.rstrip("-1234567890") for x in fragments_df.loc[:,'Name']]
-		fragments_df.loc[:,'Name'] = fragments_df.loc[:,'Name'] + '-' + sample_id
-		fragments_df = fragments_df.loc[fragments_df['Name'].isin(cell_data.index.tolist())]	
-		if len(path_to_fragments) > 1:
-			fragments_df_dict[sample_id] = fragments_df
-			fragments_df_list = [fragments_df_dict[list(fragments_df_dict.keys())[x]] for x in range(len(path_to_fragments))]
-			log.info('Merging fragments')
-			fragments_df = fragments_df_list[0].append(fragments_df_list[1:])
-	else:
-		if isinstance(input_data, cisTopicObject):
-			log.info('Reading fragments')
-			fragments_df = pr.read_bed(path_to_fragments, as_df=True)
-			fragments_df = fragments_df.loc[fragments_df['Name'].isin(cell_data.index.tolist())]
+	fragments_df_dict={}
+	for sample_id in path_to_fragments.keys():
+		if isinstance(input_data, pd.DataFrame):
+			if sample_id not in sample_ids:
+				log.info('The following path_to_fragments entry is not found in the cell metadata sample_id_col: ', sample_id, '. It will be ignored.')
+			else:	
+				log.info('Reading fragments from ' + path_to_fragments[sample_id])
+				fragments_df=pr.read_bed(path_to_fragments[sample_id], as_df=True)
+				fragments_df = fragments_df.loc[fragments_df['Name'].isin(prepare_tag_cells(cell_data.index.tolist()))]	
+				fragments_df_dict[sample_id] = fragments_df
+
 	# Set groups
-	group_var = cell_data.loc[:,variable]
-	groups = sorted(list(set(group_var)))
+	cell_data = cell_data.loc[:,[variable, sample_id_col]]
+	groups = sorted(list(set(cell_data[variable])))
 	# Check chromosome sizes
 	if isinstance(chromsizes, pd.DataFrame):
 		chromsizes = chromsizes.loc[:,['Chromosome', 'Start', 'End']]
@@ -116,12 +112,13 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 		os.makedirs(bigwig_path)
 	# Create pseudobulks
 	ray.init(num_cpus = n_cpu)
-	paths = ray.get([exportPseudoBulk_ray.remote(group_var,
+	paths = ray.get([exportPseudoBulk_ray.remote(cell_data,
 								group,
-								fragments_df, 
+								fragments_df_dict, 
 								chromsizes,
 								bigwig_path,
 								bed_path,
+								sample_id_col,
 								normalize_bigwig,
 								remove_duplicates) for group in groups])
 	ray.shutdown()
@@ -130,12 +127,13 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 	return bw_paths, bed_paths
 
 @ray.remote
-def exportPseudoBulk_ray(group_var: pd.DataFrame,
+def exportPseudoBulk_ray(cell_data: pd.DataFrame,
 						 group: str,
-						 fragments_df: pd.DataFrame,
+						 fragments_df_dict: Dict[str, pd.DataFrame],
 						 chromsizes: pr.PyRanges,
 						 bigwig_path: str,
 						 bed_path: str,
+						 sample_id_col: Optional[str] = 'sample_id',
 						 normalize_bigwig: Optional[bool] = True,
 					 	 remove_duplicates: Optional[bool] = True):
 	"""
@@ -143,19 +141,21 @@ def exportPseudoBulk_ray(group_var: pd.DataFrame,
 
 	Parameters
 	---------
-	group_var: pd.Series
-		A cell metadata :class:`pd.Series` containing barcodes and their annotation.
+	cell_data: pd.DataFrame
+		A cell metadata :class:`pd.Dataframe` containing barcodes, their annotation and their sample of origin.
 	group: str
 		A character string indicating the group for which pseudobulks will be created.
-	fragments_df: pd.DataFrame
-		A data frame containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a 
-		fragments is found assigned to that barcode. 
+	fragments_df_dict: dict
+		A dictionary containing data frames as values with 'Chromosome', 'Start', 'End', 'Name', and 'Score' as columns; and sample label
+		as keys. 'Score' indicates the number of times that a fragments is found assigned to that barcode. 
 	chromsizes: pr.PyRanges
 		A :class:`pr.PyRanges` containing size of each column, containing 'Chromosome', 'Start' and 'End' columns.
 	bed_path: str
 		Path to folder where the fragments bed file will be saved.
 	bigwig_path: str
 		Path to folder where the bigwig file will be saved.
+	sample_id_col: str
+		Name of the column containing the sample name per barcode in the input :class:`cisTopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
 	normalize_bigwig: bool
 		Whether bigwig files should be CPM normalized. Default: True.
 	remove_duplicates: bool
@@ -174,8 +174,21 @@ def exportPseudoBulk_ray(group_var: pd.DataFrame,
 	log = logging.getLogger('cisTopic')
 	
 	log.info('Creating pseudobulk for '+ str(group))
-	barcodes=group_var[group_var.isin([group])].index.tolist()
-	group_fragments=fragments_df.loc[fragments_df['Name'].isin(barcodes)]
+	group_fragments_dict={}
+	for sample_id in fragments_df_dict:
+		sample_data = cell_data[cell_data.loc[:,sample_id_col].isin([sample_id])]
+		sample_data.index = prepare_tag_cells(sample_data.index.tolist())
+		group_var = sample_data.iloc[:,0]
+		barcodes=group_var[group_var.isin([group])].index.tolist()
+		fragments_df = fragments_df_dict[sample_id]
+		group_fragments=fragments_df.loc[fragments_df['Name'].isin(barcodes)]
+		if len(fragments_df_dict) > 1:
+			group_fragments_dict[sample_id] = group_fragments
+			
+	if len(fragments_df_dict) > 1:
+		group_fragments_list = [group_fragments_dict[list(group_fragments_dict.keys())[x]] for x in range(len(fragments_df_dict))]
+		group_fragments = group_fragments_list[0].append(group_fragments_list[1:])
+		
 	group_pr=pr.PyRanges(group_fragments)
 	bigwig_path_group = bigwig_path + str(group) + '.bw'
 	bed_path_group = bed_path + str(group) + '.bed.gz'

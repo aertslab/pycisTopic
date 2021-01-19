@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import math
 import pyranges as pr
+import re
 
 def regionNamesToCoordinates(regionNames):
     chrom=pd.DataFrame([i.split(':', 1)[0] for i in regionNames])
@@ -134,3 +135,8 @@ def loadcisTopicModel(path_to_cisTopic_model_matrices):
     parameters = None
     model = cisTopicLDAModel(metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters)
     return model
+
+def prepare_tag_cells(cell_names):
+	new_cell_names = [re.findall(r"^[ACGT]*-[0-9]+-", x)[0].rstrip('-') if len(re.findall(r"^[ACGT]*-[0-9]+-", x)) != 0 else x for x in cell_names]
+	new_cell_names = [re.findall(r"^\w*-", new_cell_names[i])[0].rstrip('-') if (len(re.findall(r"^\w*-", new_cell_names[i])) != 0) & (new_cell_names[i] == cell_names[i]) else new_cell_names[i] for i in range(len(new_cell_names))]
+	return new_cell_names
