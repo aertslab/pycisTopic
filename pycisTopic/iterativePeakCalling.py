@@ -47,7 +47,7 @@ def iterative_peak_filtering(center_extended_peaks):
         center_extended_peaks_with_2_counts.Name = center_extended_peaks_with_2_counts.Chromosome.astype(str) + ':' + \
         center_extended_peaks_with_2_counts.Start.astype(str) + '-' + center_extended_peaks_with_2_counts.End.astype(str)
         original_and_merged_coordinates = center_extended_peaks.join(center_extended_peaks_with_2_counts)
-        selected_regions = pr.PyRanges(original_and_merged_coordinates.df.iloc[original_and_merged_coordinates.df.groupby(['Name_b'], as_index=False, sort=False)['Score'].idxmax().tolist()])
+        selected_regions = pr.PyRanges(original_and_merged_coordinates.df.iloc[original_and_merged_coordinates.df.groupby(['Name_b'], as_index=False, sort=False)['Score'].idxmax()['Score'].tolist()])
         selected_coordinates = pr.PyRanges(chromosomes=selected_regions.Chromosome, starts=selected_regions.Start, ends = selected_regions.End)
         center_extended_peaks_selected.append(selected_coordinates.df)
     # For peaks with more than 3 counts, take region with highest score, remove those overlapping it and repeat
@@ -56,13 +56,13 @@ def iterative_peak_filtering(center_extended_peaks):
         center_extended_peaks_with_more_than_2_counts.Name = center_extended_peaks_with_more_than_2_counts.Chromosome.astype(str) + ':' + \
         center_extended_peaks_with_more_than_2_counts.Start.astype(str) + '-' + center_extended_peaks_with_more_than_2_counts.End.astype(str)
         original_and_merged_coordinates = center_extended_peaks.join(center_extended_peaks_with_more_than_2_counts)
-        selected_regions = pr.PyRanges(original_and_merged_coordinates.df.iloc[original_and_merged_coordinates.df.groupby(['Name_b'], as_index=False, sort=False)['Score'].idxmax().tolist()])
+        selected_regions = pr.PyRanges(original_and_merged_coordinates.df.iloc[original_and_merged_coordinates.df.groupby(['Name_b'], as_index=False, sort=False)['Score'].idxmax()['Score'].tolist()])
         selected_coordinates = pr.PyRanges(chromosomes=selected_regions.Chromosome, starts=selected_regions.Start, ends = selected_regions.End)
         center_extended_peaks_selected.append(selected_coordinates.df)
         remaining_coordinates = original_and_merged_coordinates.overlap(selected_coordinates, invert=True)
     
         while len(remaining_coordinates) > 0:
-            selected_regions = pr.PyRanges(remaining_coordinates.df.iloc[remaining_coordinates.df.groupby(['Name_b'], as_index=False, sort=False)['Score'].idxmax().tolist()])
+            selected_regions = pr.PyRanges(remaining_coordinates.df.iloc[remaining_coordinates.df.groupby(['Name_b'], as_index=False, sort=False)['Score'].idxmax()['Score'].tolist()])
             selected_coordinates = pr.PyRanges(chromosomes=selected_regions.Chromosome, starts=selected_regions.Start, ends = selected_regions.End)
             center_extended_peaks_selected.append(selected_coordinates.df)
             remaining_coordinates = remaining_coordinates.overlap(selected_coordinates, invert=True)
