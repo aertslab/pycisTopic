@@ -35,6 +35,7 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 		:class:`pd.DataFrame` containing barcode as rows, containing the specified `variable` as a column (additional columns are
 		possible) and a `sample_id` column. Index names must contain the BARCODE (e.g. ATGTCGTC-1), additional tags are possible separating with - 
 		(e.g. ATGCTGTGCG-1-Sample_1). The levels in the sample_id column must agree with the keys in the path_to_fragments dictionary.
+		Alternatively, if the cell metadata contains a column named barcode it will be used instead of the index names. 
 	variable: str
 		A character string indicating the column that will be used to create the different group pseudobulk. It must be included in 
 		the cell metadata provided as input_data.
@@ -99,7 +100,10 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 				fragments_df_dict[sample_id] = fragments_df
 
 	# Set groups
-	cell_data = cell_data.loc[:,[variable, sample_id_col]]
+	if 'barcode' in cell_data:
+		cell_data = cell_data.loc[:,[variable, sample_id_col, 'barcode']]
+	else:
+		cell_data = cell_data.loc[:,[variable, sample_id_col]]
 	groups = sorted(list(set(cell_data[variable])))
 	# Check chromosome sizes
 	if isinstance(chromsizes, pd.DataFrame):
@@ -177,7 +181,10 @@ def exportPseudoBulk_ray(cell_data: pd.DataFrame,
 	group_fragments_dict={}
 	for sample_id in fragments_df_dict:
 		sample_data = cell_data[cell_data.loc[:,sample_id_col].isin([sample_id])]
-		sample_data.index = prepare_tag_cells(sample_data.index.tolist())
+		if 'barcode' in sample_data:
+			sample_data.index = sample_data['barcode'].tolist()
+		else:
+			sample_data.index = prepare_tag_cells(sample_data.index.tolist())
 		group_var = sample_data.iloc[:,0]
 		barcodes=group_var[group_var.isin([group])].index.tolist()
 		fragments_df = fragments_df_dict[sample_id]
