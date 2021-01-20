@@ -631,8 +631,10 @@ def createcisTopicObjectFromFragments(path_to_fragments: str,
 										path_to_fragments={project: path_to_fragments},
 										project=project)
 	if metrics is not None:
+		metrics['barcode']=metrics.index.tolist()
 		cisTopic_obj.addCellData(metrics)
 	else:
+		FPB_DF['barcode']=FPB_DF.index.tolist()
 		cisTopic_obj.addCellData(FPB_DF)
 	return(cisTopic_obj)
 
