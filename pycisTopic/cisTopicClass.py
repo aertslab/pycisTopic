@@ -89,7 +89,7 @@ class cisTopicObject:
 		flag=False
 		if len(set(self.cell_names) & set(cell_data.index)) < len(self.cell_names):
 			check_cell_names = prepare_tag_cells(self.cell_names)
-			if len(set(check_cell_names) & set(cell_data.index)) < len(self.cell_names):
+			if len(set(check_cell_names) & set(cell_data.index)) < len(set(self.cell_names) & set(cell_data.index)):
 				print("Warning: Some cells in this cisTopicObject are not present in this cell_data. Values will be filled with Nan \n")
 			else:
 				flag=True
@@ -99,9 +99,9 @@ class cisTopicObject:
 		if flag==False:
 			cell_data = cell_data.loc[list(set(self.cell_names) & set(cell_data.index)),]
 			new_cell_data = pd.concat([self.cell_data, cell_data], axis=1, sort=False)
-		if flag==True:
-			cell_data.index = prepare_tag_cells(cell_data.index.tolist())
-			cell_data = cell_data.loc[list(set(self.cell_names) & set(cell_data.index)),]
+		elif flag==True:
+			self.cell_data.index = prepare_tag_cells(self.cell_names)
+			cell_data = cell_data.loc[list(set(self.cell_data.index.tolist()) & set(cell_data.index)),]
 			new_cell_data = pd.concat([self.cell_data, cell_data], axis=1, sort=False)
 			new_cell_data = new_cell_data.loc[prepare_tag_cells(self.cell_names),:]
 			new_cell_data.index = self.cell_names
@@ -153,9 +153,22 @@ class cisTopicObject:
 		cisTopicObject
 			A :class:`cisTopicObject` containing the selected cells and/or regions.
 		"""
+		# Create logger
+		level	= logging.INFO
+		format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+		handlers = [logging.StreamHandler(stream=sys.stdout)]
+		logging.basicConfig(level = level, format = format, handlers = handlers)
+		log = logging.getLogger('cisTopic')
+		
 		# Select cells
 		if cells is not None:
-			keep_cells_index = getPositionIndex(cells, self.cell_names)
+			try:
+				keep_cells_index = getPositionIndex(cells, self.cell_names)
+			except:
+				try:
+					keep_cells_index = getPositionIndex(cells, prepare_tag_cells(self.cell_names))
+				except:
+					log.error('None of the given cells is contained in this cisTopic object!')	
 		else:
 			keep_cells_index = list(range(len(self.cell_names)))
 		# Select regions
@@ -228,38 +241,41 @@ class cisTopicObject:
 		fragment_matrix_list = [x.fragment_matrix for x in cisTopic_obj_list]
 		region_names_list = [x.region_names for x in cisTopic_obj_list]
 		cell_names_list = [x.cell_names for x in cisTopic_obj_list]
-		cell_data = [x.cell_data for x in cisTopic_obj_list]
+		cell_data_list = [x.cell_data.copy() for x in cisTopic_obj_list]
 		project_list = [x.project for x in cisTopic_obj_list]
 		path_to_fragments_list = [x.path_to_fragments for x in cisTopic_obj_list]
 		path_to_fragments_dict = {k: v for ptf in path_to_fragments_list for k,v in ptf.items()}
+        
 		if len(project_list) > len(set(project_list)):
+			ori_project_list = project_list
 			log.info('You cannot merge objects with the same project id. Project id will be updated.')
 			project_list=list(map(lambda x: x[1] + '_' + str(project_list[:x[0]].count(x[1]) + 1) if project_list.count(x[1]) > 1 else x[1], enumerate(project_list)))
 			for i in range(len(project_list)):
-				if set(cell_data[i]['sample_id']) <= 1:
-					if cell_data[i]['sample_id'][0] == ori_project_list[i]:
-						log.info('Conflicting sample_id on project ', project_list[i], ' will be updated to match with the new project name.')
-						cell_data[i]['sample_id'] = project_list[i]*len(cell_data[i]['sample_id'])
-						if list(path_to_fragments_list[i].keys()) == 1:
-							if list(path_to_fragments_list[i].keys()) == ori_project_list[i]:
-								log.info('Conflicting path_to_fragments key on project ', project_list[i], ' will be updated to match with the new project name.')
-								path_to_fragments_list[project_list[i]] = path_to_fragments_list.pop(ori_project_list[i])
+				print(i)
+				if len(list(set(cell_data_list[i]['sample_id']))) <= 1:
+					if (cell_data_list[i]['sample_id'][0] == ori_project_list[i]) & (cell_data_list[i]['sample_id'][0] != project_list[i]):
+						log.info('Conflicting sample_id on project ' + ori_project_list[i] + ' will be updated to match with the new project name.')
+						cell_data_list[i]['sample_id'] = [project_list[i]]*len(cell_data_list[i]['sample_id'])
+				if list(path_to_fragments_list[i].keys()) == 1:
+					if list(path_to_fragments_list[i].keys()) == ori_project_list[i]:
+						log.info('Conflicting path_to_fragments key on project ' + project_list[i] + ' will be updated to match with the new project name.')
+						path_to_fragments_list[project_list[i]] = path_to_fragments_list.pop(ori_project_list[i])
+                                
+		cell_names_list = [prepare_tag_cells(cell_names_list[x]) for x in range(len(cell_names_list))]
 		fragment_matrix = fragment_matrix_list[0]
 		region_names= region_names_list[0]
-		cell_names = cell_names_list[0]
+		cell_names = [n+'-'+s for n,s in zip(cell_names_list[0],cell_data_list[0]['sample_id'].tolist())]
 		object_id = [project_list[0]]*len(cell_names)
-		cell_names = prepare_tag_cells(cell_names_list[0])
-		cell_names = [cell_names[x] + '-' + cell_data[0]['sample_id'].tolist()[x] for x in range(len(cell_names))]
-		cell_data[0].index = cell_names
+
+		cell_data_list[0].index = cell_names
 		
 		for i in range(1,len(region_names_list)):
 			region_names_to_add=region_names_list[i]
 			fragment_matrix_to_add=fragment_matrix_list[i]
-			cell_names_to_add = prepare_tag_cells(cell_names_list[i])
-			cell_names_to_add = [cell_names_to_add[x] + '-' + cell_data[i]['sample_id'].tolist()[x] for x in range(len(cell_names_to_add))]
+			cell_names_to_add = cell_names_list[i]
 			object_id_to_add = [project_list[i]]*len(cell_names_to_add)
-			cell_names_to_add = [cell_names_to_add[i] + '-' + object_id_to_add[i] for i in range(len(cell_names_to_add))]
-			cell_data[i].index = cell_names_to_add
+			cell_names_to_add = [n+'-'+s for n,s in zip(cell_names_to_add,cell_data_list[i]['sample_id'].tolist())]
+			cell_data_list[i].index = cell_names_to_add
 			cell_names=cell_names+cell_names_to_add
 			
 			object_id=object_id+object_id_to_add
@@ -281,12 +297,12 @@ class cisTopicObject:
 		
 		
 		binary_matrix = sp.binarize(fragment_matrix, threshold=is_acc-1)
-		cell_data = pd.concat(cell_data, axis=0, sort=False)
+		cell_data = pd.concat(cell_data_list, axis=0, sort=False)
 		cell_data.index = cell_names
 		region_data = [x.region_data for x in cisTopic_obj_list]
 		region_data = pd.concat(region_data, axis=0, sort=False)
 		if copy is True:
-			cisTopic_obj=cisTopicObject(fragment_matrix, binary_matrix, cell_names, region_names, cell_data, region_data, path_to_fragments_dict, project, tag_cells=False)
+			cisTopic_obj=cisTopicObject(fragment_matrix, binary_matrix, cell_names, region_names, cell_data, region_data, path_to_fragments_dict, project)
 			return cisTopic_obj
 		else:
 			self.fragment_matrix = fragment_matrix
@@ -295,7 +311,7 @@ class cisTopicObject:
 			self.region_names = region_names
 			self.cell_data = cell_data
 			self.region_data = region_data
-			self.path_to_fragments = list(set(path_to_fragments))
+			self.path_to_fragments = path_to_fragments_dict
 			self.project = project
 			self.selected_model = []
 			self.projections= {}
