@@ -390,7 +390,6 @@ def createcisTopicObject(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix]
 		fragment_matrix = sparse.csr_matrix(fragment_matrix.to_numpy())
 	
 	if tag_cells == True: 
-		cell_names=prepare_tag_cells(cell_names)
 		cell_names=[cell_names[x] + '-' + project for x in range(len(cell_names))]
 
 	if isinstance(path_to_blacklist, str):
@@ -469,7 +468,7 @@ def createcisTopicObjectFromMatrixFile(fragment_matrix_file: str,
 	path_to_fragments: dict, optional
 		A list containing the paths to the fragments files used to generate the :class:`cisTopicObject`. Default: None.
 	sample_id: pd.DataFrame, optional
-		A data frame indicating from which sample each barcode is derived. Required if path_to_fragments is provided. Default: None.
+		A data frame indicating from which sample each barcode is derived. Required if path_to_fragments is provided. Levels must agree with keys in path_to_fragments. Default: None.
 	project: str, optional
 		Name of the cisTopic project. Default: 'cisTopic'
 		
@@ -506,8 +505,12 @@ def createcisTopicObjectFromMatrixFile(fragment_matrix_file: str,
 										is_acc=is_acc,
 										path_to_fragments=path_to_fragments,
 										project=project)
+										
 	if sample_id is not None:
-		cisTopic_obj.addCellData(sample_id)
+		if (isinstance(path_to_fragments, dict)):
+			cisTopic_obj.addCellData(sample_id)
+		else:
+			log.error('Provide path_to_fragments with keys matching levels in sample_id!')
 	return(cisTopic_obj)
 
 def createcisTopicObjectFromFragments(path_to_fragments: str,
@@ -552,7 +555,8 @@ def createcisTopicObjectFromFragments(path_to_fragments: str,
 		Name of the cisTopic project. It will also be used as name for sample_id in the cell_data :class:`cisTopicObject.cell_data`. Default: 'cisTopic'
 	partition: int, optional
 		When using Pandas > 0.21, counting may fail (https://github.com/pandas-dev/pandas/issues/26314). In that case, the fragments data frame is divided in this number of partitions, and after counting data is merged.
-		
+	fragments_df: pd.DataFrame or pr.PyRanges, optional
+		A PyRanges or DataFrame containing chromosome, start, end and assigned barcode for each read, corresponding to te data in path_to_fragments.
 	Return
 	------
 	cisTopicObject

@@ -45,17 +45,17 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 		Path to folder where the fragments bed files per group will be saved.
 	bigwig_path: str
 		Path to folder where the bigwig files per group will be saved.
-	path_to_fragments: str or dict
+	path_to_fragments: str or dict, optional
 		A dictionary of character strings, with sample name as names indicating the path to the fragments file/s from which pseudobulk profiles have to
 		be created. If a :class:`cisTopicObject` is provided as input it will be ignored, but if a cell metadata :class:`pd.DataFrame` is provided it
 		is necessary to provide it. The keys of the dictionary need to match with the sample_id tag added to the index names of the input data frame.
-	sample_id_col: str
+	sample_id_col: str, optional
 		Name of the column containing the sample name per barcode in the input :class:`cisTopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
-	n_cpu: int
+	n_cpu: int, optional
 		Number of cores to use. Default: 1.	
-	normalize_bigwig: bool
+	normalize_bigwig: bool, optional
 		Whether bigwig files should be CPM normalized. Default: True.
-	remove_duplicates: bool
+	remove_duplicates: bool, optional
 		Whether duplicates should be removed before converting the data to bigwig.
 		
 	Return
@@ -158,11 +158,11 @@ def exportPseudoBulk_ray(cell_data: pd.DataFrame,
 		Path to folder where the fragments bed file will be saved.
 	bigwig_path: str
 		Path to folder where the bigwig file will be saved.
-	sample_id_col: str
+	sample_id_col: str, optional
 		Name of the column containing the sample name per barcode in the input :class:`cisTopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
-	normalize_bigwig: bool
+	normalize_bigwig: bool, optional
 		Whether bigwig files should be CPM normalized. Default: True.
-	remove_duplicates: bool
+	remove_duplicates: bool, optional
 		Whether duplicates should be removed before converting the data to bigwig.
 		
 	Return
@@ -232,20 +232,20 @@ def peakCalling(macs_path: str,
 		Path to the output directory. 
 	genome_size: str
 		Effective genome size which is defined as the genome size which can be sequenced. Possible values: 'hs', 'mm', 'ce' and 'dm'.
-	n_cpu: int
+	n_cpu: int, optional
 		Number of cores to use. Default: 1.	
-	input_format: str
+	input_format: str, optional
 		Format of tag file can be ELAND, BED, ELANDMULTI, ELANDEXPORT, SAM, BAM, BOWTIE, BAMPE, or BEDPE. Default is AUTO which will
 		allow MACS to decide the format automatically. Default: 'BEDPE'.
-	shift: int
+	shift: int, optional
 		To set an arbitrary shift in bp. For finding enriched cutting sites (such as in ATAC-seq) a shift of 73 bp is recommended.
 		Default: 73.
-	ext_size: int
+	ext_size: int, optional
 		To extend reads in 5'->3' direction to fix-sized fragment. For ATAC-seq data, a extension of 146 bp is recommended. 
 		Default: 146.
-	keep_dup: str
+	keep_dup: str, optional
 		Whether to keep duplicate tags at te exact same location. Default: 'all'.
-	q_value: float
+	q_value: float, optional
 		The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
 	
 	Return
@@ -295,18 +295,18 @@ def MACS_callPeak_ray(macs_path: str,
 		Path to the output directory. 
 	genome_size: str
 		Effective genome size which is defined as the genome size which can be sequenced. Possible values: 'hs', 'mm', 'ce' and 'dm'.
-	input_format: str
+	input_format: str, optional
 		Format of tag file can be ELAND, BED, ELANDMULTI, ELANDEXPORT, SAM, BAM, BOWTIE, BAMPE, or BEDPE. Default is AUTO which will
 		allow MACS to decide the format automatically. Default: 'BEDPE'.
-	shift: int
+	shift: int, optional
 		To set an arbitrary shift in bp. For finding enriched cutting sites (such as in ATAC-seq) a shift of 73 bp is recommended.
 		Default: 73.
-	ext_size: int
+	ext_size: int, optional
 		To extend reads in 5'->3' direction to fix-sized fragment. For ATAC-seq data, a extension of 146 bp is recommended. 
 		Default: 146.
-	keep_dup: str
+	keep_dup: str, optional
 		Whether to keep duplicate tags at te exact same location. Default: 'all'.
-	q_value: float
+	q_value: float, optional
 		The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
 	
 	Return
@@ -343,18 +343,18 @@ class MACS_callPeak():
 		Path to the output directory. 
 	genome_size: str
 		Effective genome size which is defined as the genome size which can be sequenced. Possible values: 'hs', 'mm', 'ce' and 'dm'.
-	input_format: str
+	input_format: str, optional
 		Format of tag file can be ELAND, BED, ELANDMULTI, ELANDEXPORT, SAM, BAM, BOWTIE, BAMPE, or BEDPE. Default is AUTO which will
 		allow MACS to decide the format automatically. Default: 'BEDPE'.
-	shift: int
+	shift: int, optional
 		To set an arbitrary shift in bp. For finding enriched cutting sites (such as in ATAC-seq) a shift of 73 bp is recommended.
 		Default: 73.
-	ext_size: int
+	ext_size: int, optional
 		To extend reads in 5'->3' direction to fix-sized fragment. For ATAC-seq data, a extension of 146 bp is recommended. 
 		Default: 146.
-	keep_dup: str
+	keep_dup: str, optional
 		Whether to keep duplicate tags at te exact same location. Default: 'all'.
-	q_value: float
+	q_value: float, optional
 		The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
 	"""
 	def __init__(self,
