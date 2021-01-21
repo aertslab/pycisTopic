@@ -448,8 +448,8 @@ def profileTSS(fragments: Union[str, pd.DataFrame],
 		if isinstance(annotation, pr.PyRanges):
 			annotation = annotation.df
 		tss_space_annotation = annotation[['Chromosome', 'Start', 'Strand']]
-		tss_space_annotation.loc[:,'End']=tss_space_annotation.Start+flank_window
-		tss_space_annotation.loc[:,'Start']=tss_space_annotation.Start-flank_window
+		tss_space_annotation['End']=tss_space_annotation['Start']+flank_window
+		tss_space_annotation['Start']=tss_space_annotation['Start']-flank_window
 		tss_space_annotation = tss_space_annotation[["Chromosome", "Start", "End", "Strand"]]
 		tss_space_annotation = pr.PyRanges(tss_space_annotation)
 		log.info('Overlapping fragments with TSS')
@@ -475,9 +475,7 @@ def profileTSS(fragments: Union[str, pd.DataFrame],
 
 		if rolling_window != None:
 			TSS_matrix = TSS_matrix.rolling(window=rolling_window, min_periods=0, axis=1).mean()
-		log.info('Done')
 		TSS_counts=TSS_matrix.values.sum(axis=0)
-		log.info('Done')
 		div=max((np.mean(TSS_counts[-minimum_signal_window:])+np.mean(TSS_counts[0:minimum_signal_window]))/2, min_norm)
 		fig, ax = plt.subplots()
 		ax.plot(range(-flank_window-1,flank_window),TSS_counts/div, color=color)
@@ -596,7 +594,7 @@ def FRIP(fragments: Union[str, pd.DataFrame],
 			blacklist=pr.read_bed(path_to_blacklist)
 			regions=regions.overlap(blacklist, invert=True)
 
-		log.info('Counting total number of fragments')
+		log.info('Counting fragments')
 		fragments_per_barcode_dup = fragments.df.groupby(["Name"]).agg({"Score": np.sum}).rename_axis(None)
 		fragments_per_barcode_dup.columns = ['Total_nr_frag']
 		fragments_per_barcode_nodup = fragments.df.groupby(["Name"]).size().to_frame(name = 'Unique_nr_frag').rename_axis(None)
@@ -771,9 +769,9 @@ def computeQCStats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 			log.info('Computing barcode rank plot for ' + label_list[i])
 			metrics['barcodeRankPlot'] = barcodeRankPlot(fragments = fragments_df,
 														 valid_bc = valid_bc,
-														 path_to_regions=path_to_regions,
 														 n_frag = n_frag,
 														 n_bc = n_bc,
+														 remove_duplicates = remove_duplicates,
 														 plot = False,
 														 return_bc = True,
 														 return_plot_data = True)
@@ -795,6 +793,7 @@ def computeQCStats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 			log.info('Computing insert size distribution for ' + label_list[i])
 			metrics['insertSizeDistribution'] = insertSizeDistribution(fragments=fragments_df,
 																	   valid_bc=valid_bc,
+																	   remove_duplicates=remove_duplicates,
 																	   plot=False,
 																	   return_plot_data=True)
 		# TSS
@@ -810,7 +809,6 @@ def computeQCStats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 											   tss_window=tss_window,
 											   minimum_signal_window = tss_minimum_signal_window,
 											   rolling_window = tss_rolling_window,
-											   remove_duplicates = remove_duplicates,
 											   return_TSS_enrichment_per_barcode=True,
 											   return_TSS_coverage_matrix_per_barcode=True,
 											   return_plot_data=True)
@@ -823,6 +821,7 @@ def computeQCStats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 			metrics['FRIP'] = FRIP(fragments=fragments_df,
 								   path_to_regions=path_to_regions,
 								   valid_bc=valid_bc,
+								   remove_duplicates=remove_duplicates,
 								   n_cpu=n_cpu,
 								   plot=False,
 								   return_plot_data=True)
