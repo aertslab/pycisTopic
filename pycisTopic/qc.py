@@ -11,8 +11,9 @@ from scipy.stats import gaussian_kde
 from scipy.stats import norm
 import sys
 from typing import Optional, Union
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from .cisTopicClass import *
+from .utils import multiplot_from_generator
 
 dtype = pd.SparseDtype(int, fill_value=0)
 plt.ioff()
@@ -419,7 +420,7 @@ def profileTSS(fragments: Union[str, pd.DataFrame],
 	dict
 	A dictionary containing a :class:`pd.DataFrame` with the normalized enrichment score on the TSS for each barcode, a :class:`pd.DataFrame` with the normalized enrichment scores in each position for each barcode and/or a :class:`pd.DataFrame` with the TSS profile plot data.
 	"""
-		# Create logger
+	# Create logger
 	level	= logging.INFO
 	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
 	handlers = [logging.StreamHandler(stream=sys.stdout)]
@@ -632,7 +633,7 @@ def FRIP(fragments: Union[str, pd.DataFrame],
 
 		output={}
 		if return_plot_data == True:
-			output.update({'FRIP' : FPB_FPBIR_DF})
+			output.update({'FRIP_plot_data' : FPB_FPBIR_DF})
 			return output
 
 def metrics2data(metrics: Optional[Dict]):
@@ -649,34 +650,53 @@ def metrics2data(metrics: Optional[Dict]):
 	dict
 		A dictionary containing a :class:`pd.DataFrame` containing barcode-level statistics and a dictionary containing sample-level profiles.
 	"""
+    
+	# Create logger
+	level	= logging.INFO
+	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+	handlers = [logging.StreamHandler(stream=sys.stdout)]
+	logging.basicConfig(level = level, format = format, handlers = handlers)
+	log = logging.getLogger('cisTopic')
+    
 	# Add log total fragments
+	metrics_list = []
+	if 'duplicateRate' in metrics:
+		metrics['duplicateRate']['duplicate_rate_plot_data']['Log_total_nr_frag'] = np.log10(metrics['duplicateRate']['duplicate_rate_plot_data']['Total_nr_frag'])
+		metrics['duplicateRate']['duplicate_rate_plot_data']['Log_unique_nr_frag'] = np.log10(metrics['duplicateRate']['duplicate_rate_plot_data']['Unique_nr_frag'])
+		metrics_list.append(metrics['duplicateRate']['duplicate_rate_plot_data'].iloc[:,[4,5,0,1,2,3]])
 	if 'FRIP' in metrics:
-		metrics['FRIP']['FRIP']['Log_total_nr_frag'] = np.log10(metrics['FRIP']['FRIP']['Total_nr_frag'])
-		metrics['FRIP']['FRIP']['Log_total_nr_frag_in_regions'] = np.log10(metrics['FRIP']['FRIP']['Total_nr_frag_in_regions'])
-		# Metadata per barcode
-		if 'profileTSS' in metrics:
-			metadata_bc = pd.concat([metrics['profileTSS']['TSS_enrichment'], metrics['FRIP']['FRIP']], axis=1, sort=False)
-			metadata_bc = metadata_bc.iloc[:,[1,4,2,5,3,0]] # Reorder
+		if 'duplicateRate' not in metrics:
+			metrics['FRIP']['FRIP_plot_data']['Log_total_nr_frag'] = np.log10(metrics['FRIP']['FRIP_plot_data']['Total_nr_frag'])
+			metrics['FRIP']['FRIP_plot_data']['Log_unique_nr_frag'] = np.log10(metrics['FRIP']['FRIP_plot_data']['Unique_nr_frag'])
+			metrics_list.append(metrics['FRIP']['FRIP_plot_data'].iloc[:,[5,6,0,1,2,3,4]])
 		else:
-			metadata_bc = metrics['FRIP']['FRIP']
-	else:
-		if 'profileTSS' in metrics:
-			metadata_bc = metrics['profileTSS']
-		else:
-			metadata_bc=None
+			metrics_list.append(metrics['FRIP']['FRIP_plot_data'].iloc[:,[2,3,4]])
+	if 'profileTSS' in metrics:
+		metrics_list.append(metrics['profileTSS']['TSS_enrichment'])
+    
+	if len(metrics_list) > 1:
+		metadata_bc = pd.concat(metrics_list, axis=1, sort=False)
+	elif len(metrics_list) == 1:
+		metadata_bc = metrics_list[0]
+	elif len(metrics_list) < 1:
+		log.info('No barcode statistics have been computed')
+		metadara_bc=[]
+    
 	# Plot dict
 	profile_dict={}
 	if 'barcodeRankPlot' in metrics:
 		profile_dict['barcodeRankPlot']=metrics['barcodeRankPlot']['valid_bc_plot_data']
 		selected_bc = len(metrics['barcodeRankPlot']['valid_bc'])
 		profile_dict['barcodeRankPlot']['Selected'] = np.ma.masked_where(profile_dict['barcodeRankPlot']['Barcode_rank'] <= selected_bc, profile_dict['barcodeRankPlot']['Barcode_rank']).mask
+	if 'duplicateRate' in metrics:
+		profile_dict['duplicateRate'] = metrics['duplicateRate']['duplicate_rate_plot_data']
 	if 'insertSizeDistribution' in metrics:
 		profile_dict['insertSizeDistribution']=metrics['insertSizeDistribution']['fragment_size_plot_data']
 	if 'profileTSS' in metrics:
 		profile_dict['profileTSS']=metrics['profileTSS']['TSS_plot_data']
 		profile_dict['profileTSSPerBarcode']=metrics['profileTSS']['TSS_coverage_mat']
 	if 'FRIP' in metrics:
-		profile_dict['FRIP']=metrics['FRIP']['FRIP']
+		profile_dict['FRIP']=metrics['FRIP']['FRIP_plot_data']
 	return metadata_bc, profile_dict
 
 def computeQCStats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
@@ -829,154 +849,235 @@ def computeQCStats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 		metadata_bc, profile_data = metrics2data(metrics)
 		metadata_bc_dict[label_list[i]] = metadata_bc.fillna(0)
 		profile_data_dict[label_list[i]] = profile_data
+		log.info('Sample ' + label_list[i] + ' done!')
 
 	return metadata_bc_dict, profile_data_dict
 
 def plotProfile(profile_data_dict: Dict[str, pd.DataFrame],
-				profile_list: Optional[Union['barcodeRankPlot', 'insertSizeDistribution', 'profileTSS', 'FRIP']] = ['barcodeRankPlot', 'insertSizeDistribution', 'profileTSS', 'FRIP'],
-				color: Optional[List[List[Union[str]]]] = None,
-				plot: Optional[bool] = True,
-				insert_size_distriubtion_xlim: Optional[List[int]] = None,
-				save: Optional[str] = None):
-	"""
-	Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample).
-	
-	Parameters
-	---------
-	profile_data_dict: list of dict
-		Dictionary of dictionaries with keys 'barcodeRankPlot', 'insertSizeDistribution', 'profileTSS' and/or 'FRIP', containing the sample-level profiles for each metric. This dictionary is an output of `metrics2data`.
-	profile_list: list, optional
-		List of the sample-level profiles to plot. Default: All.
-	color: list, optional
-		List containing the colors to each for sample. When using barcodeRankPlot, at least two colors must be provided per sample. Default: None.
-	plot: bool, optional
-		Whether the plots should be returned to the console. Default: True
-	insert_size_distriubtion_xlim: list, optional
-		A list with two numbers that indicate the x axis limits. Default: None
-	save: str, optional
-		Output file to save plot. Default: None.
-	"""
-	# Create logger
-	level	= logging.INFO
-	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-	handlers = [logging.StreamHandler(stream=sys.stdout)]
-	logging.basicConfig(level = level, format = format, handlers = handlers)
-	log = logging.getLogger('cisTopic')
-	
-	if save is not None:
-		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
+                profile_list: Optional[Union['barcodeRankPlot', 'duplicateRate', 'insertSizeDistribution', 'profileTSS', 'FRIP']] = ['barcodeRankPlot', 'duplicateRate', 'insertSizeDistribution', 'profileTSS', 'FRIP'],
+                remove_duplicates: Optional[bool] = True,
+                color: Optional[List[List[Union[str]]]] = None,
+                cmap: Optional[str] = None, 
+                ncol: Optional[int] = 1,
+                figsize: Optional[Tuple[int,int]] = None,
+                insert_size_distriubtion_xlim: Optional[List[int]] = None,
+                plot: Optional[bool] = True,
+                save: Optional[str] = None):
+    
+    """
+    Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample).
+    
+    Parameters
+    ---------
+    profile_data_dict: list of dict
+        Dictionary of dictionaries with keys 'barcodeRankPlot', 'insertSizeDistribution', 'profileTSS' and/or 'FRIP', containing the sample-level profiles for each metric. This dictionary is an output of `metrics2data`.
+    profile_list: list, optional
+        List of the sample-level profiles to plot. Default: All.
+    remove_duplicates: optional, bool
+        Whether duplicated should not be considered for the barcode rank plot. Default: True
+    color: list, optional
+        List containing the colors to each for sample. When using barcodeRankPlot, at least two colors must be provided per sample. Default: None.
+    cmap: list, optional
+        Color map to color the plot by density for the duplicate rate plot. Default: None
+    ncol: int, optional
+        Number of columns for grid plot. If 1 each plot will be drawn independently, while the number of rows is automatically adjusted. Default: 1.
+    figsize: tuple, optional
+        Figure size. If drawing each plot independently it corresponds to the size of each plot, if using grid plotting it will correspond to the total size of the figure.
+    insert_size_distriubtion_xlim: list, optional
+        A list with two numbers that indicate the x axis limits. Default: None
+    plot: bool, optional
+        Whether the plots should be returned to the console. Default: True
+    save: str, optional
+        Output file to save plot. Default: None.
+    """
+    
+    plot_profile_generator=plotProfile_generator(profile_data_dict=profile_data_dict,
+                profile_list = profile_list,
+                remove_duplicates = remove_duplicates,
+                color = color,
+                cmap = cmap, 
+                plot = plot,
+                insert_size_distriubtion_xlim = insert_size_distriubtion_xlim)
+    
+    multiplot_from_generator(g=plot_profile_generator,
+                             num_columns=ncol,
+                             n_plots=len(profile_list),
+                             figsize=figsize,
+                             plot=plot,
+                             save=save)
 
-	# Prepare labels
-	label_list = list(profile_data_dict.keys())
 
-	# Check if it is only one sample, without sample name as entry in dict
-	if isinstance(profile_data_dict[label_list[0]], pd.DataFrame):
-		profile_data_dict = {'Sample 0': profile_data_dict}
-		label_list = list(profile_data_dict.keys())
+def plotProfile_generator(profile_data_dict: Dict[str, pd.DataFrame],
+                profile_list: Optional[Union['barcodeRankPlot', 'duplicateRate', 'insertSizeDistribution', 'profileTSS', 'FRIP']] = ['barcodeRankPlot', 'duplicateRate', 'insertSizeDistribution', 'profileTSS', 'FRIP'],
+                remove_duplicates: Optional[bool] = True,
+                color: Optional[List[List[Union[str]]]] = None,
+                cmap: Optional[str] = None, 
+                insert_size_distriubtion_xlim: Optional[List[int]] = None):
+    """
+    Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample). This function creates the generator to pass to the multiplotting function.
+    
+    Parameters
+    ---------
+    profile_data_dict: list of dict
+        Dictionary of dictionaries with keys 'barcodeRankPlot', 'insertSizeDistribution', 'profileTSS' and/or 'FRIP', containing the sample-level profiles for each metric. This dictionary is an output of `metrics2data`.
+    profile_list: list, optional
+        List of the sample-level profiles to plot. Default: All.
+    remove_duplicates: optional, bool
+        Whether duplicated should not be considered for the barcode rank plot. Default: True
+    color: list, optional
+        List containing the colors to each for sample. When using barcodeRankPlot, at least two colors must be provided per sample. Default: None.
+    cmap: list, optional
+        Color map to color the plot by density for the duplicate rate plot.
+    insert_size_distriubtion_xlim: list, optional
+        A list with two numbers that indicate the x axis limits. Default: None
+    """
+    # Create logger
+    level    = logging.INFO
+    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level = level, format = format, handlers = handlers)
+    log = logging.getLogger('cisTopic')
+    
 
-	# Rank plot
-	if 'barcodeRankPlot' in profile_list:
-		fig=plt.figure()
-		legend_labels=[]
-		for i in range(len(profile_data_dict)):
-			if 'barcodeRankPlot' not in profile_data_dict[label_list[i]]:
-				log.error('barcodeRankPlot is not included in the profiles dictionary')
-			plot_data = profile_data_dict[label_list[i]]['barcodeRankPlot']
-			
-			sel=np.ma.masked_where(plot_data['Selected'] == True, plot_data['Barcode_rank'])
-			nosel=np.ma.masked_where(plot_data['Selected'] == False, plot_data['Barcode_rank'])
-			
-			if color is None:
-				plt.plot(nosel, plot_data['Total_nr_frag'], sel,plot_data['Total_nr_frag'])
-			else:
-				if len(color[i]) < 2:
-					plt.plot(nosel, plot_data['Total_nr_frag'], sel, plot_data['Total_nr_frag'])
-				else:
-					plt.plot(nosel, plot_data['Total_nr_frag'], color[i][0], sel ,plot_data['Total_nr_frag'], color[i][1])
-			plt.xscale("log")
-			plt.yscale("log")
-			plt.xlabel("Barcode Rank",fontsize=10)
-			plt.ylabel("Number of fragments in regions",fontsize=10)
-			legend_labels.append(f'{label_list[i]} - Selected BC: {sum(sel.mask)}')
-			legend_labels.append(f'{label_list[i]} - Non-selected BC: {plot_data.shape[0]-sum(sel.mask)}')
-		plt.legend(legend_labels)
-		if save is not None:
-			pdf.savefig(fig, bbox_inches='tight')
-		if plot is not False:
-			plt.show()
-	# Fragment size
-	if 'insertSizeDistribution' in profile_list:
-		fig=plt.figure()
-		for i in range(len(profile_data_dict)):
-			if 'insertSizeDistribution' not in profile_data_dict[label_list[i]]:
-				log.error('insertSizeDistribution is not included in the profiles dictionary')
-			plot_data = profile_data_dict[label_list[i]]['insertSizeDistribution']
-			if color is not None:
-				if len(color[i]) > 2:
-					selected_color = color[i][0]
-				else:
-					selected_color = None
-			else:
-				selected_color = None
-			plt.plot(plot_data['Width'], plot_data['Perc_frag'], color=selected_color)
-			plt.xlabel("Fragment size",fontsize=10)
-			plt.ylabel("Percentage of fragments",fontsize=10)
-			if insert_size_distriubtion_xlim != None:
-				plt.xlim(insert_size_distriubtion_xlim[0], insert_size_distriubtion_xlim[1])
-		plt.legend(label_list)
-		if save is not None:
-			pdf.savefig(fig, bbox_inches='tight')
-		if plot is not False:
-			plt.show()
-	# TSS
-	if 'profileTSS' in profile_list:
-		fig=plt.figure()
-		for i in range(len(profile_data_dict)):
-			if 'profileTSS' not in profile_data_dict[label_list[i]]:
-				log.error('profileTSS is not included in the profiles dictionary')
-			plot_data = profile_data_dict[label_list[i]]['profileTSS']
-			if color is not None:
-				if len(color[i]) > 2:
-					selected_color = color[i][0]
-				else:
-					selected_color = None
-			else:
-				selected_color = None
-			plt.plot(plot_data['Position'], plot_data['TSS_enrichment'], color=selected_color)
-			plt.xlim(min(plot_data['Position']), max(plot_data['Position']))
-			plt.xlabel("Position from TSS",fontsize=10)
-			plt.ylabel("Normalized enrichment",fontsize=10)
-		plt.legend(label_list)
-		if save is not None:
-			pdf.savefig(fig, bbox_inches='tight')
-		if plot is not False:
-			plt.show()
-	# FRIP
-	if 'FRIP' in profile_list:
-		fig=plt.figure()
-		for i in range(len(profile_data_dict)):
-			if 'FRIP' not in profile_data_dict[label_list[i]]:
-				log.error('FRIP is not included in the profiles dictionary')
-			plot_data = profile_data_dict[label_list[i]]['FRIP']
-			if color is not None:
-				if len(color[i]) > 2:
-					selected_color = color[i][0]
-				else:
-					selected_color = None
-			else:
-				selected_color = None
-			sns.distplot(plot_data['FRIP'], hist = False, kde = True, color=selected_color, label = label_list[i])
-			plt.xlabel("FRIP",fontsize=10)
-		plt.legend(label_list)
-		if save is not None:
-			pdf.savefig(fig, bbox_inches='tight')
-		if plot is not False:
-			plt.show()
-		else:
-			plt.close(fig)
+    # Prepare labels
+    label_list = list(profile_data_dict.keys())
 
-	if save != None:
-		pdf.close()
+    # Check if it is only one sample, without sample name as entry in dict
+    if isinstance(profile_data_dict[label_list[0]], pd.DataFrame):
+        profile_data_dict = {'Sample': profile_data_dict}
+        label_list = list(profile_data_dict.keys())
+
+    # Rank plot
+    if 'barcodeRankPlot' in profile_list:     
+        yield
+
+        legend_labels=[]
+        for i in range(len(profile_data_dict)):
+            if 'barcodeRankPlot' not in profile_data_dict[label_list[i]]:
+                log.error('barcodeRankPlot is not included in the profiles dictionary')
+            plot_data = profile_data_dict[label_list[i]]['barcodeRankPlot']
+            
+            sel=np.ma.masked_where(plot_data['Selected'] == True, plot_data['Barcode_rank'])
+            nosel=np.ma.masked_where(plot_data['Selected'] == False, plot_data['Barcode_rank'])
+            
+            if remove_duplicates == False:
+                NF=plot_data['Total_nr_frag']
+            else:
+                NF=plot_data['Unique_nr_frag']
+            
+            if color is None:
+                plt.plot(nosel, NF, sel, NF)
+            else:
+                if len(color[i]) < 2:
+                    plt.plot(nosel, NF, sel, NF)
+                else:
+                    plt.plot(nosel, NF, color[i][0], sel , NF, color[i][1])
+                        
+            plt.xscale("log")
+            plt.yscale("log")
+            plt.xlabel("Barcode Rank",fontsize=10)
+            plt.ylabel("Number of fragments in regions",fontsize=10)
+            
+            if (len(label_list) > 1) | (label_list[0] != ''):
+                legend_labels.append(f'{label_list[i]} - Selected BC: {sum(sel.mask)}')
+                legend_labels.append(f'{label_list[i]} - Non-selected BC: {plot_data.shape[0]-sum(sel.mask)}')
+            else:
+                legend_labels.append(f'Selected BC: {sum(sel.mask)}')
+                legend_labels.append(f'Non-selected BC: {plot_data.shape[0]-sum(sel.mask)}')
+                
+            plt.legend(legend_labels)
+
+    # Fragment size
+    if 'insertSizeDistribution' in profile_list:
+        yield
+            
+        for i in range(len(profile_data_dict)):
+            if 'insertSizeDistribution' not in profile_data_dict[label_list[i]]:
+                log.error('insertSizeDistribution is not included in the profiles dictionary')
+            plot_data = profile_data_dict[label_list[i]]['insertSizeDistribution']
+            if color is not None:
+                if len(color[i]) > 2:
+                    selected_color = color[i][0]
+                else:
+                    selected_color = None
+            else:
+                selected_color = None
+
+            plt.plot(plot_data['Width'], plot_data['Perc_frag'], color=selected_color)
+            plt.xlabel("Fragment size",fontsize=10)
+            plt.ylabel("Percentage of fragments",fontsize=10)
+            if insert_size_distriubtion_xlim != None:
+                plt.xlim(insert_size_distriubtion_xlim[0], insert_size_distriubtion_xlim[1])
+        if (len(label_list) > 1) | (label_list[0] != ''):
+            plt.legend(label_list)
+            
+    # TSS
+    if 'profileTSS' in profile_list:
+        yield
+        
+        for i in range(len(profile_data_dict)):
+            if 'profileTSS' not in profile_data_dict[label_list[i]]:
+                log.error('profileTSS is not included in the profiles dictionary')
+            plot_data = profile_data_dict[label_list[i]]['profileTSS']
+            if color is not None:
+                if len(color[i]) > 2:
+                    selected_color = color[i][0]
+                else:
+                    selected_color = None
+            else:
+                selected_color = None
+                
+            plt.plot(plot_data['Position'], plot_data['TSS_enrichment'], color=selected_color)
+                
+            plt.xlim(min(plot_data['Position']), max(plot_data['Position']))
+            plt.xlabel("Position from TSS",fontsize=10)
+            plt.ylabel("Normalized enrichment",fontsize=10)
+        if (len(label_list) > 1) | (label_list[0] != ''):
+            plt.legend(label_list)
+
+    # FRIP
+    if 'FRIP' in profile_list:
+        yield
+        
+        for i in range(len(profile_data_dict)):
+            if 'FRIP' not in profile_data_dict[label_list[i]]:
+                log.error('FRIP is not included in the profiles dictionary')
+            plot_data = profile_data_dict[label_list[i]]['FRIP']
+            if color is not None:
+                if len(color[i]) > 2:
+                    selected_color = color[i][0]
+                else:
+                    selected_color = None
+            else:
+                selected_color = None
+
+            sns.distplot(plot_data['FRIP'], hist = False, kde = True, color=selected_color, label = label_list[i])
+            plt.xlabel("FRIP",fontsize=10)
+            
+    # Duplicate rate        
+    if 'duplicateRate' in profile_list:
+        for i in range(len(profile_data_dict)):
+            yield
+            if 'duplicateRate' not in profile_data_dict[label_list[i]]:
+                log.error('duplicateRate is not included in the profiles dictionary')
+            
+            plot_data = profile_data_dict[label_list[i]]['duplicateRate']
+            x = plot_data['Unique_nr_frag']
+            y = plot_data['Dupl_rate']
+    
+            xy = np.vstack([x,y])
+            z = gaussian_kde(xy)(xy)
+            idx = z.argsort()
+            x, y, z = x[idx], y[idx], z[idx]
+
+            plt.scatter(x, y, c=z, s=10,  edgecolor='', cmap=cmap)
+            plt.title(label_list[i])
+            plt.ylim(0,1)
+            plt.xscale("log")
+            plt.xlabel("Number of (unique) fragments",fontsize=10)
+            plt.ylabel("Duplication rate",fontsize=10)
+            plt.colorbar().set_label('Density')
+
 
 def plotBarcodeProfileTSS(tss_profile_per_barcode: pd.DataFrame,
 					  barcode: Union[List[str],str],

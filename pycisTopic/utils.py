@@ -140,3 +140,47 @@ def prepare_tag_cells(cell_names):
 	new_cell_names = [re.findall(r"^[ACGT]*-[0-9]+-", x)[0].rstrip('-') if len(re.findall(r"^[ACGT]*-[0-9]+-", x)) != 0 else x for x in cell_names]
 	new_cell_names = [re.findall(r"^\w*-", new_cell_names[i])[0].rstrip('-') if (len(re.findall(r"^\w*-", new_cell_names[i])) != 0) & (new_cell_names[i] == cell_names[i]) else new_cell_names[i] for i in range(len(new_cell_names))]
 	return new_cell_names
+	
+def multiplot_from_generator(g, num_columns, n_plots, figsize=None, plot=True, save=None):
+    if save is not None:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(save)
+    # call 'next(g)' to get past the first 'yield'
+    next(g)
+    # default to 15-inch rows, with square subplots
+    if figsize is None:
+        if num_columns == 1:
+            figsize = (5, 5)
+        else:
+            num_rows = np.ceil(n_plots/num_columns)
+            figsize = (6.4*num_columns, 4.8*num_rows)
+              
+    if num_columns > 1:
+        fig=plt.figure(figsize=figsize) 
+        num_rows = np.ceil(n_plots/num_columns)
+    plot = 0    
+    try:
+        while True:
+            # call plt.figure once per row
+            if num_columns == 1:
+                fig=plt.figure(figsize=figsize)
+                ax = plt.subplot(1, 1, 1)
+                if save is not None:
+                        pdf.savefig(fig, bbox_inches='tight')
+            if num_columns > 1:
+                ax = plt.subplot(num_rows, num_columns, plot+1)
+                ax.autoscale(enable=True)
+                plot = plot + 1
+            next(g)
+    except StopIteration:
+        if num_columns == 1:
+            if save is not None:
+                pdf.savefig(fig, bbox_inches='tight')
+        pass
+    if num_columns > 1:
+        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+        if save is not None:
+            pdf.savefig(fig, bbox_inches='tight')
+    if save != None:
+        pdf.close()
+    if plot == False:
+    	plt.close()
