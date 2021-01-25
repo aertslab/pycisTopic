@@ -556,7 +556,7 @@ def createcisTopicObjectFromFragments(path_to_fragments: str,
 	partition: int, optional
 		When using Pandas > 0.21, counting may fail (https://github.com/pandas-dev/pandas/issues/26314). In that case, the fragments data frame is divided in this number of partitions, and after counting data is merged.
 	fragments_df: pd.DataFrame or pr.PyRanges, optional
-		A PyRanges or DataFrame containing chromosome, start, end and assigned barcode for each read, corresponding to te data in path_to_fragments.
+		A PyRanges or DataFrame containing chromosome, start, end and assigned barcode for each read, corresponding to the data in path_to_fragments.
 	Return
 	------
 	cisTopicObject

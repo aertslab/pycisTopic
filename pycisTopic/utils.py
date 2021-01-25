@@ -1,8 +1,11 @@
 import pandas as pd
 import numpy as np
 import math
+import matplotlib.backends.backend_pdf
+import matplotlib.pyplot as plt
 import pyranges as pr
 import re
+
 
 def regionNamesToCoordinates(regionNames):
     chrom=pd.DataFrame([i.split(':', 1)[0] for i in regionNames])
