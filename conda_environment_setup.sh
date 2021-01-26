@@ -8,10 +8,11 @@ conda create -n pycisTopic_env python=3.7.4
 conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
-conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama ray
+conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama
 conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing fit-sne
 conda install ipykernel  # for Jupyter
 pip install -U "tmtoolkit[recommended]"
+pip install ray # https://docs.ray.io/en/master/installation.html
 
 ## pyscenic (required for pycisTopic)
 conda install -c anaconda xlrd cytoolz
