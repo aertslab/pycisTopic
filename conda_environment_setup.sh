@@ -2,10 +2,10 @@ ssh ...
 my_conda_initialize
 
 # Create conda environment 
-conda create -n pyCisTopic_env python=3.7.4
+conda create -n pycisTopic_env python=3.7.4
 
 # Install dependencies (& any extra packages)
-conda activate pyCisTopic_env
+conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
 conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama ray
@@ -13,7 +13,7 @@ conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx
 conda install ipykernel  # for Jupyter
 pip install -U "tmtoolkit[recommended]"
 
-## pyScenic (required for pyCisTopic)
+## pyscenic (required for pycisTopic)
 conda install -c anaconda xlrd cytoolz
 pip install pyscenic
 
