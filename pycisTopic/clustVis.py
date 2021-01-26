@@ -17,7 +17,7 @@ import sys
 import umap
 
 from typing import Optional, Union
-from typing import List, Iterable
+from typing import Dict, List, Iterable
 
 from pycisTopic.cisTopicClass import *
 
@@ -190,8 +190,6 @@ def runTSNE(cisTopic_obj: 'cisTopicObject',
 			selected_topics: Optional[List[int]] = None,
 		    selected_cells: Optional[List[str]] = None,
 		    harmony: Optional[bool] = False):
-    
-    
     """
 	Run tSNE and add it to the dimensionality reduction dictionary. 
 	
@@ -262,26 +260,34 @@ def runTSNE(cisTopic_obj: 'cisTopicObject',
 
 def plotMetaData(cisTopic_obj: 'cisTopicObject',
  				 reduction_name: str,
-  				 variable: str,
+  				 variables: List[str],
   				 target: Optional[str] = 'cell',
   				 cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis, 
   				 s: Optional[int] = 10, 
   				 alpha: Optional[Union[float, int]] = 1, 
-  				 seed=123, 
-  				 color_dictionary={}, 
-  				 selected_cells=None,
-  				 save=None):
-    cell_data=cisTopic_obj.cell_data
-    embedding=cisTopic_obj.projections[reduction_name]
-    if selected_cells != None:
-        cell_data=cell_data.loc[selected_cells]
-        embedding=embedding.loc[selected_cells]
-    cell_data=cell_data.loc[embedding.index.to_list()]
+  				 seed: Optional[int] = 123, 
+  				 color_dictionary: Optional[Dict[str,str]] = {}, 
+  				 selected_features: Optional[List[str]] = None,
+  				 save: Optional[str] = None):
+  				 
+    if target == 'cell':
+    	data_mat = cisTopic_obj.cell_data
+    if target == 'region':
+    	data_mat = cisTopic_obj.region_data
+    	
+    embedding = cisTopic_obj.projections[target][reduction_name]
+    
+    if selected_features != None:
+        data_mat = data_mat.loc[selected_features]
+        embedding = embedding.loc[selected_features]
+        
+    data_mat=data_mat.loc[embedding.index.to_list()]
+    
     if save != None:
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
-    for var in variable:
-        fig=plt.figure()
-        var_data=cell_data.loc[:,var].to_list()
+    for var in variables:
+        fig = plt.figure()
+        var_data = data_mat.loc[:,var].to_list()
         if isinstance(var_data[0], str):
             categories = set(var_data)
             try:
@@ -290,7 +296,7 @@ def plotMetaData(cisTopic_obj: 'cisTopicObject',
                 random.seed(seed)
                 color = list(map(lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),range(len(categories))))
                 color_dict = dict(zip(categories, color))
-            plt.scatter(embedding.iloc[:, 0], embedding.iloc[:, 1], c=cell_data.loc[:,var].apply(lambda x: color_dict[x]), s=s, alpha=alpha)
+            plt.scatter(embedding.iloc[:, 0], embedding.iloc[:, 1], c=data_mat.loc[:,var].apply(lambda x: color_dict[x]), s=s, alpha=alpha)
             plt.xlabel(embedding.columns[0])
             plt.ylabel(embedding.columns[1])
             plt.title(var)
@@ -321,7 +327,18 @@ def plotMetaData(cisTopic_obj: 'cisTopicObject',
         pdf = pdf.close()
 
 
-def plotTopic(cisTopic_obj, reduction_name, topic=None, cmap=cm.viridis, s=10, alpha=1, scale=False, selected_topics=None,  selected_cells=None, harmony=False, save=None):
+def plotTopic(cisTopic_obj: 'cisTopicObject',
+			  reduction_name: str,
+			  target: Optional[str] = 'cell',
+			  cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis, 
+  			  s: Optional[int] = 10, 
+  			  alpha: Optional[Union[float, int]] = 1,
+  			  scale: Optional[bool] = False,
+  			  selected_topics: Optional[List[int]] = None,
+  			  selected_features: Optional[List[str]] = None,
+  			  harmony: Optional[bool] = False,
+  			  save: Optional[str] =None):
+  			  
     embedding=cisTopic_obj.projections[reduction_name]
     model=cisTopic_obj.selected_model
     if harmony == True:
@@ -342,10 +359,10 @@ def plotTopic(cisTopic_obj, reduction_name, topic=None, cmap=cm.viridis, s=10, a
         cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
     cell_topic = cell_topic.transpose()
     
-    if topic == None:
+    if selected_topics == None:
         topic = cell_topic.columns.to_list()
     else:
-        topic = ['Topic'+str(t) for t in topic]
+        topic = ['Topic'+str(t) for t in selected_topics]
 
     if save != None:
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
@@ -375,7 +392,15 @@ def plotTopic(cisTopic_obj, reduction_name, topic=None, cmap=cm.viridis, s=10, a
     if save != None:
         pdf.close()
 
-def plotImputedFeatures(cisTopic_obj, reduction_name, imputed_data, features, cmap=cm.viridis, s=10, alpha=1, selected_cells=None, save=None):
+def plotImputedFeatures(cisTopic_obj: 'cisTopicObject',
+						reduction_name: str,
+						imputed_data: 'cisTopicImputedFeatures',
+						features: List[str],
+						cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis, 
+  			  			s: Optional[int] = 10, 
+  			  			alpha: Optional[Union[float, int]] = 1,
+						selected_cells: Optional[List[str]] = None,
+						save: Optional[str] = None):
     if save != None:
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
     for feature in features:
@@ -407,7 +432,19 @@ def plotImputedFeatures(cisTopic_obj, reduction_name, imputed_data, features, cm
     if save != None:
         pdf = pdf.close()
 
-def cellTopicHeatmap(cisTopic_obj, variables, scale=False, cluster_topics=False, color_dict={}, seed=123, legend_loc_x=1.2, legend_loc_y=-0.5, legend_dist_y=-1, selected_topics=None, selected_cells=None, harmony=False, save=None):
+def cellTopicHeatmap(cisTopic_obj: 'cisTopicObject',
+					 variables: Optional[List[str]] = None,
+					 scale: Optional[bool] = False,
+					 cluster_topics: Optional[bool] = False, 
+					 color_dict: Optional[Dict[str,Dict[str,str]]] = {}, 
+					 seed: Optional[int] = 123,
+					 legend_loc_x: Optional[float] = 1.2,
+					 legend_loc_y: Optional[float] = -0.5,
+					 legend_dist_y: Optional[float] = -1,
+					 selected_topics: Optional[List[int]] = None,
+					 selected_cells: Optional[List[str]] = None,
+					 harmony: Optional[bool] = False,
+					 save: Optional[str] = None):
     model=cisTopic_obj.selected_model
     if harmony == True:
         cell_topic=model.cell_topic_harmony
@@ -430,27 +467,26 @@ def cellTopicHeatmap(cisTopic_obj, variables, scale=False, cluster_topics=False,
     cell_topic = cell_topic.loc[var_data.index.to_list(),:]
     df = pd.concat([cell_topic, var_data], axis=1, sort=False)
     topic_order = df.groupby(var).mean().idxmax().sort_values().index.to_list()
-    cell_topic = cell_topic.loc[:,topic_order]
+    cell_topic = cell_topic.loc[:,topic_order].T
     # Color dict
     col_colors={}
-    for var in variables:
-        var_data = cell_data.loc[:,var].sort_values()
-        categories = set(var_data)
-        try:
-            color_dict = color_dictionary[var]
-        except:
-            random.seed(seed)
-            color = list(map(lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),range(len(categories))))
-            color = [mcolors.to_rgb(x) for x in color]
-            color_dict[var] = dict(zip(categories, color))
-        col_colors[var] = var_data.map(color_dict[var])
-        seed=seed+1
+    if variables is not None:
+    	for var in variables:
+        	var_data = cell_data.loc[:,var].sort_values()
+        	categories = set(var_data)
+        	try:
+            	color_dict = color_dictionary[var]
+        	except:
+            	random.seed(seed)
+            	color = list(map(lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),range(len(categories))))
+            	color = [mcolors.to_rgb(x) for x in color]
+            	color_dict[var] = dict(zip(categories, color))
+        	col_colors[var] = var_data.map(color_dict[var])
+        	seed=seed+1
+    	col_colors = pd.concat([col_colors[var] for var in variables], axis=1, sort=False)
 
-    cell_topic = cell_topic.transpose()
-    col_colors = pd.concat([col_colors[var] for var in variables], axis=1, sort=False)
-
-    fig=plt.figure()
-    g=sns.clustermap(cell_topic,
+    	fig=plt.figure()
+    	g=sns.clustermap(cell_topic,
                      row_cluster=cluster_topics,
                      col_cluster=False,
                      col_colors=col_colors,
@@ -458,26 +494,36 @@ def cellTopicHeatmap(cisTopic_obj, variables, scale=False, cluster_topics=False,
                      xticklabels=False,
                      figsize=(8,8))
         
-    cbar = g.cax
-    cbar.set_position([legend_loc_x, 0.55, 0.05, 0.2])
-    g.ax_col_dendrogram.set_visible(False)
-    g.ax_row_dendrogram.set_visible(False)
+    	cbar = g.cax
+    	cbar.set_position([legend_loc_x, 0.55, 0.05, 0.2])
+    	g.ax_col_dendrogram.set_visible(False)
+   		g.ax_row_dendrogram.set_visible(False)
                      
-    pos= legend_loc_y
-    for key in color_dict:
-        patchList = []
-        for subkey in color_dict[key]:
-                data_key = mpatches.Patch(color=color_dict[key][subkey], label=subkey)
-                patchList.append(data_key)
-        legend = plt.legend(handles=patchList, bbox_to_anchor=(legend_loc_x, pos), loc="center", title=key)
-        ax = plt.gca().add_artist(legend)
-        pos += legend_dist_y
+    	pos= legend_loc_y
+    	for key in color_dict:
+        	patchList = []
+        	for subkey in color_dict[key]:
+                	data_key = mpatches.Patch(color=color_dict[key][subkey], label=subkey)
+                	patchList.append(data_key)
+        	legend = plt.legend(handles=patchList, bbox_to_anchor=(legend_loc_x, pos), loc="center", title=key)
+        	ax = plt.gca().add_artist(legend)
+        	pos += legend_dist_y
+    else:
+    	g=sns.clustermap(cell_topic,
+                row_cluster=cluster_topics,
+                col_cluster=False,
+                cmap=cm.viridis,
+                xticklabels=False,
+                figsize=(8,8))
 
     if save != None:
         g.savefig(save, bbox_inches='tight')
     plt.show()
 
-def harmony(cisTopic_obj, vars_use, scale=True, random_state = 0):
+def harmony(cisTopic_obj: 'cisTopicObject',
+			vars_use: List[str],
+			scale: Optional[bool] = True,
+			random_state: Optional[seed] = 555):
     cell_data=cisTopic_obj.cell_data
     model= cisTopic_obj.selected_model
     cell_topic=model.cell_topic
