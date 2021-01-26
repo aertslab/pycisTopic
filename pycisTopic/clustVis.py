@@ -1,24 +1,65 @@
+import fitsne
+import harmonypy as hm
+import igraph as ig
+import leidenalg as la
+import logging
+import matplotlib.backends.backend_pdf
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import pandas as pd
+import random
+import seaborn as sns
+import sklearn
 from sklearn.neighbors import kneighbors_graph
 import sys
-import leidenalg as la
-import igraph as ig
-import pandas as pd
 import umap
-import sklearn
-import random
-import matplotlib.patches as mpatches
-import fitsne
-import matplotlib.colors as mcolors
-import matplotlib.cm as cm
-import seaborn as sns
-import matplotlib.pyplot as plt
-import logging
-import harmonypy as hm
-import matplotlib.backends.backend_pdf
+
+from typing import Optional, Union
+from typing import List, Iterable
+
 from pycisTopic.cisTopicClass import *
 
-
-def findClusters(cisTopic_obj, k=10, res=0.6, seed=555, scale=False, prefix='', selected_topics=None, selected_cells=None, harmony=False):
+def findClusters(cisTopic_obj: 'cisTopicObject',
+				 target: Optional[str] = 'cell',
+				 k: Optional[int] = 10,
+				 res: Optional[float] = 0.6,
+				 seed: Optional[int] = 555,
+				 scale: Optional[bool] = False,
+				 prefix: Optional[str] = '',
+				 selected_topics: Optional[List[int]] = None,
+				 selected_features: Optional[List[str]] = None,
+				 harmony : Optional[bool] =False):
+				 
+	"""
+	Performing leiden cell or region clustering and add results to cisTopic object's metadata. 
+	
+	Parameters
+	---------
+	cisTopic_obj: `class::cisTopicObject`
+		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	target: str, optional
+		Whether cells ('cell') or regions ('region') should be clustered. Default: 'cell'
+	k: int, optional
+		Number of neighbours in the k-neighbours graph. Default: 10
+	res: float, optional
+		Resolution parameter for the leiden algorithm step. Default: 0.6
+	seed: int, optional
+		Seed parameter for the leiden algorithm step. Default: 555
+	scale: bool, optional
+		Whether to scale the cell-topic or topic-regions contributions prior to the clustering. Default: False
+	prefix: str, optional
+		Prefix to add to the clustering name when adding it to the correspondent metadata attribute. Default: ''
+	selected_topics: list, optional
+		A list with selected topics to be used for clustering. Default: None (use all topics)
+	selected_features: list, optional
+		A list with selected features (cells or regions) to cluster. This is recommended when working with regions (e.g. selecting 
+		regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
+	harmony: bool, optional
+		If target is 'cell', whether to use harmony processed topic contributions. Default: False.
+	"""
+	
     # Create cisTopic logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -28,24 +69,30 @@ def findClusters(cisTopic_obj, k=10, res=0.6, seed=555, scale=False, prefix='', 
     
     log.info(f"Finding neighbours")
     model=cisTopic_obj.selected_model
-    if harmony == True:
-        cell_topic=model.cell_topic_harmony
-        prefix='harmony_'+prefix
-    else:
-        cell_topic=model.cell_topic
-
-    cell_names=cisTopic_obj.cell_names
     
+    if target == 'cell':
+    	if (harmony == True):
+        	data_mat=model.cell_topic_harmony
+        	prefix='harmony_'+prefix
+    	else:
+        	data_mat=model.cell_topic
+
+    	data_names=cisTopic_obj.cell_names
+    	
+    if target == 'region':
+    	data_mat=model.topic_region.T
+    	data_names=cisTopic_obj.region_names
+     
     if selected_topics != None:
-        cell_topic=cell_topic.loc[['Topic' + str(x) for x in selected_topics],]
-    if selected_cells != None:
-        cell_topic=cell_topic.loc[:,selected_cells]
-        cell_names=selected_cells
+        data_mat=data_mat.loc[['Topic' + str(x) for x in selected_topics],:]
+    if selected_features != None:
+        data_mat=data_mat[selected_features]
+        data_names=selected_cells
     
     if scale == True:
-        cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
-    cell_topic = cell_topic.transpose()
-    A = kneighbors_graph(cell_topic, k)
+        data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
+    data_mat = data_mat.T
+    A = kneighbors_graph(data_mat, k)
     sources, targets = A.nonzero()
     G = ig.Graph(directed=True)
     G.add_vertices(A.shape[0])
@@ -53,11 +100,45 @@ def findClusters(cisTopic_obj, k=10, res=0.6, seed=555, scale=False, prefix='', 
     G.add_edges(edges)
     log.info(f"Finding clusters")
     partition = la.find_partition(G, la.RBConfigurationVertexPartition, resolution_parameter = res, seed = seed)
-    cluster = pd.DataFrame(partition.membership, index=cell_names, columns=[prefix + 'Leiden_' + str(k) + '_' + str(res)]).astype(str)
-    cisTopic_obj.addCellData(cluster)
-    return cisTopic_obj
+    cluster = pd.DataFrame(partition.membership, index=data_names, columns=[prefix + 'leiden_' + str(k) + '_' + str(res)]).astype(str)
+    if target == 'cell':
+    	cisTopic_obj.addCellData(cluster)
+    if target == 'region':
+    	cisTopic_obj.addRegionData(cluster)
 
-def runUMAP(cisTopic_obj, scale=False, reduction_name='UMAP', random_state=123, selected_topics=None, selected_cells=None, harmony=False):
+def runUMAP(cisTopic_obj: 'cisTopicObject',
+			target: Optional[str] = 'cell',
+			scale: Optional[bool] = False,
+			reduction_name: Optional[str] = 'UMAP',
+		    random_state: Optional[int] = 555,
+		    selected_topics: Optional[List[int]] = None,
+		    selected_cells: Optional[List[str]] = None,
+		    harmony: Optional[bool] = False):
+	
+	"""
+	Run UMAP and add it to the dimensionality reduction dictionary. 
+	
+	Parameters
+	---------
+	cisTopic_obj: `class::cisTopicObject`
+		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	target: str, optional
+		Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
+	scale: bool, optional
+		Whether to scale the cell-topic or topic-regions contributions prior to the dimensionality reduction. Default: False
+	reduction_name: str, optional
+		Reduction name to use as key in the dimensionality reduction dictionary. Default: 'UMAP'
+	random_state: int, optional
+		Seed parameter for running UMAP. Default: 555
+	selected_topics: list, optional
+		A list with selected topics to be used for clustering. Default: None (use all topics)
+	selected_features: list, optional
+		A list with selected features (cells or regions) to cluster. This is recommended when working with regions (e.g. selecting 
+		regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
+	harmony: bool, optional
+		If target is 'cell', whether to use harmony processed topic contributions. Default: False.
+	"""
+		    
     # Create cisTopic logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -66,31 +147,76 @@ def runUMAP(cisTopic_obj, scale=False, reduction_name='UMAP', random_state=123, 
     log = logging.getLogger('cisTopic')
     
     model=cisTopic_obj.selected_model
-    if harmony == True:
-        cell_topic=model.cell_topic_harmony
-    else:
-        cell_topic=model.cell_topic
-    cell_names=cisTopic_obj.cell_names
     
+    if target == 'cell':
+    	if (harmony == True):
+        	data_mat=model.cell_topic_harmony
+        	prefix='harmony_'+prefix
+    	else:
+        	data_mat=model.cell_topic
+
+    	data_names=cisTopic_obj.cell_names
+    	
+    if target == 'region':
+    	data_mat=model.topic_region.T
+    	data_names=cisTopic_obj.region_names
+     
     if selected_topics != None:
-        cell_topic=cell_topic.loc[['Topic' + str(x) for x in selected_topics],]
-    if selected_cells != None:
-        cell_topic=cell_topic.loc[:,selected_cells]
-        cell_names=selected_cells
+        data_mat=data_mat.loc[['Topic' + str(x) for x in selected_topics],:]
+    if selected_features != None:
+        data_mat=data_mat[selected_features]
+        data_names=selected_cells
     
     if scale == True:
-        cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
-    cell_topic = cell_topic.transpose()
+        data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
+    
+    data_mat = data_mat.T
 
     log.info(f"Running UMAP")
     reducer=umap.UMAP(random_state=random_state)
-    embedding = reducer.fit_transform(cell_topic)
-    dr = pd.DataFrame(embedding, index=cell_names, columns=['UMAP_1', 'UMAP_2'])
-    dr = dr.loc[cell_names]
-    cisTopic_obj.projections[reduction_name] = dr
-    return cisTopic_obj
+    embedding = reducer.fit_transform(data_mat)
+    dr = pd.DataFrame(embedding, index=data_names, columns=['UMAP_1', 'UMAP_2'])
+    if target == 'cell':
+    	cisTopic_obj.projections['cell'][reduction_name] = dr
+    if target == 'region':
+    	cisTopic_obj.projections['region'][reduction_name] = dr
 
-def runTSNE(cisTopic_obj, scale=False, reduction_name='tSNE', seed=123, perplexity=30, selected_topics=None, selected_cells=None, harmony=False):
+def runTSNE(cisTopic_obj: 'cisTopicObject',
+			target: Optional[str] = 'cell',
+			scale: Optional[bool] = False,
+			reduction_name: Optional[str] = 'tSNE',
+			seed: Optional[int] = 555,
+			perplexity: Optional[int] = 30,
+			selected_topics: Optional[List[int]] = None,
+		    selected_cells: Optional[List[str]] = None,
+		    harmony: Optional[bool] = False):
+    
+    
+    """
+	Run tSNE and add it to the dimensionality reduction dictionary. 
+	
+	Parameters
+	---------
+	cisTopic_obj: `class::cisTopicObject`
+		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	target: str, optional
+		Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
+	scale: bool, optional
+		Whether to scale the cell-topic or topic-regions contributions prior to the dimensionality reduction. Default: False
+	reduction_name: str, optional
+		Reduction name to use as key in the dimensionality reduction dictionary. Default: 'tSNE'
+	random_state: int, optional
+		Seed parameter for running UMAP. Default: 555
+	perplexity: int, optional
+		Perplexity parameter for FitSNE. Default: 30
+	selected_topics: list, optional
+		A list with selected topics to be used for clustering. Default: None (use all topics)
+	selected_features: list, optional
+		A list with selected features (cells or regions) to cluster. This is recommended when working with regions (e.g. selecting 
+		regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
+	harmony: bool, optional
+		If target is 'cell', whether to use harmony processed topic contributions. Default: False.
+	"""
     # Create cisTopic logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -100,31 +226,51 @@ def runTSNE(cisTopic_obj, scale=False, reduction_name='tSNE', seed=123, perplexi
     
     
     model=cisTopic_obj.selected_model
-    if harmony == True:
-        cell_topic=model.cell_topic_harmony
-        prefix='harmony_'
-    else:
-        cell_topic=model.cell_topic
-    cell_names=cisTopic_obj.cell_names
     
+    if target == 'cell':
+    	if (harmony == True):
+        	data_mat=model.cell_topic_harmony
+        	prefix='harmony_'+prefix
+    	else:
+        	data_mat=model.cell_topic
+
+    	data_names=cisTopic_obj.cell_names
+    	
+    if target == 'region':
+    	data_mat=model.topic_region.T
+    	data_names=cisTopic_obj.region_names
+     
     if selected_topics != None:
-        cell_topic=cell_topic.loc[['Topic' + str(x) for x in selected_topics],]
-    if selected_cells != None:
-        cell_topic=cell_topic.loc[:,selected_cells]
-        cell_names=selected_cells
+        data_mat=data_mat.loc[['Topic' + str(x) for x in selected_topics],:]
+    if selected_features != None:
+        data_mat=data_mat[selected_features]
+        data_names=selected_cells
     
     if scale == True:
-        cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
-    cell_topic = cell_topic.transpose()
+        data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
+    
+    data_mat = data_mat.T
 
     log.info(f"Running tSNE")
-    embedding = fitsne.FItSNE(np.ascontiguousarray(cell_topic.to_numpy()), rand_seed=seed, perplexity=perplexity)
-    dr = pd.DataFrame(embedding, index=cell_names, columns=['tSNE_1', 'tSNE_2'])
-    dr = dr.loc[cell_names]
-    cisTopic_obj.projections[reduction_name] = dr
-    return cisTopic_obj
+    embedding = fitsne.FItSNE(np.ascontiguousarray(data_mat.to_numpy()), rand_seed=seed, perplexity=perplexity)
+    dr = pd.DataFrame(embedding, index=data_names, columns=['tSNE_1', 'tSNE_2'])
 
-def plotMetaData(cisTopic_obj, reduction_name, variable, cmap=cm.viridis, s=10, alpha=1, seed=123, color_dictionary={}, selected_cells=None, save=None):
+	if target == 'cell':
+    	cisTopic_obj.projections['cell'][reduction_name] = dr
+    if target == 'region':
+    	cisTopic_obj.projections['region'][reduction_name] = dr
+
+def plotMetaData(cisTopic_obj: 'cisTopicObject',
+ 				 reduction_name: str,
+  				 variable: str,
+  				 target: Optional[str] = 'cell',
+  				 cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis, 
+  				 s: Optional[int] = 10, 
+  				 alpha: Optional[Union[float, int]] = 1, 
+  				 seed=123, 
+  				 color_dictionary={}, 
+  				 selected_cells=None,
+  				 save=None):
     cell_data=cisTopic_obj.cell_data
     embedding=cisTopic_obj.projections[reduction_name]
     if selected_cells != None:
