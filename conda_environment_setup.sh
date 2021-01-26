@@ -50,6 +50,7 @@ conda install cython
 conda install -c bioconda pyBigWig 
 pip install pyscenic # tmtoolkit 0.10.0 requires pandas<1.2,>=1.1.0, but you have pandas 0.25.3 which is incompatible.
 conda install pandas 
+pip install pybiomart
 
 
 
