@@ -9,10 +9,9 @@ conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
 conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama
-conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing fit-sne smart_open
+conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing fit-sne
 conda install ipykernel  # for Jupyter
 pip install -U "tmtoolkit[recommended]"
-pip install ray # https://docs.ray.io/en/master/installation.html
 
 ## pyscenic (required for pycisTopic)
 conda install -c anaconda xlrd cytoolz
@@ -38,3 +37,17 @@ import pycisTopic
 conda install scikit-learn statsmodels numba pytables
 conda install -c conda-forge python-igraph louvain multicore-tsne
 # pip install scanpy   #  ERROR: anndata 0.7.5 has requirement pandas!=1.1,>=1.0, but you'll have pandas 0.25.3 which is incompatible.
+
+#########
+# trying to run tutorial: some still missing...
+pip install ray # https://docs.ray.io/en/master/installation.html
+# needed to re-install (why??):
+conda install -c conda-forge gensim 
+conda install smart_open==2.0.0
+pip install lda  # no longer works with conda-forge...
+conda install cython
+
+
+
+
+
