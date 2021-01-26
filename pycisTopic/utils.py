@@ -3,6 +3,7 @@ import numpy as np
 import math
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
+from PIL import Image
 import pyranges as pr
 import re
 
@@ -187,3 +188,12 @@ def multiplot_from_generator(g, num_columns, n_plots, figsize=None, plot=True, s
         pdf.close()
     if plot == False:
     	plt.close()
+
+def fig2img(fig):
+    """Convert a Matplotlib figure to a PIL Image and return it"""
+    import io
+    buf = io.BytesIO()
+    fig.savefig(buf, bbox_inches='tight', dpi=500)
+    buf.seek(0)
+    img = Image.open(buf)
+    return img
