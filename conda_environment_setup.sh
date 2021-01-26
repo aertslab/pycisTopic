@@ -48,6 +48,7 @@ conda install smart_open==2.0.0
 pip install lda  # no longer works with conda-forge...
 conda install cython
 conda install -c bioconda pyBigWig 
+pip install pyscenic
 
 
 
