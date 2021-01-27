@@ -52,4 +52,8 @@ pip install pyscenic # tmtoolkit 0.10.0 requires pandas<1.2,>=1.1.0, but you hav
 pip install pybiomart
 conda install pandas==1.2.0  # important
 
+#########
+# After installing any new package, check pandas version. It keeps getting downgraded:
+conda list | grep pandas
+
 
