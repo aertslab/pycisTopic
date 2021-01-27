@@ -9,10 +9,12 @@ conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
 conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart
-conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing fit-sne adjusttext
+conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing adjusttext
 conda install ipykernel  # for Jupyter
 pip install ray # https://docs.ray.io/en/master/installation.html
 pip install -U "tmtoolkit[recommended]"
+conda install -c conda-forge cython fftw # for fitsne
+pip install fitsne
 
 ## pyscenic (required for pycisTopic)
 conda install -c anaconda xlrd cytoolz
