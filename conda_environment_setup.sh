@@ -9,7 +9,7 @@ conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
 conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart
-conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing fit-sne
+conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing fit-sne adjusttext
 conda install ipykernel  # for Jupyter
 pip install ray # https://docs.ray.io/en/master/installation.html
 pip install -U "tmtoolkit[recommended]"
@@ -49,8 +49,7 @@ pip install lda  # no longer works with conda-forge...
 conda install cython
 conda install -c bioconda pyBigWig 
 pip install pyscenic # tmtoolkit 0.10.0 requires pandas<1.2,>=1.1.0, but you have pandas 0.25.3 which is incompatible.
-conda install pandas 
 pip install pybiomart
-
+conda install pandas==1.2.0  # important
 
 
