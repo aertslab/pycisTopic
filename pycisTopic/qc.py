@@ -1234,7 +1234,7 @@ def plotBarcodeMetrics(input_metrics: Union[Dict, pd.DataFrame, 'cisTopicObject'
 			selected_cells=plotBarcodeMetricsPerGroup(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot=False, save=None)
 			if save is not None:
 				pdf = matplotlib.backends.backend_pdf.PdfPages(save)
-
+			plt.close()
 			fig = plt.figure()
 			grouped = [(v, d.loc[:,var_x].dropna().values) for v, d in input_metrics.groupby(var_group)]
 			sample, data = zip(*grouped)
@@ -1375,9 +1375,10 @@ def plotBarcodeMetricsPerGroup(input_metrics: Dict,
 			idx = z.argsort()
 			x, y, z = x[idx], y[idx], z[idx]
 			#Plot xy
+			plt.close()
 			fig = plt.figure(figsize=(5, 5))
 			fig.add_axes([0, 0, 0.8, 0.8])
-			plt.scatter(x, y, c=z, s=10,  edgecolor='', cmap=cmap)
+			plt.scatter(x, y, c=z, s=10,  edgecolor=None, cmap=cmap)
 			plt.xlabel(var_x, fontsize=10)
 			plt.ylabel(var_y, fontsize=10)
 			plt.xlim(min(x), max(x))
@@ -1425,6 +1426,7 @@ def plotBarcodeMetricsPerGroup(input_metrics: Dict,
 				plt.close(fig)
 
 		else:
+			plt.close()
 			fig = plt.figure()
 			if isinstance(var_y, str):
 				log.info('The given var_y is not a column in cisTopic_obj.cell_data')
