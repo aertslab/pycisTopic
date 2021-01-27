@@ -8,14 +8,17 @@ conda create -n pycisTopic_env python=3.7.4
 conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
-conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama
-conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing fit-sne
+conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart
+conda install -c conda-forge loompy igraph leidenalg lda IPython gensim networkx typing adjusttext gcc openssl 
 conda install ipykernel  # for Jupyter
+pip install ray # https://docs.ray.io/en/master/installation.html
 pip install -U "tmtoolkit[recommended]"
+conda install -c conda-forge cython fftw # for fitsne
+pip install fitsne
 
 ## pyscenic (required for pycisTopic)
 conda install -c anaconda xlrd cytoolz
-pip install pyscenic
+pip install pyscenic # incompatible version with the one required by tmtoolkit
 
 # conda list
 # These "imports" are not listed in conda but are available (i.e. default from python? or installed through another dependency?):
@@ -39,15 +42,20 @@ conda install -c conda-forge python-igraph louvain multicore-tsne
 # pip install scanpy   #  ERROR: anndata 0.7.5 has requirement pandas!=1.1,>=1.0, but you'll have pandas 0.25.3 which is incompatible.
 
 #########
-# trying to run tutorial: some still missing...
+# trying to run tutorial... started complainin about missing...
 pip install ray # https://docs.ray.io/en/master/installation.html
 # needed to re-install (why??):
 conda install -c conda-forge gensim 
 conda install smart_open==2.0.0
 pip install lda  # no longer works with conda-forge...
 conda install cython
+conda install -c bioconda pyBigWig 
+pip install pyscenic # tmtoolkit 0.10.0 requires pandas<1.2,>=1.1.0, but you have pandas 0.25.3 which is incompatible.
+pip install pybiomart
+conda install pandas==1.2.0  # important
 
-
-
+#########
+# After installing any new package, check pandas version. It keeps getting downgraded:
+conda list | grep pandas
 
 
