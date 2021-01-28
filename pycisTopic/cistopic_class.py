@@ -408,7 +408,7 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
 	selected_regions = non_zero_rows(binary_matrix)
 	fragment_matrix = fragment_matrix[selected_regions,]
 	binary_matrix = binary_matrix[selected_regions,]
-	region_names = subsetList(region_names, selected_regions)
+	region_names = subset_list(region_names, selected_regions)
 	
 	cisTopic_nr_frag=np.array(fragment_matrix.sum(axis=0)).flatten()
 	cisTopic_nr_acc=np.array(binary_matrix.sum(axis=0)).flatten()

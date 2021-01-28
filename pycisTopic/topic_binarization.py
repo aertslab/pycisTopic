@@ -23,8 +23,38 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
 	cistopic_obj: `class::CistopicObject`
 		A cisTopic object with a model in `class::CistopicObject.selected_model`.
 	method: str, optional
-		Method to use for topic binarization. Possible options are: 'otsu' []
-	
+		Method to use for topic binarization. Possible options are: 'otsu' [Otsu, 1979], 'yen' [Yen et al., 1995], 'li'
+		[Li & Lee, 1993] or 'ntop' [Taking the top n regions per topic]. Default: 'otsu'
+	smooth_topics: bool, optional
+		Whether to smooth topics distributions to penalize regions enriched across many topics. The formula applied is
+		\eqn{\beta_{w, k} (\log\beta_{w,k} - 1 / K \sum_{k'} \log \beta_{w,k'})}
+	ntop: int, optional
+		Number of top regions to select when using method='ntop'. Default: 2000
+	nbins: int, optional
+		Number of bins to use in the histogram used for otsu, yen and li thresholding. Default: 100
+	plot: bool, optional
+		Whether to plot region-topic distributions and their threshold. Default: False
+	figsize: tuple, optional
+		Size of the figure. If num_columns is 1, this is the size for each figure; if num_columns is above 1, this is the overall size of the figure (if keeping
+		default, it will be the size of each subplot in the figure). Default: (6.4, 4.8)
+	num_columns: int, optional
+		For multiplot figures, indicates the number of columns (the number of rows will be automatically determined based on the number of plots). Default: 1
+	save: str, optional
+		Path to save plot. Default: None.
+		
+	Return
+	---------
+	dict
+		A dictionary containing a pd.DataFrame with the selected regions with region names as indexes and a topic score 
+		column.
+		
+	References
+	---------	
+	Otsu, N., 1979. A threshold selection method from gray-level histograms. IEEE transactions on systems, man, and 
+	cybernetics, 9(1), pp.62-66.
+	Yen, J.C., Chang, F.J. and Chang, S., 1995. A new criterion for automatic multilevel thresholding. IEEE Transactions on 
+	Image Processing, 4(3), pp.370-378.
+	Li, C.H. and Lee, C.K., 1993. Minimum cross entropy thresholding. Pattern recognition, 26(4), pp.617-625.
 	"""
 	# Create cisTopic logger
 	level	= logging.INFO
@@ -90,6 +120,18 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
 	return binarized_topics
 
 def smooth_topics(topic_region):
+	"""
+	Smooth topic-region distributions.
+	
+	Parameters
+	---------
+	topic_region: `class::pd.DataFrame`
+		A pandas dataframe with topic-region distributions (with topics as columns and regions as rows)
+
+	Return
+	---------
+	pd.DataFrame
+	"""
 	topic_region_np = np.apply_along_axis(norm, 1, topic_region.values)
 	topic_region = pd.DataFrame(topic_region_np, index=topic_region.index.tolist(), columns=topic_region.columns)
 	return topic_region
