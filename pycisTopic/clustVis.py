@@ -152,7 +152,6 @@ def runUMAP(cisTopic_obj: 'cisTopicObject',
 	if target == 'cell':
 		if (harmony == True):
 			data_mat=model.cell_topic_harmony
-			prefix='harmony_'+prefix
 		else:
 			data_mat=model.cell_topic
 
@@ -233,7 +232,6 @@ def runTSNE(cisTopic_obj: 'cisTopicObject',
 	if target == 'cell':
 		if (harmony == True):
 			data_mat=model.cell_topic_harmony
-			prefix='harmony_'+prefix
 		else:
 			data_mat=model.cell_topic
 
@@ -291,7 +289,7 @@ def plotMetaData(cisTopic_obj: 'cisTopicObject',
 	Parameters
 	---------
 	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with dimensionality reductions in `class::cisTopicObject.dr`.
+		A cisTopic object with dimensionality reductions in `class::cisTopicObject.projections`.
 	reduction_name: str
 		Name of the dimensionality reduction to use
 	variables: list
@@ -455,7 +453,7 @@ def plotTopic(cisTopic_obj: 'cisTopicObject',
 	Parameters
 	---------
 	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with dimensionality reductions in `class::cisTopicObject.dr`.
+		A cisTopic object with dimensionality reductions in `class::cisTopicObject.projections`.
 	reduction_name: str
 		Name of the dimensionality reduction to use
 	target: str, optional
@@ -564,6 +562,7 @@ def plotImputedFeatures(cisTopic_obj: 'cisTopicObject',
 						reduction_name: str,
 						imputed_data: 'cisTopicImputedFeatures',
 						features: List[str],
+						scale: Optional[bool] = False,
 						cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis, 
 						dot_size: Optional[int] = 10, 
 						alpha: Optional[Union[float, int]] = 1,
@@ -584,6 +583,8 @@ def plotImputedFeatures(cisTopic_obj: 'cisTopicObject',
 		A `class::cisTopicImputedFeatures` object derived from the input cisTopic object.
 	features: list
 		Names of the features to plot.
+	scale: bool, optional
+		Whether to scale the imputed features prior to plotting. Default: False
 	cmap: str or 'matplotlib.cm', optional
 		For continuous variables, color map to use for the legend color bar. Default: cm.viridis
 	dot_size: int, optional
@@ -618,6 +619,8 @@ def plotImputedFeatures(cisTopic_obj: 'cisTopicObject',
 			embedding=embedding.loc[selected_cells]
 		feature_index = getPositionIndex([feature], imputed_data.feature_names)
 		feature_data = imputed_data.mtx[feature_index,:]
+		if scale == True:
+            feature_data=sklearn.preprocessing.scale(feature_data.todense(), axis=1)
 		if isinstance(feature_data, sparse.csr_matrix):
 			color_data = pd.DataFrame(feature_data.transpose().todense(), index=embedding.index.tolist())
 		else:
@@ -655,7 +658,7 @@ def cellTopicHeatmap(cisTopic_obj: 'cisTopicObject',
 					 scale: Optional[bool] = False,
 					 cluster_topics: Optional[bool] = False, 
 					 color_dict: Optional[Dict[str,Dict[str,str]]] = {}, 
-					 seed: Optional[int] = 123,
+					 seed: Optional[int] = 555,
 					 legend_loc_x: Optional[float] = 1.2,
 					 legend_loc_y: Optional[float] = -0.5,
 					 legend_dist_y: Optional[float] = -1,
@@ -670,26 +673,37 @@ def cellTopicHeatmap(cisTopic_obj: 'cisTopicObject',
 	Parameters
 	---------
 	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with dimensionality reductions in `class::cisTopicObject.dr`.
+		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	variables: list
+		List of variables to plot. They should be included in `class::cisTopicObject.cell_data` and `class::cisTopicObject.region_data`, depending on which 
+		target is specified.
+	remove_nan: bool, optional
+		Whether to remove data points for which the variable value is 'nan'. Default: True
 	reduction_name: str
 		Name of the dimensionality reduction to use
-	imputed_data: `class::cisTopicImputedFeatures`
-		A `class::cisTopicImputedFeatures` object derived from the input cisTopic object.
-	features: list
-		Names of the features to plot.
-	cmap: str or 'matplotlib.cm', optional
-		For continuous variables, color map to use for the legend color bar. Default: cm.viridis
-	dot_size: int, optional
-		Dot size in the plot. Default: 10
-	alpha: float, optional
-		Transparency value for the dots in the plot. Default: 1
-	selected_cells: list, optional
-		A list with selected cells to plot. Default: None (use all cells)
+	scale: bool, optional
+		Whether to scale the cell-topic or topic-regions contributions prior to plotting. Default: False
+	cluster_topics: bool, optional
+		Whether to cluster rows in the heatmap. Otherwise, they will be ordered based on the maximum values over the ordered cells. Default: False
+	color_dictionary: dict, optional
+		A dictionary containing an entry per variable, whose values are dictionaries with variable levels as keys and corresponding colors as values.
+		Default: None
+	seed: int, optional
+		Random seed used to select random colors. Default: 555
+	legend_loc_x: float, optional
+		X location for legend. Default: 1.2
+	legend_loc_y: float, optional
+		Y location for legend. Default: -0.5
+	legend_dist_y: float, optional
+		Y distance between legends. Default: -1
 	figsize: tuple, optional
-		Size of the figure. If num_columns is 1, this is the size for each figure; if num_columns is above 1, this is the overall size of the figure (if keeping
-		default, it will be the size of each subplot in the figure). Default: (6.4, 4.8)
-	num_columns: int, optional
-		For multiplot figures, indicates the number of columns (the number of rows will be automatically determined based on the number of plots). Default: 1
+		Size of the figure. Default: (6.4, 4.8)
+	selected_topics: list, optional
+		A list with selected topics to be used for plotting. Default: None (use all topics)
+	selected_cellss: list, optional
+		A list with selected cells to plot. Default: None (use all cells)
+	harmony: bool, optional
+		If target is 'cell', whether to use harmony processed topic contributions. Default: False
 	save: str, optional
 		Path to save plot. Default: None.
 	"""
@@ -776,6 +790,26 @@ def harmony(cisTopic_obj: 'cisTopicObject',
 			vars_use: List[str],
 			scale: Optional[bool] = True,
 			random_state: Optional[int] = 555):
+	"""
+	Apply harmony batch effect correction (Korsunsky et al, 2019) over cell-topic distribution
+	
+	Parameters
+	---------
+	cisTopic_obj: `class::cisTopicObject`
+		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	vars_use: list
+		List of variables to correct batch effect with.
+	scale: bool, optional
+		Whether to scale probability matrix prior to correction. Default: True
+	random_state: int, optional
+		Random seed used to use with harmony. Default: 555
+	
+	References
+	---------
+	Korsunsky, I., Millard, N., Fan, J., Slowikowski, K., Zhang, F., Wei, K., ... & Raychaudhuri, S. (2019). Fast, sensitive and accurate integration of 
+	single-cell data with Harmony. Nature methods, 16(12), 1289-1296.
+	"""
+	
 	cell_data=cisTopic_obj.cell_data
 	model= cisTopic_obj.selected_model
 	cell_topic=model.cell_topic
@@ -785,7 +819,6 @@ def harmony(cisTopic_obj: 'cisTopicObject',
 	ho = hm.run_harmony(cell_topic, cell_data, vars_use, random_state=random_state)
 	cell_topic_harmony = pd.DataFrame(ho.Z_corr, index=model.cell_topic.index.to_list(), columns=model.cell_topic.columns)
 	cisTopic_obj.selected_model.cell_topic_harmony = cell_topic_harmony
-	return cisTopic_obj
 
 
 
