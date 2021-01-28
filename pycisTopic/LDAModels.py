@@ -19,7 +19,7 @@ import sys
 import tempfile
 import tmtoolkit
 from typing import Optional, Union
-from typing import List, Iterable
+from typing import List, Iterable, Tuple
 import warnings
 import xml.etree.ElementTree as et
 import zipfile
