@@ -20,9 +20,9 @@ import umap
 from typing import Optional, Union
 from typing import Dict, List, Tuple
 
-from pycisTopic.cisTopicClass import *
+from .cistopic_class import *
 
-def findClusters(cisTopic_obj: 'cisTopicObject',
+def find_clusters(cistopic_obj: 'CistopicObject',
 				 target: Optional[str] = 'cell',
 				 k: Optional[int] = 10,
 				 res: Optional[float] = 0.6,
@@ -38,8 +38,8 @@ def findClusters(cisTopic_obj: 'cisTopicObject',
 	
 	Parameters
 	---------
-	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with a model in `class::CistopicObject.selected_model`.
 	target: str, optional
 		Whether cells ('cell') or regions ('region') should be clustered. Default: 'cell'
 	k: int, optional
@@ -69,7 +69,7 @@ def findClusters(cisTopic_obj: 'cisTopicObject',
 	log = logging.getLogger('cisTopic')
 	
 	log.info(f"Finding neighbours")
-	model=cisTopic_obj.selected_model
+	model=cistopic_obj.selected_model
 	
 	if target == 'cell':
 		if (harmony == True):
@@ -78,11 +78,11 @@ def findClusters(cisTopic_obj: 'cisTopicObject',
 		else:
 			data_mat=model.cell_topic
 
-		data_names=cisTopic_obj.cell_names
+		data_names=cistopic_obj.cell_names
 		
 	if target == 'region':
 		data_mat=model.topic_region.T
-		data_names=cisTopic_obj.region_names
+		data_names=cistopic_obj.region_names
 	 
 	if selected_topics != None:
 		data_mat=data_mat.loc[['Topic' + str(x) for x in selected_topics],:]
@@ -103,11 +103,11 @@ def findClusters(cisTopic_obj: 'cisTopicObject',
 	partition = la.find_partition(G, la.RBConfigurationVertexPartition, resolution_parameter = res, seed = seed)
 	cluster = pd.DataFrame(partition.membership, index=data_names, columns=[prefix + 'leiden_' + str(k) + '_' + str(res)]).astype(str)
 	if target == 'cell':
-		cisTopic_obj.addCellData(cluster)
+		cistopic_obj.add_cell_data(cluster)
 	if target == 'region':
-		cisTopic_obj.addRegionData(cluster)
+		cistopic_obj.add_region_data(cluster)
 
-def runUMAP(cisTopic_obj: 'cisTopicObject',
+def run_umap(cistopic_obj: 'CistopicObject',
 			target: Optional[str] = 'cell',
 			scale: Optional[bool] = False,
 			reduction_name: Optional[str] = 'UMAP',
@@ -121,8 +121,8 @@ def runUMAP(cisTopic_obj: 'cisTopicObject',
 	
 	Parameters
 	---------
-	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with a model in `class::CistopicObject.selected_model`.
 	target: str, optional
 		Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
 	scale: bool, optional
@@ -147,7 +147,7 @@ def runUMAP(cisTopic_obj: 'cisTopicObject',
 	logging.basicConfig(level = level, format = format, handlers = handlers)
 	log = logging.getLogger('cisTopic')
 	
-	model=cisTopic_obj.selected_model
+	model=cistopic_obj.selected_model
 	
 	if target == 'cell':
 		if (harmony == True):
@@ -155,11 +155,11 @@ def runUMAP(cisTopic_obj: 'cisTopicObject',
 		else:
 			data_mat=model.cell_topic
 
-		data_names=cisTopic_obj.cell_names
+		data_names=cistopic_obj.cell_names
 		
 	if target == 'region':
 		data_mat=model.topic_region.T
-		data_names=cisTopic_obj.region_names
+		data_names=cistopic_obj.region_names
 	 
 	if selected_topics != None:
 		data_mat=data_mat.loc[['Topic' + str(x) for x in selected_topics],:]
@@ -177,11 +177,11 @@ def runUMAP(cisTopic_obj: 'cisTopicObject',
 	embedding = reducer.fit_transform(data_mat)
 	dr = pd.DataFrame(embedding, index=data_names, columns=['UMAP_1', 'UMAP_2'])
 	if target == 'cell':
-		cisTopic_obj.projections['cell'][reduction_name] = dr
+		cistopic_obj.projections['cell'][reduction_name] = dr
 	if target == 'region':
-		cisTopic_obj.projections['region'][reduction_name] = dr
+		cistopic_obj.projections['region'][reduction_name] = dr
 
-def runTSNE(cisTopic_obj: 'cisTopicObject',
+def run_tsne(cistopic_obj: 'CistopicObject',
 			target: Optional[str] = 'cell',
 			scale: Optional[bool] = False,
 			reduction_name: Optional[str] = 'tSNE',
@@ -195,8 +195,8 @@ def runTSNE(cisTopic_obj: 'cisTopicObject',
 	
 	Parameters
 	---------
-	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with a model in `class::CistopicObject.selected_model`.
 	target: str, optional
 		Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
 	scale: bool, optional
@@ -227,7 +227,7 @@ def runTSNE(cisTopic_obj: 'cisTopicObject',
 	log = logging.getLogger('cisTopic')
 	
 	
-	model=cisTopic_obj.selected_model
+	model=cistopic_obj.selected_model
 	
 	if target == 'cell':
 		if (harmony == True):
@@ -235,11 +235,11 @@ def runTSNE(cisTopic_obj: 'cisTopicObject',
 		else:
 			data_mat=model.cell_topic
 
-		data_names=cisTopic_obj.cell_names
+		data_names=cistopic_obj.cell_names
 		
 	if target == 'region':
 		data_mat=model.topic_region.T
-		data_names=cisTopic_obj.region_names
+		data_names=cistopic_obj.region_names
 	 
 	if selected_topics != None:
 		data_mat=data_mat.loc[['Topic' + str(x) for x in selected_topics],:]
@@ -262,11 +262,11 @@ def runTSNE(cisTopic_obj: 'cisTopicObject',
 	dr = pd.DataFrame(embedding, index=data_names, columns=['tSNE_1', 'tSNE_2'])
 
 	if target == 'cell':
-		cisTopic_obj.projections['cell'][reduction_name] = dr
+		cistopic_obj.projections['cell'][reduction_name] = dr
 	if target == 'region':
-		cisTopic_obj.projections['region'][reduction_name] = dr
+		cistopic_obj.projections['region'][reduction_name] = dr
 
-def plotMetaData(cisTopic_obj: 'cisTopicObject',
+def plot_metadata(cistopic_obj: 'CistopicObject',
 				   reduction_name: str,
 				   variables: List[str],
 				   target: Optional[str] = 'cell',
@@ -288,12 +288,12 @@ def plotMetaData(cisTopic_obj: 'cisTopicObject',
 	
 	Parameters
 	---------
-	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with dimensionality reductions in `class::cisTopicObject.projections`.
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with dimensionality reductions in `class::CistopicObject.projections`.
 	reduction_name: str
 		Name of the dimensionality reduction to use
 	variables: list
-		List of variables to plot. They should be included in `class::cisTopicObject.cell_data` and `class::cisTopicObject.region_data`, depending on which 
+		List of variables to plot. They should be included in `class::CistopicObject.cell_data` and `class::CistopicObject.region_data`, depending on which 
 		target is specified.
 	target: str, optional
 		Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
@@ -328,11 +328,11 @@ def plotMetaData(cisTopic_obj: 'cisTopicObject',
 		Path to save plot. Default: None.
 	"""
 	if target == 'cell':
-		data_mat = cisTopic_obj.cell_data
+		data_mat = cistopic_obj.cell_data
 	if target == 'region':
-		data_mat = cisTopic_obj.region_data
+		data_mat = cistopic_obj.region_data
 		
-	embedding = cisTopic_obj.projections[target][reduction_name]
+	embedding = cistopic_obj.projections[target][reduction_name]
 	
 	if selected_features != None:
 		data_mat = data_mat.loc[selected_features]
@@ -433,7 +433,7 @@ def plotMetaData(cisTopic_obj: 'cisTopicObject',
 		pdf = pdf.close()
 
 
-def plotTopic(cisTopic_obj: 'cisTopicObject',
+def plot_topic(cistopic_obj: 'CistopicObject',
 				reduction_name: str,
 				target: Optional[str] = 'cell',
 				cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis, 
@@ -452,8 +452,8 @@ def plotTopic(cisTopic_obj: 'cisTopicObject',
 	
 	Parameters
 	---------
-	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with dimensionality reductions in `class::cisTopicObject.projections`.
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with dimensionality reductions in `class::CistopicObject.projections`.
 	reduction_name: str
 		Name of the dimensionality reduction to use
 	target: str, optional
@@ -482,8 +482,8 @@ def plotTopic(cisTopic_obj: 'cisTopicObject',
 		Path to save plot. Default: None.
 	"""
 				
-	embedding=cisTopic_obj.projections[target][reduction_name]
-	model=cisTopic_obj.selected_model
+	embedding=cistopic_obj.projections[target][reduction_name]
+	model=cistopic_obj.selected_model
 	
 	if target == 'cell':
 		if harmony == True:
@@ -558,7 +558,7 @@ def plotTopic(cisTopic_obj: 'cisTopicObject',
 	if save != None:
 		pdf.close()
 
-def plotImputedFeatures(cisTopic_obj: 'cisTopicObject',
+def plot_imputed_features(cistopic_obj: 'CistopicObject',
 						reduction_name: str,
 						imputed_data: 'cisTopicImputedFeatures',
 						features: List[str],
@@ -575,8 +575,8 @@ def plotImputedFeatures(cisTopic_obj: 'cisTopicObject',
 	
 	Parameters
 	---------
-	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with dimensionality reductions in `class::cisTopicObject.dr`.
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with dimensionality reductions in `class::CistopicObject.dr`.
 	reduction_name: str
 		Name of the dimensionality reduction to use
 	imputed_data: `class::cisTopicImputedFeatures`
@@ -614,7 +614,7 @@ def plotImputedFeatures(cisTopic_obj: 'cisTopicObject',
 	fig = plt.figure(figsize=figsize)
 		
 	for feature in features:
-		embedding=cisTopic_obj.projections['cell'][reduction_name]
+		embedding=cistopic_obj.projections['cell'][reduction_name]
 		if selected_cells != None:
 			embedding=embedding.loc[selected_cells]
 		feature_index = getPositionIndex([feature], imputed_data.feature_names)
@@ -652,7 +652,7 @@ def plotImputedFeatures(cisTopic_obj: 'cisTopicObject',
 	if save != None:
 		pdf = pdf.close()
 
-def cellTopicHeatmap(cisTopic_obj: 'cisTopicObject',
+def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
 					 variables: Optional[List[str]] = None,
 					 remove_nan: Optional[bool] = True,
 					 scale: Optional[bool] = False,
@@ -672,10 +672,10 @@ def cellTopicHeatmap(cisTopic_obj: 'cisTopicObject',
 	
 	Parameters
 	---------
-	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with a model in `class::CistopicObject.selected_model`.
 	variables: list
-		List of variables to plot. They should be included in `class::cisTopicObject.cell_data` and `class::cisTopicObject.region_data`, depending on which 
+		List of variables to plot. They should be included in `class::CistopicObject.cell_data` and `class::CistopicObject.region_data`, depending on which 
 		target is specified.
 	remove_nan: bool, optional
 		Whether to remove data points for which the variable value is 'nan'. Default: True
@@ -707,12 +707,12 @@ def cellTopicHeatmap(cisTopic_obj: 'cisTopicObject',
 	save: str, optional
 		Path to save plot. Default: None.
 	"""
-	model=cisTopic_obj.selected_model
+	model=cistopic_obj.selected_model
 	if harmony == True:
 		cell_topic=model.cell_topic_harmony
 	else:
 		cell_topic=model.cell_topic
-	cell_data=cisTopic_obj.cell_data
+	cell_data=cistopic_obj.cell_data
 	
 	if selected_topics != None:
 		cell_topic=cell_topic.loc[['Topic' + str(x) for x in selected_topics],]
@@ -786,7 +786,7 @@ def cellTopicHeatmap(cisTopic_obj: 'cisTopicObject',
 		g.savefig(save, bbox_inches='tight')
 	plt.show()
 	
-def harmony(cisTopic_obj: 'cisTopicObject',
+def harmony(cistopic_obj: 'CistopicObject',
 			vars_use: List[str],
 			scale: Optional[bool] = True,
 			random_state: Optional[int] = 555):
@@ -795,8 +795,8 @@ def harmony(cisTopic_obj: 'cisTopicObject',
 	
 	Parameters
 	---------
-	cisTopic_obj: `class::cisTopicObject`
-		A cisTopic object with a model in `class::cisTopicObject.selected_model`.
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with a model in `class::CistopicObject.selected_model`.
 	vars_use: list
 		List of variables to correct batch effect with.
 	scale: bool, optional
@@ -810,15 +810,15 @@ def harmony(cisTopic_obj: 'cisTopicObject',
 	single-cell data with Harmony. Nature methods, 16(12), 1289-1296.
 	"""
 	
-	cell_data=cisTopic_obj.cell_data
-	model= cisTopic_obj.selected_model
+	cell_data=cistopic_obj.cell_data
+	model= cistopic_obj.selected_model
 	cell_topic=model.cell_topic
 	if scale == True:
 		cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
 	cell_topic=cell_topic.transpose().to_numpy()
 	ho = hm.run_harmony(cell_topic, cell_data, vars_use, random_state=random_state)
 	cell_topic_harmony = pd.DataFrame(ho.Z_corr, index=model.cell_topic.index.to_list(), columns=model.cell_topic.columns)
-	cisTopic_obj.selected_model.cell_topic_harmony = cell_topic_harmony
+	cistopic_obj.selected_model.cell_topic_harmony = cell_topic_harmony
 
 
 

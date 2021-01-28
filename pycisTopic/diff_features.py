@@ -9,9 +9,9 @@ import scipy.sparse as sparse
 import matplotlib.pyplot as plt
 import matplotlib
 
-from pycisTopic.utils import *
+from .utils import *
 
-class cisTopicImputedFeatures:
+class CistopicImputedFeatures:
     def __init__(self, imputed_acc, feature_names, cell_names, project):
         self.mtx=imputed_acc
         self.feature_names=feature_names
@@ -19,10 +19,10 @@ class cisTopicImputedFeatures:
         self.project=project
     
     def __str__(self):
-        descr = f"cisTopicImputedFeatures from project {self.project} with nCells × nFeatures = {len(self.cell_names)} × {len(self.feature_names)}"
+        descr = f"CistopicImputedFeatures from project {self.project} with nCells × nFeatures = {len(self.cell_names)} × {len(self.feature_names)}"
         return(descr)
 
-def imputeAccessibility(cisTopic_obj, selected_cells=None, selected_regions=None, scale_factor=10**6, project='cisTopic_Impute'):
+def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=None, scale_factor=10**6, project='cisTopic_Impute'):
     # Create cisTopic logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -30,12 +30,12 @@ def imputeAccessibility(cisTopic_obj, selected_cells=None, selected_regions=None
     logging.basicConfig(level = level, format = format, handlers = handlers)
     log = logging.getLogger('cisTopic')
     
-    model=cisTopic_obj.selected_model
-    cell_names=cisTopic_obj.cell_names
+    model=cistopic_obj.selected_model
+    cell_names=cistopic_obj.cell_names
     cell_topic=model.cell_topic.loc[:,cell_names]
-    region_names=cisTopic_obj.region_names
+    region_names=cistopic_obj.region_names
     topic_region=model.topic_region.loc[region_names,:]
-    project=cisTopic_obj.project
+    project=cistopic_obj.project
     
     if selected_cells != None:
         cell_topic=cell_topic.loc[:,selected_cells]
@@ -57,14 +57,14 @@ def imputeAccessibility(cisTopic_obj, selected_cells=None, selected_regions=None
             imputed_acc = imputed_acc.round()
             log.info('Converting to sparse matrix')
             imputed_acc=sparse.csr_matrix(imputed_acc)
-            keep_regions_index = nonZeroRows(imputed_acc)
+            keep_regions_index = non_zero_rows(imputed_acc)
             imputed_acc=imputed_acc[keep_regions_index,]
-            region_names=subsetList(region_names, keep_regions_index)
-    imputed_acc_obj=cisTopicImputedFeatures(imputed_acc, region_names, cell_names, project)
+            region_names=subset_list(region_names, keep_regions_index)
+    imputed_acc_obj=CistopicImputedFeatures(imputed_acc, region_names, cell_names, project)
     log.info('Done!')  
     return(imputed_acc_obj)
 
-def normalizeScores(input_mat, scale_factor=10**4):
+def normalize_scores(input_mat, scale_factor=10**4):
     # Create cisTopic logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -73,16 +73,16 @@ def normalizeScores(input_mat, scale_factor=10**4):
     log = logging.getLogger('cisTopic')
     
     log.info('Normalizing imputed data')
-    if isinstance(input_mat, cisTopicImputedFeatures):
+    if isinstance(input_mat, CistopicImputedFeatures):
         mtx = np.log1p(input_mat.mtx/input_mat.mtx.sum(0)*scale_factor)
-        output=cisTopicImputedFeatures(mtx, input_mat.feature_names, input_mat.cell_names, input_mat.project)
+        output=CistopicImputedFeatures(mtx, input_mat.feature_names, input_mat.cell_names, input_mat.project)
     elif isinstance(input_mat, pd.DataFrame):
         output = np.log1p(input_mat.values/input_mat.values.sum(0)*scale_factor)
         output = pd.DataFrame(output, index=input_mat.index.tolist(), columns=input_mat.columns)
     log.info('Done!')
     return(output)
 
-def findHighVariableFeatures(input_mat, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, n_bins=20, n_top_features=None, plot=True, save=None):
+def find_high_variable_features(input_mat, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, n_bins=20, n_top_features=None, plot=True, save=None):
     # Create cisTopic logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -174,25 +174,25 @@ def findHighVariableFeatures(input_mat, min_disp = 0.05, min_mean = 0.0125, max_
     log.info('Done!')
     return var_features
 
-def subsetImputedMatrix(imputed_features_obj, cells=None, features=None):
+def subset_imputed_matrix(imputed_features_obj, cells=None, features=None):
     if cells == None:
         cells = imputed_features_obj.cell_names
         mtx = imputed_features_obj.mtx
     else:
         mtx = imputed_features_obj.mtx
-        cell_index = getPositionIndex(cells, imputed_features_obj.cell_names)
+        cell_index = get_position_index(cells, imputed_features_obj.cell_names)
         mtx = mtx[:,cell_index]
         
     if features == None:
         features = imputed_features_obj.feature_names
     else:
-        feature_index = getPositionIndex(features, imputed_features_obj.feature_names)
+        feature_index = get_position_index(features, imputed_features_obj.feature_names)
         mtx = mtx[feature_index,]
     
-    new_imputed_features_obj=cisTopicImputedFeatures(mtx, features, cells, imputed_features_obj.project)
+    new_imputed_features_obj=CistopicImputedFeatures(mtx, features, cells, imputed_features_obj.project)
     return new_imputed_features_obj
     
-def findDiffFeatures(cisTopic_obj, imputed_features_obj, variable, var_features=None, contrasts=None, contrast_name='contrast', adjpval_thr=0.05, log2fc_thr=1, n_cpu=1):
+def find_diff_features(cistopic_obj, imputed_features_obj, variable, var_features=None, contrasts=None, contrast_name='contrast', adjpval_thr=0.05, log2fc_thr=1, n_cpu=1):
     # Create cisTopic logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -200,7 +200,7 @@ def findDiffFeatures(cisTopic_obj, imputed_features_obj, variable, var_features=
     logging.basicConfig(level = level, format = format, handlers = handlers)
     log = logging.getLogger('cisTopic')
     
-    group_var=cisTopic_obj.cell_data.loc[:,variable]
+    group_var=cistopic_obj.cell_data.loc[:,variable]
     if contrasts == None:
         levels=sorted(list(set(group_var.tolist())))
         contrasts=[[[x], levels[:levels.index(x)] + levels[levels.index(x)+1:]] for x in levels]
@@ -210,7 +210,7 @@ def findDiffFeatures(cisTopic_obj, imputed_features_obj, variable, var_features=
     # Get barcodes in each class per contrats
     barcode_groups = [[group_var[group_var.isin(contrasts[x][0])].index.tolist(), group_var[group_var.isin(contrasts[x][1])].index.tolist()] for x in range(len(contrasts))]
     # Subset imputed accessibility matrix
-    subset_imputed_features_obj = subsetImputedMatrix(imputed_features_obj, cells=None, features=var_features)
+    subset_imputed_features_obj = subset_imputed_matrix(imputed_features_obj, cells=None, features=var_features)
     # Compute p-val and log2FC
     ray.init(num_cpus=n_cpu)
     markers_list=ray.get([markers_ray.remote(subset_imputed_features_obj, barcode_groups[i], contrasts_names[i], adjpval_thr=adjpval_thr, log2fc_thr=log2fc_thr) for i in range(len(contrasts))])
@@ -245,8 +245,8 @@ def markers_ray(input_mat, barcode_group, contrast_name, adjpval_thr=0.05, log2f
         features = input_mat.feature_names
         samples = input_mat.cell_names
     
-    fg_cells_index = getPositionIndex(barcode_group[0], samples)
-    bg_cells_index = getPositionIndex(barcode_group[1], samples)
+    fg_cells_index = get_position_index(barcode_group[0], samples)
+    bg_cells_index = get_position_index(barcode_group[1], samples)
     log.info('Computing p-value for ' + contrast_name)
     if sparse.issparse(mat):
         wilcox_test = [ranksums(mat[x, fg_cells_index].toarray()[0], y=mat[x, bg_cells_index].toarray()[0]) for x in range(mat.shape[0])]

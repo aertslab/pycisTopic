@@ -8,7 +8,7 @@ import scanorama
 import logging
 import sys
 
-def labelTransfer(rna_anndata,
+def label_transfer(rna_anndata,
                   atac_anndata,
                   vars_to_transfer,
                   variable_genes=True,

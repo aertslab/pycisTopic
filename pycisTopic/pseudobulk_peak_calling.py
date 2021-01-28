@@ -11,11 +11,11 @@ import sys
 from typing import Optional, Union
 from typing import List, Dict
 
-from .cisTopicClass import *
+from .cistopic_class import *
 from .utils import *
 
 
-def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str, pd.DataFrame]],
+def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str, pd.DataFrame]],
 					 variable: str,
 					 chromsizes: Union[pd.DataFrame, pr.PyRanges],
 					 bed_path: str,
@@ -30,8 +30,8 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 
 	Parameters
 	---------
-	input_data: cisTopicObject or pd.DataFrame
-		A :class:`cisTopicObject` containing the specified `variable` as a column in :class:`cisTopicObject.cell_data` or a cell metadata 
+	input_data: CistopicObject or pd.DataFrame
+		A :class:`CistopicObject` containing the specified `variable` as a column in :class:`CistopicObject.cell_data` or a cell metadata 
 		:class:`pd.DataFrame` containing barcode as rows, containing the specified `variable` as a column (additional columns are
 		possible) and a `sample_id` column. Index names must contain the BARCODE (e.g. ATGTCGTC-1), additional tags are possible separating with - 
 		(e.g. ATGCTGTGCG-1-Sample_1). The levels in the sample_id column must agree with the keys in the path_to_fragments dictionary.
@@ -47,10 +47,10 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 		Path to folder where the bigwig files per group will be saved.
 	path_to_fragments: str or dict, optional
 		A dictionary of character strings, with sample name as names indicating the path to the fragments file/s from which pseudobulk profiles have to
-		be created. If a :class:`cisTopicObject` is provided as input it will be ignored, but if a cell metadata :class:`pd.DataFrame` is provided it
+		be created. If a :class:`CistopicObject` is provided as input it will be ignored, but if a cell metadata :class:`pd.DataFrame` is provided it
 		is necessary to provide it. The keys of the dictionary need to match with the sample_id tag added to the index names of the input data frame.
 	sample_id_col: str, optional
-		Name of the column containing the sample name per barcode in the input :class:`cisTopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
+		Name of the column containing the sample name per barcode in the input :class:`CistopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
 	n_cpu: int, optional
 		Number of cores to use. Default: 1.	
 	normalize_bigwig: bool, optional
@@ -72,11 +72,11 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 	log = logging.getLogger('cisTopic')
 	
 	# Get fragments file
-	if isinstance(input_data, cisTopicObject):
-		path_to_fragments = cisTopic_obj.path_to_fragments
+	if isinstance(input_data, CistopicObject):
+		path_to_fragments = cistopic_obj.path_to_fragments
 		if path_to_fragments == None:
 			log.error('No path_to_fragments in this cisTopic object.')
-		cell_data = cisTopic_obj.cell_data
+		cell_data = cistopic_obj.cell_data
 	elif isinstance(input_data, pd.DataFrame):
 		if path_to_fragments == None:
 			log.error('Please, provide path_to_fragments.')
@@ -116,7 +116,7 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 		os.makedirs(bigwig_path)
 	# Create pseudobulks
 	ray.init(num_cpus = n_cpu)
-	paths = ray.get([exportPseudoBulk_ray.remote(cell_data,
+	paths = ray.get([export_pseudobulk_ray.remote(cell_data,
 								group,
 								fragments_df_dict, 
 								chromsizes,
@@ -131,7 +131,7 @@ def exportPseudoBulk(input_data: Union['cisTopicObject', pd.DataFrame, Dict[str,
 	return bw_paths, bed_paths
 
 @ray.remote
-def exportPseudoBulk_ray(cell_data: pd.DataFrame,
+def export_pseudobulk_ray(cell_data: pd.DataFrame,
 						 group: str,
 						 fragments_df_dict: Dict[str, pd.DataFrame],
 						 chromsizes: pr.PyRanges,
@@ -159,7 +159,7 @@ def exportPseudoBulk_ray(cell_data: pd.DataFrame,
 	bigwig_path: str
 		Path to folder where the bigwig file will be saved.
 	sample_id_col: str, optional
-		Name of the column containing the sample name per barcode in the input :class:`cisTopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
+		Name of the column containing the sample name per barcode in the input :class:`CistopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
 	normalize_bigwig: bool, optional
 		Whether bigwig files should be CPM normalized. Default: True.
 	remove_duplicates: bool, optional
@@ -209,7 +209,7 @@ def exportPseudoBulk_ray(cell_data: pd.DataFrame,
 	log.info(str(group)+' done!')
 	return {group: [bigwig_path_group, bed_path_group]}
 
-def peakCalling(macs_path: str,
+def peak_calling(macs_path: str,
 				bed_paths: Dict,
 			 	outdir: str,
 			 	genome_size: str,
@@ -254,7 +254,7 @@ def peakCalling(macs_path: str,
 		A dictionary containing each group label as names and :class:`pr.PyRanges` with MACS2 narrow peaks as values.
 	"""
 	ray.init(num_cpus=n_cpu)
-	narrow_peaks = ray.get([MACS_callPeak_ray.remote(macs_path,
+	narrow_peaks = ray.get([macs_call_peak_ray.remote(macs_path,
 								bed_paths[name],
 								name,
 								outdir, 
@@ -270,7 +270,7 @@ def peakCalling(macs_path: str,
 
 
 @ray.remote
-def MACS_callPeak_ray(macs_path: str,
+def macs_call_peak_ray(macs_path: str,
 					  bed_path: str,
 					  name: str,
 					  outdir: str,
@@ -324,12 +324,12 @@ def MACS_callPeak_ray(macs_path: str,
 	if not os.path.exists(outdir):
 		os.makedirs(outdir)
 	
-	MACS_peak_calling = MACS_callPeak(macs_path, bed_path, name, outdir, genome_size, input_format=input_format, shift=shift, ext_size=ext_size, keep_dup = keep_dup, q_value = q_value)
+	MACS_peak_calling = MACSCallPeak(macs_path, bed_path, name, outdir, genome_size, input_format=input_format, shift=shift, ext_size=ext_size, keep_dup = keep_dup, q_value = q_value)
 	log.info(name + ' done!')
 	return MACS_peak_calling
 	
 
-class MACS_callPeak():
+class MACSCallPeak():
 	"""
 	Parameters
 	---------
@@ -378,9 +378,9 @@ class MACS_callPeak():
 		self.ext_size = ext_size
 		self.keep_dup = keep_dup
 		self.qvalue = q_value
-		self.callpeak()
+		self.call_peak()
 
-	def callpeak(self):
+	def call_peak(self):
 		"""
 		Run MACS2 peak calling.
 		"""

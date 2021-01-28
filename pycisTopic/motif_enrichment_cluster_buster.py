@@ -9,8 +9,8 @@ from IPython.display import HTML
 ssl._create_default_https_context = ssl._create_unverified_context
 pd.set_option('display.max_colwidth', None)
 
-from pycisTopic.diffFeatures import *
-from pycisTopic.utils import *
+from .diff_features import *
+from .utils import *
 
 
 @ray.remote
@@ -106,13 +106,13 @@ def get_sequence_names_from_fasta(fasta_filename):
     return sequence_names_list
 
 
-def pyRanges2Names(regions):
+def pyranges2names(regions):
     return ['>'+str(chrom) + ":" + str(start) + '-' + str(end) for chrom, start, end in zip(list(regions.Chromosome), list(regions.Start), list(regions.End))]
 
 def grep(l, s):
     return [i for i in l if s in i]
 
-def ClusterBuster(cbust_path, input_data, outdir, path_to_fasta, path_to_motifs, n_cpu=1, motifs=None, verbose=False):
+def cluster_buster(cbust_path, input_data, outdir, path_to_fasta, path_to_motifs, n_cpu=1, motifs=None, verbose=False):
     # Create logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -126,7 +126,7 @@ def ClusterBuster(cbust_path, input_data, outdir, path_to_fasta, path_to_motifs,
         os.mkdir(outdir)  
     if not os.path.exists(outdir+'regions.fa'):
         log.info('Getting sequences')
-        pr_regions_names_dict = {key: pyRanges2Names(pr_regions_dict[key]) for key in pr_regions_dict.keys()}
+        pr_regions_names_dict = {key: pyranges2names(pr_regions_dict[key]) for key in pr_regions_dict.keys()}
         pr_sequence_list = [pd.DataFrame([pr_regions_names_dict[key], pr.get_fasta(pr_regions_dict[key], path_to_fasta).tolist()], index=['Name', 'Sequence'], columns=pr_regions_names_dict[key]) for key in pr_regions_dict.keys()]
         seq_df = pd.concat(pr_sequence_list, axis=1)
         seq_df = seq_df.loc[:,~seq_df.columns.duplicated()]
@@ -151,7 +151,7 @@ def ClusterBuster(cbust_path, input_data, outdir, path_to_fasta, path_to_motifs,
     return crm_df
 
 
-def findEnrichedMotifs(crm_df, group_dict, var_features=None, contrasts=None, contrast_name='contrast', adjpval_thr=0.05, log2fc_thr=1, n_cpu=1, tmp_dir=None, memory=None, object_store_memory=None):
+def find_enriched_motifs(crm_df, group_dict, var_features=None, contrasts=None, contrast_name='contrast', adjpval_thr=0.05, log2fc_thr=1, n_cpu=1, tmp_dir=None, memory=None, object_store_memory=None):
     # Create cisTopic logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -251,7 +251,7 @@ def load_motif_annotations(specie: str,
     df = pd.concat([df_direct_annot, motif_similarity_annot, orthology_annot, motif_similarity_and_orthology_annot], axis=1, sort=False)
     return df
 
-def addMotifAnnotation(motif_enrichment_dict,
+def add_motif_annotation(motif_enrichment_dict,
                        specie,
                        version,
                        path_to_motif_annotations=None,

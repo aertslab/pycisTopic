@@ -24,15 +24,15 @@ import warnings
 import xml.etree.ElementTree as et
 import zipfile
 
-from .cisTopicClass import *
+from .cistopic_class import *
 from .utils import *
 
 
-class cisTopicLDAModel:
+class CistopicLDAModel:
     """
     cisTopic LDA model class
     
-    :class:`cisTopicLDA` contains model quality metrics (model coherence (adaptation from Mimno et al., 2011), log-likelihood (Griffiths and Steyvers, 2004), density-based (Cao Juan et al., 2009) and divergence-based (Arun et al., 2010)), topic quality metrics (coherence, marginal distribution and total number of assignments), cell-topic and topic-region distribution, model parameters and model dimensions.
+    :class:`cistopicLdaModel` contains model quality metrics (model coherence (adaptation from Mimno et al., 2011), log-likelihood (Griffiths and Steyvers, 2004), density-based (Cao Juan et al., 2009) and divergence-based (Arun et al., 2010)), topic quality metrics (coherence, marginal distribution and total number of assignments), cell-topic and topic-region distribution, model parameters and model dimensions.
     
     Parameters
     ----------
@@ -83,10 +83,10 @@ class cisTopicLDAModel:
         
         
     def __str__(self):
-        descr = f"cisTopicLDAModel with {self.n_topic} topics and n_cells × n_regions = {self.n_cells} × {self.n_regions}"
+        descr = f"CistopicLDAModel with {self.n_topic} topics and n_cells × n_regions = {self.n_cells} × {self.n_regions}"
         return(descr)
 
-def runCGSModels(cisTopic_obj:'cisTopicObject',
+def run_cgs_models(cistopic_obj:'cisTopicObject',
                  n_topics:List[int],
                  n_cpu: Optional[int] = 1,
                  n_iter: Optional[int] = 150,
@@ -102,7 +102,7 @@ def runCGSModels(cisTopic_obj:'cisTopicObject',
         
     Parameters
     ----------
-    cisTopic_obj: cisTopicObject
+    cistopic_obj: cisTopicObject
         A :class:`cisTopicObject`. Note that cells/regions have to be filtered before running any LDA model.
     n_topics: list of int
         A list containing the number of topics to use in each model.
@@ -127,7 +127,7 @@ def runCGSModels(cisTopic_obj:'cisTopicObject',
         
     Return
     ------
-    list of :class:`cisTopicLDAModel`
+    list of :class:`CistopicLDAModel`
         A list with cisTopic LDA models.
         
     References
@@ -135,11 +135,11 @@ def runCGSModels(cisTopic_obj:'cisTopicObject',
     Griffiths, T. L., & Steyvers, M. (2004). Finding scientific topics. Proceedings of the National academy of Sciences, 101(suppl 1), 5228-5235.
     """
     
-    binary_matrix = cisTopic_obj.binary_matrix.transpose()
-    region_names = cisTopic_obj.region_names
-    cell_names = cisTopic_obj.cell_names
+    binary_matrix = cistopic_obj.binary_matrix.transpose()
+    region_names = cistopic_obj.region_names
+    cell_names = cistopic_obj.cell_names
     ray.init(num_cpus=n_cpu)
-    model_list=ray.get([runCGSModel.remote(binary_matrix,
+    model_list=ray.get([run_cgs_model.remote(binary_matrix,
                               n_topics=n_topic,
                               cell_names=cell_names,
                               region_names=region_names,
@@ -155,7 +155,7 @@ def runCGSModels(cisTopic_obj:'cisTopicObject',
     return model_list
 
 @ray.remote
-def runCGSModel(binary_matrix: sparse.csr_matrix,
+def run_cgs_model(binary_matrix: sparse.csr_matrix,
                 n_topics: int,
                 cell_names: List[str],
                 region_names: List[str],
@@ -199,7 +199,7 @@ def runCGSModel(binary_matrix: sparse.csr_matrix,
     
     Return
     ------
-    cisTopicLDAModel
+    CistopicLDAModel
         A cisTopic LDA model.
     
     References
@@ -271,7 +271,7 @@ def runCGSModel(binary_matrix: sparse.csr_matrix,
     topic_region = pd.DataFrame.from_records(model.topic_word_, columns = region_names, index=['Topic'+ str(i) for i in range(1, n_topics+1)]).transpose()
     parameters = pd.DataFrame(['lda', n_topics, n_iter, random_state, alpha, alpha_by_topic, eta, eta_by_topic, top_topics_coh], index=['package', 'n_topics', 'n_iter', 'random_state', 'alpha', 'alpha_by_topic', 'eta', 'eta_by_topic', 'top_topics_coh'], columns=['Parameter'])
     # Create object 
-    model = cisTopicLDAModel(metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters)
+    model = CistopicLDAModel(metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters)
     log.info(f"Model with {n_topics} topics done!")
     if isinstance(save_path, str):
         log.info(f"Saving model with {n_topics} topics at {save_path}")
@@ -541,8 +541,8 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         return self.tmp_dir + self.random_label + 'topickeys.txt'
 
 
-def runCGSModelsMallet(path_to_mallet_binary: str,
-                       cisTopic_obj: 'cisTopicObject',
+def run_cgs_models_mallet(path_to_mallet_binary: str,
+                       cistopic_obj: 'cisTopicObject',
                        n_topics: List[int],
                        n_cpu: Optional[int]=1,
                        n_iter: Optional[int]=150,
@@ -561,7 +561,7 @@ def runCGSModelsMallet(path_to_mallet_binary: str,
     ----------
     path_to_mallet_binary: str
         Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet).
-    cisTopic_obj: cisTopicObject
+    cistopic_obj: cisTopicObject
         A :class:`cisTopicObject`. Note that cells/regions have to be filtered before running any LDA model.
     n_topics: list of int
         A list containing the number of topics to use in each model.
@@ -588,7 +588,7 @@ def runCGSModelsMallet(path_to_mallet_binary: str,
     
     Return
     ------
-    list of :class:`cisTopicLDAModel`
+    list of :class:`CistopicLDAModel`
         A list with cisTopic LDA models.
     
     References
@@ -596,11 +596,11 @@ def runCGSModelsMallet(path_to_mallet_binary: str,
     McCallum, A. K. (2002). Mallet: A machine learning for language toolkit. http://mallet.cs.umass.edu.
     """
     
-    binary_matrix = cisTopic_obj.binary_matrix
-    region_names = cisTopic_obj.region_names
-    cell_names = cisTopic_obj.cell_names
+    binary_matrix = cistopic_obj.binary_matrix
+    region_names = cistopic_obj.region_names
+    cell_names = cistopic_obj.cell_names
     
-    model_list=[runCGSModelMallet(path_to_mallet_binary, binary_matrix,
+    model_list=[run_cgs_model_mallet(path_to_mallet_binary, binary_matrix,
                                   n_topics=n_topic,
                                   cell_names=cell_names,
                                   region_names=region_names,
@@ -616,7 +616,7 @@ def runCGSModelsMallet(path_to_mallet_binary: str,
                                   save_path=save_path) for n_topic in n_topics]
     return model_list
 
-def runCGSModelMallet(path_to_mallet_binary: str,
+def run_cgs_model_mallet(path_to_mallet_binary: str,
                       binary_matrix: sparse.csr_matrix,
                       n_topics: List[int],
                       cell_names: List[str],
@@ -670,7 +670,7 @@ def runCGSModelMallet(path_to_mallet_binary: str,
         
     Return
     ------
-    cisTopicLDAModel
+    CistopicLDAModel
         A cisTopic LDA model.
         
     References
@@ -707,12 +707,12 @@ def runCGSModelMallet(path_to_mallet_binary: str,
     doc_topic = pd.read_csv(model.fdoctopics(), header=None, sep='\t').iloc[:,2:].to_numpy()
 
     # Model evaluation
-    cellCov=np.asarray(binary_matrix.sum(axis=0)).astype(float)
-    arun_2010=tmtoolkit.topicmod.evaluate.metric_arun_2010(topic_word, doc_topic, cellCov)
+    cell_cov=np.asarray(binary_matrix.sum(axis=0)).astype(float)
+    arun_2010=tmtoolkit.topicmod.evaluate.metric_arun_2010(topic_word, doc_topic, cell_cov)
     cao_juan_2009=tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(topic_word)
     mimno_2011=tmtoolkit.topicmod.evaluate.metric_coherence_mimno_2011(topic_word, dtm=binary_matrix.transpose(), top_n=20, eps=1e-12, normalize=True, return_mean=False)
     topic_word_assig=model.word_topics
-    doc_topic_assig=(doc_topic.T * (cellCov+n_topics*alpha)).T-alpha
+    doc_topic_assig=(doc_topic.T * (cell_cov+n_topics*alpha)).T-alpha
     ll=loglikelihood(topic_word_assig, doc_topic_assig, alpha, eta)
 
     # Organinze data
@@ -721,13 +721,13 @@ def runCGSModelMallet(path_to_mallet_binary: str,
     else:
         metrics = pd.DataFrame([arun_2010, cao_juan_2009, np.mean(mimno_2011[np.argpartition(mimno_2011, -top_topics_coh)[-top_topics_coh:]]), ll], index=['Arun_2010', 'Cao_Juan_2009', 'Mimno_2011', 'loglikelihood'], columns=['Metric']).transpose()
     coherence = pd.DataFrame([range(n_topics), mimno_2011], index=['Topic', 'Mimno_2011']).transpose()
-    marg_topic = pd.DataFrame([range(n_topics), tmtoolkit.topicmod.model_stats.marginal_topic_distrib(doc_topic, cellCov)], index=['Topic', 'Marg_Topic']).transpose()
+    marg_topic = pd.DataFrame([range(n_topics), tmtoolkit.topicmod.model_stats.marginal_topic_distrib(doc_topic, cell_cov)], index=['Topic', 'Marg_Topic']).transpose()
     topic_ass = pd.DataFrame.from_records([range(1, n_topics+1),  list(chain.from_iterable(model.word_topics.sum(axis=1)[:,None]))], index=['Topic', 'Assignments']).transpose()
     cell_topic = pd.DataFrame.from_records(doc_topic, index = cell_names, columns=['Topic'+ str(i) for i in range(1, n_topics+1)]).transpose()
     topic_region = pd.DataFrame.from_records(topic_word, columns = region_names, index=['Topic'+ str(i) for i in range(1, n_topics+1)]).transpose()
     parameters = pd.DataFrame(['Mallet', n_topics, n_iter, random_state, alpha, alpha_by_topic, eta, top_topics_coh], index=['package', 'n_topics', 'n_iter', 'random_state', 'alpha', 'alpha_by_topic', 'eta', 'top_topics_coh'], columns=['Parameter'])
     # Create object
-    model = cisTopicLDAModel(metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters)
+    model = CistopicLDAModel(metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters)
     log.info(f"Model with {n_topics} topics done!")
     if isinstance(save_path, str):
         log.info(f"Saving model with {n_topics} topics at {save_path}")
@@ -735,7 +735,7 @@ def runCGSModelMallet(path_to_mallet_binary: str,
             pickle.dump(model, f)
     return model
 
-def evaluateModels(models: List['cisTopicLDAModel'],
+def evaluate_models(models: List['CistopicLDAModel'],
                    select_model: Optional[int]=None,
                    return_model: Optional[bool]=True,
                    metrics: Optional[str]=['Minmo_2011', 'loglikelihood', 'Cao_Juan_2009', 'Arun_2010'],
@@ -749,12 +749,12 @@ def evaluateModels(models: List['cisTopicLDAModel'],
         
     Parameters
     ----------
-    models: list of :class:`cisTopicLDAModel`
-        A list containing cisTopic LDA models, as returned from runCGSModels or runCGSModelsMallet.
+    models: list of :class:`CistopicLDAModel`
+        A list containing cisTopic LDA models, as returned from run_cgs_models or run_cgs_modelsMallet.
     selected_model: int, optional
         Integer indicating the number of topics of the selected model. If not provided, the best model will be selected automatically based on the model quality metrics. Default: None.
     return_model: bool, optional
-        Whether to return the selected model as :class:`cisTopicLDAModel`
+        Whether to return the selected model as :class:`CistopicLDAModel`
     metrics: list of str
         Metrics to use for plotting and model selection:
             Minmo_2011: Uses the average model coherence as calculated by Mimno et al (2011). In order to reduce the impact of the number of topics, we calculate the average coherence based on the top selected average values. The better the model, the higher coherence.

@@ -6,7 +6,7 @@ import sys
 from typing import Optional, Union
 from typing import List, Dict
 
-def consensusPeaks(narrow_peaks_dict: Dict[str, pr.PyRanges],
+def get_consensus_peaks(narrow_peaks_dict: Dict[str, pr.PyRanges],
 				   peak_half_width: int,
 				   chromsizes: Optional[Union[pr.PyRanges, pd.DataFrame]] = None,
 				   path_to_blacklist: Optional[str] = None):
@@ -62,7 +62,7 @@ def consensusPeaks(narrow_peaks_dict: Dict[str, pr.PyRanges],
 	log.info('Extending and merging peaks per class')
 	center_extended_peaks=[iterative_peak_filtering(calculate_peaks_and_extend(narrow_peaks_dict[x], peak_half_width, chromsizes, path_to_blacklist)).df for x in list(narrow_peaks_dict.keys())]
 	log.info('Normalizing peak scores')
-	center_extended_peaks_norm=[CPM(x, 'Score') for x in center_extended_peaks]  
+	center_extended_peaks_norm=[cpm(x, 'Score') for x in center_extended_peaks]  
 	center_extended_peaks_norm=pr.PyRanges(pd.concat(center_extended_peaks_norm, axis=0, sort=False))
 	log.info('Merging peaks')
 	consensus_peaks = iterative_peak_filtering(center_extended_peaks_norm)
@@ -70,10 +70,10 @@ def consensusPeaks(narrow_peaks_dict: Dict[str, pr.PyRanges],
 	log.info('Done!')
 	return consensus_peaks
 	
-def CPM(x: pr.PyRanges,
+def cpm(x: pr.PyRanges,
 		column: str):
 	"""
-	CPM normalization
+	cpm normalization
 	
 	Parameters
 	---------

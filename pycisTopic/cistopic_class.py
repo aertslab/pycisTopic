@@ -9,20 +9,20 @@ import sklearn.preprocessing as sp
 import sys
 from typing import Optional, Union
 from typing import List, Dict
-from .LDAModels import *
+from .lda_models import *
 from .utils import *
 
 dtype = pd.SparseDtype(int, fill_value=0)
 pd.options.mode.chained_assignment = None
 
-class cisTopicObject:
+class CistopicObject:
 	"""
 	cisTopic data class.
 	
-	:class:`cisTopicObject` contains the cell by fragment matrices (stored as counts :attr:`fragment_matrix` and as binary accessibility :attr:`binary_matrix`),
+	:class:`CistopicObject` contains the cell by fragment matrices (stored as counts :attr:`fragment_matrix` and as binary accessibility :attr:`binary_matrix`),
 	cell metadata :attr:`cell_data`, region metadata :attr:`region_data` and path/s to the fragments file/s :attr:`path_to_fragments`.
 	
-	LDA models from :class:`cisTopicCGSModel` can be stored :attr:`selected_model` as well as cell/region projections :attr:`projections` as a dictionary.
+	LDA models from :class:`CisTopicLDAModel` can be stored :attr:`selected_model` as well as cell/region projections :attr:`projections` as a dictionary.
 	
 	Attributes
 	---------
@@ -39,7 +39,7 @@ class cisTopicObject:
 	region_data: pd.DataFrame
 		A data frame containing region information, with region as indexes and attributes as columns.
 	path_to_fragments: str or dict
-		A list containing the paths to the fragments files used to generate the :class:`cisTopicObject`.
+		A list containing the paths to the fragments files used to generate the :class:`CistopicObject`.
 	project: str
 		Name of the cisTopic project.
 	"""
@@ -67,13 +67,13 @@ class cisTopicObject:
 	
 	
 	def __str__(self):
-		descr = f"cisTopicObject from project {self.project} with nCells × nRegions = {len(self.cell_names)} × {len(self.region_names)}"
+		descr = f"CistopicObject from project {self.project} with nCells × nRegions = {len(self.cell_names)} × {len(self.region_names)}"
 		return(descr)
 
-	def addCellData(self,
+	def add_cell_data(self,
 					cell_data: pd.DataFrame):
 		"""
-		Add cell metadata to :class:`cisTopicObject`. If the column already exist on the cell metadata, it will be overwritten.
+		Add cell metadata to :class:`CistopicObject`. If the column already exist on the cell metadata, it will be overwritten.
 		
 		Parameters
 		---------
@@ -82,15 +82,15 @@ class cisTopicObject:
 			
 		Return
 		------
-		cisTopicObject
-			The input :class:`cisTopicObject` with :attr:`cell_data` updated.
+		CistopicObject
+			The input :class:`CistopicObject` with :attr:`cell_data` updated.
 		"""
 		
 		flag=False
 		if len(set(self.cell_names) & set(cell_data.index)) < len(self.cell_names):
 			check_cell_names = prepare_tag_cells(self.cell_names)
 			if len(set(check_cell_names) & set(cell_data.index)) < len(set(self.cell_names) & set(cell_data.index)):
-				print("Warning: Some cells in this cisTopicObject are not present in this cell_data. Values will be filled with Nan \n")
+				print("Warning: Some cells in this CistopicObject are not present in this cell_data. Values will be filled with Nan \n")
 			else:
 				flag=True
 		if len(set(self.cell_data.columns) & set(cell_data.columns)) > 0:
@@ -108,10 +108,10 @@ class cisTopicObject:
 		
 		self.cell_data = new_cell_data.loc[self.cell_names,:]
 
-	def addRegionData(self,
+	def add_region_data(self,
 					  region_data: pd.DataFrame):
 		"""
-		Add region metadata to :class:`cisTopicObject`. If the column already exist on the region metadata, it will be overwritten.
+		Add region metadata to :class:`CistopicObject`. If the column already exist on the region metadata, it will be overwritten.
 		
 		Parameters
 		---------
@@ -120,11 +120,11 @@ class cisTopicObject:
 		
 		Return
 		------
-		cisTopicObject
-			The input :class:`cisTopicObject` with :attr:`region_data` updated.
+		CistopicObject
+			The input :class:`CistopicObject` with :attr:`region_data` updated.
 		"""
 		if len(set(self.region_names) & set(region_data.index)) < len(self.region_names):
-			print("Warning: Some regions in this cisTopicObject are not present in this region_data. Values will be filled with Nan \n")
+			print("Warning: Some regions in this CistopicObject are not present in this region_data. Values will be filled with Nan \n")
 		if len(set(self.region_data.columns.values) & set(region_data.columns.values)) > 0:
 			print(f"Columns {list(set(self.region_data.columns.values) & set(region_data.columns.values))} will be overwritten")
 			self.region_data = self.region_data.loc[:,list(set(self.region_data.columns.values).difference(set(self.columns.values)))]
@@ -137,7 +137,8 @@ class cisTopicObject:
 			regions: Optional[List[str]] = None,
 			copy: Optional[bool] = False):
 		"""
-		Subset cells and/or regions from :class:`cisTopicObject`. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`cisTopicObject` are derived from the cells it contains.
+		Subset cells and/or regions from :class:`CistopicObject`. Existent :class:`CisTopicLDAModel` and projections will be deleted. This is to ensure that 
+		models contained in a :class:`CistopicObject` are derived from the cells it contains.
 		
 		Parameters
 		---------
@@ -146,12 +147,12 @@ class cisTopicObject:
 		regions: list, optional
 			A list containing the names of the regions to keep.
 		copy: bool, optional
-			Whether changes should be done on the input :class:`cisTopicObject` or a new object should be returned
+			Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
 		
 		Return
 		------
-		cisTopicObject
-			A :class:`cisTopicObject` containing the selected cells and/or regions.
+		CistopicObject
+			A :class:`CistopicObject` containing the selected cells and/or regions.
 		"""
 		# Create logger
 		level	= logging.INFO
@@ -163,17 +164,17 @@ class cisTopicObject:
 		# Select cells
 		if cells is not None:
 			try:
-				keep_cells_index = getPositionIndex(cells, self.cell_names)
+				keep_cells_index = get_position_index(cells, self.cell_names)
 			except:
 				try:
-					keep_cells_index = getPositionIndex(cells, prepare_tag_cells(self.cell_names))
+					keep_cells_index = get_position_index(cells, prepare_tag_cells(self.cell_names))
 				except:
 					log.error('None of the given cells is contained in this cisTopic object!')	
 		else:
 			keep_cells_index = list(range(len(self.cell_names)))
 		# Select regions
 		if regions is not None:
-			keep_regions_index = getPositionIndex(regions, self.region_names)
+			keep_regions_index = get_position_index(regions, self.region_names)
 		else:
 			keep_regions_index = list(range(len(self.region_names)))
 		# Subset
@@ -181,21 +182,21 @@ class cisTopicObject:
 		fragment_matrix = fragment_matrix[keep_regions_index,:]
 		binary_matrix = self.binary_matrix[:, keep_cells_index]
 		binary_matrix = binary_matrix[keep_regions_index, :]
-		region_names = subsetList(self.region_names, keep_regions_index) # Subset selected regions
-		keep_regions_index = nonZeroRows(binary_matrix)
+		region_names = subset_list(self.region_names, keep_regions_index) # Subset selected regions
+		keep_regions_index = non_zero_rows(binary_matrix)
 		fragment_matrix = fragment_matrix[keep_regions_index,]
 		binary_matrix = binary_matrix[keep_regions_index,]
 		# Update
-		cell_names = subsetList(self.cell_names, keep_cells_index)
-		region_names = subsetList(region_names, keep_regions_index) # Subset regions with all zeros
+		cell_names = subset_list(self.cell_names, keep_cells_index)
+		region_names = subset_list(region_names, keep_regions_index) # Subset regions with all zeros
 		cell_data = self.cell_data.iloc[keep_cells_index,]
 		region_data = self.region_data.iloc[keep_regions_index,]
 		path_to_fragments = self.path_to_fragments
 		project = self.project
 		# Create new object
 		if copy == True:
-			subset_cisTopic_obj = cisTopicObject(fragment_matrix, binary_matrix, cell_names, region_names, cell_data, region_data, path_to_fragments, project)
-			return subset_cisTopic_obj
+			subset_cistopic_obj = CistopicObject(fragment_matrix, binary_matrix, cell_names, region_names, cell_data, region_data, path_to_fragments, project)
+			return subset_cistopic_obj
 		else:
 			self.fragment_matrix = fragment_matrix
 			self.binary_matrix = binary_matrix
@@ -207,28 +208,28 @@ class cisTopicObject:
 			self.projections= {}
 
 	def merge(self,
-			  cisTopic_obj_list: List['cisTopicObject'],
+			  cistopic_obj_list: List['CistopicObject'],
 			  is_acc: Optional[int] = 1,
 			  project: Optional[str] = 'cisTopic_merge',
 			  copy: Optional[bool] = False):
 		
 		"""
-		Merge a list of :class:`cisTopicObject` to the input :class:`cisTopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`cisTopicObject` are derived from the cells it contains.
+		Merge a list of :class:`CistopicObject` to the input :class:`CistopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`CistopicObject` are derived from the cells it contains.
 		
 		Parameters
 		---------
-		cisTopic_obj_list: list
-			A list containing one or more :class:`cisTopicObject` to merge.
+		cistopic_obj_list: list
+			A list containing one or more :class:`CistopicObject` to merge.
 		is_acc: int, optional
 			Minimal number of fragments for a region to be considered accessible. Default: 1.
 		project: str, optional
 			Name of the cisTopic project.
 		copy: bool, optional
-			Whether changes should be done on the input :class:`cisTopicObject` or a new object should be returned
+			Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
 		Return
 		------
-		cisTopicObject
-			A combined :class:`cisTopicObject`. Two new columns in :attr:`cell_data` indicate the :class:`cisTopicObject` of origin (`cisTopic_id`) and the fragment file from which the cell comes from (`path_to_fragments`).
+		CistopicObject
+			A combined :class:`CistopicObject`. Two new columns in :attr:`cell_data` indicate the :class:`CistopicObject` of origin (`cisTopic_id`) and the fragment file from which the cell comes from (`path_to_fragments`).
 		"""
 		# Create logger
 		level	= logging.INFO
@@ -237,13 +238,13 @@ class cisTopicObject:
 		logging.basicConfig(level = level, format = format, handlers = handlers)
 		log = logging.getLogger('cisTopic')
 		
-		cisTopic_obj_list.insert(0, self)
-		fragment_matrix_list = [x.fragment_matrix for x in cisTopic_obj_list]
-		region_names_list = [x.region_names for x in cisTopic_obj_list]
-		cell_names_list = [x.cell_names for x in cisTopic_obj_list]
-		cell_data_list = [x.cell_data.copy() for x in cisTopic_obj_list]
-		project_list = [x.project for x in cisTopic_obj_list]
-		path_to_fragments_list = [x.path_to_fragments for x in cisTopic_obj_list]
+		cistopic_obj_list.insert(0, self)
+		fragment_matrix_list = [x.fragment_matrix for x in cistopic_obj_list]
+		region_names_list = [x.region_names for x in cistopic_obj_list]
+		cell_names_list = [x.cell_names for x in cistopic_obj_list]
+		cell_data_list = [x.cell_data.copy() for x in cistopic_obj_list]
+		project_list = [x.project for x in cistopic_obj_list]
+		path_to_fragments_list = [x.path_to_fragments for x in cistopic_obj_list]
 		path_to_fragments_dict = {k: v for ptf in path_to_fragments_list for k,v in ptf.items()}
         
 		if len(project_list) > len(set(project_list)):
@@ -282,8 +283,8 @@ class cisTopicObject:
 			common_regions=list(set(region_names) & set(region_names_to_add))
 			diff_regions=list(set(region_names) ^ set(region_names_to_add))
 			
-			common_index_fm = getPositionIndex(common_regions, region_names)
-			common_index_fm_to_add = getPositionIndex(common_regions, region_names_to_add)
+			common_index_fm = get_position_index(common_regions, region_names)
+			common_index_fm_to_add = get_position_index(common_regions, region_names_to_add)
 			fragment_matrix=sparse.hstack([fragment_matrix[common_index_fm,], fragment_matrix_to_add[common_index_fm_to_add,]])
 			region_names=common_regions
 			
@@ -299,11 +300,11 @@ class cisTopicObject:
 		binary_matrix = sp.binarize(fragment_matrix, threshold=is_acc-1)
 		cell_data = pd.concat(cell_data_list, axis=0, sort=False)
 		cell_data.index = cell_names
-		region_data = [x.region_data for x in cisTopic_obj_list]
+		region_data = [x.region_data for x in cistopic_obj_list]
 		region_data = pd.concat(region_data, axis=0, sort=False)
 		if copy is True:
-			cisTopic_obj=cisTopicObject(fragment_matrix, binary_matrix, cell_names, region_names, cell_data, region_data, path_to_fragments_dict, project)
-			return cisTopic_obj
+			cistopic_obj=CistopicObject(fragment_matrix, binary_matrix, cell_names, region_names, cell_data, region_data, path_to_fragments_dict, project)
+			return cistopic_obj
 		else:
 			self.fragment_matrix = fragment_matrix
 			self.binary_matrix = binary_matrix
@@ -316,15 +317,15 @@ class cisTopicObject:
 			self.selected_model = []
 			self.projections= {}
 
-	def addLDAModel(self,
-					model: 'cisTopicLDAModel'):
+	def add_LDA_model(self,
+					model: 'CistopicLDAModel'):
 		"""
 		Add LDA model to a cisTopic object.
 		
 		Parameters
 		---
-		model: cisTopicLDAModel
-			Selected cisTopic LDA model results (see `LDAModels.evaluateModels`)
+		model: CistopicLDAModel
+			Selected cisTopic LDA model results (see `LDAModels.evaluate_models`)
 		"""
 		# Check that region and cell names are in the same order
 		model.region_topic = model.topic_region.loc[self.region_names,:]
@@ -332,7 +333,7 @@ class cisTopicObject:
 		self.selected_model = model
 
 
-def createcisTopicObject(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix],
+def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix],
 						 cell_names: Optional[List[str]] = None,
 						 region_names: Optional[List[str]] = None,
 						 path_to_blacklist: Optional[str] = None,
@@ -343,7 +344,7 @@ def createcisTopicObject(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix]
 						 project: Optional[str] = 'cisTopic',
 						 tag_cells: Optional[bool] = True):
 	"""
-	Creates a cisTopicObject from a count matrix.
+	Creates a CistopicObject from a count matrix.
 		
 	Parameters
 	---------
@@ -362,7 +363,7 @@ def createcisTopicObject(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix]
 	is_acc: int, optional
 		Minimal number of fragments for a region to be considered accessible. Default: 1
 	path_to_fragments: str, dict
-		A dict or str containing the paths to the fragments files used to generate the :class:`cisTopicObject`. Default: {}.
+		A dict or str containing the paths to the fragments files used to generate the :class:`CistopicObject`. Default: {}.
 	project: str, optional
 		Name of the cisTopic project. Default: 'cisTopic'
 	tag_cells: bool, optional
@@ -370,7 +371,7 @@ def createcisTopicObject(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix]
 		
 	Return
 	------
-	cisTopicObject
+	CistopicObject
 	
 	References
 	------
@@ -394,17 +395,17 @@ def createcisTopicObject(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix]
 
 	if isinstance(path_to_blacklist, str):
 		log.info('Removing blacklisted regions')
-		regions = pr.PyRanges(regionNamesToCoordinates(region_names))
+		regions = pr.PyRanges(region_names_to_coordinates(region_names))
 		blacklist = pr.read_bed(path_to_blacklist)
 		regions = regions.overlap(blacklist, invert=True)
 		selected_regions = [str(chrom) + ":" + str(start) + '-' + str(end) for chrom, start, end in zip(list(regions.Chromosome), list(regions.Start), list(regions.End))]
-		index = getPositionIndex(selected_regions, region_names)
+		index = get_position_index(selected_regions, region_names)
 		fragment_matrix = fragment_matrix[index,]
 		region_names = selected_regions
 
-	log.info('Creating cisTopicObject')
+	log.info('Creating CistopicObject')
 	binary_matrix = sp.binarize(fragment_matrix, threshold=is_acc-1)
-	selected_regions = nonZeroRows(binary_matrix)
+	selected_regions = non_zero_rows(binary_matrix)
 	fragment_matrix = fragment_matrix[selected_regions,]
 	binary_matrix = binary_matrix[selected_regions,]
 	region_names = subsetList(region_names, selected_regions)
@@ -421,7 +422,7 @@ def createcisTopicObject(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix]
 		cell_data = cell_data.loc[selected_cells,]
 		cell_names = cell_data.index.to_list()
 
-	region_data=regionNamesToCoordinates(region_names)
+	region_data=region_names_to_coordinates(region_names)
 	region_data['Width'] = abs(region_data.End-region_data.Start).astype(dtype)
 	region_data['cisTopic_nr_frag'] = np.array(fragment_matrix.sum(axis=1)).flatten()
 	region_data['cisTopic_log_nr_frag'] = np.log10(region_data['cisTopic_nr_frag'])
@@ -435,11 +436,11 @@ def createcisTopicObject(fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix]
 		region_data = region_data[selected_regions,:]
 		region_names = region_data.index.to_list()
 	
-	cisTopic_obj = cisTopicObject(fragment_matrix, binary_matrix, cell_names, region_names, cell_data, region_data, path_to_fragments, project)
+	cistopic_obj = CistopicObject(fragment_matrix, binary_matrix, cell_names, region_names, cell_data, region_data, path_to_fragments, project)
 	log.info('Done!')
-	return(cisTopic_obj)
+	return(cistopic_obj)
 
-def createcisTopicObjectFromMatrixFile(fragment_matrix_file: str,
+def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
 									   path_to_blacklist: Optional[str] = None,
 									   compression: Optional[str] = None,
 									   min_frag: Optional[int] = 1,
@@ -449,7 +450,7 @@ def createcisTopicObjectFromMatrixFile(fragment_matrix_file: str,
 									   sample_id: Optional[pd.DataFrame] = None,
 									   project: Optional[str] = 'cisTopic'):
 	"""
-	Creates a cisTopicObject from a count matrix file (tsv).
+	Creates a CistopicObject from a count matrix file (tsv).
 	
 	Parameters
 	---------
@@ -466,7 +467,7 @@ def createcisTopicObjectFromMatrixFile(fragment_matrix_file: str,
 	is_acc: int, optional
 		Minimal number of fragments for a region to be considered accessible. Default: 1
 	path_to_fragments: dict, optional
-		A list containing the paths to the fragments files used to generate the :class:`cisTopicObject`. Default: None.
+		A list containing the paths to the fragments files used to generate the :class:`CistopicObject`. Default: None.
 	sample_id: pd.DataFrame, optional
 		A data frame indicating from which sample each barcode is derived. Required if path_to_fragments is provided. Levels must agree with keys in path_to_fragments. Default: None.
 	project: str, optional
@@ -474,7 +475,7 @@ def createcisTopicObjectFromMatrixFile(fragment_matrix_file: str,
 		
 	Return
 	------
-	cisTopicObject
+	CistopicObject
 	
 	References
 	------
@@ -498,7 +499,7 @@ def createcisTopicObjectFromMatrixFile(fragment_matrix_file: str,
 			sep='\t',
 			header=0)
 
-	cisTopic_obj = createcisTopicObject(fragment_matrix=fragment_matrix,
+	cistopic_obj = create_cistopic_object(fragment_matrix=fragment_matrix,
 										path_to_blacklist=path_to_blacklist,
 										min_frag=min_frag,
 										min_cell=min_cell,
@@ -508,12 +509,12 @@ def createcisTopicObjectFromMatrixFile(fragment_matrix_file: str,
 										
 	if sample_id is not None:
 		if (isinstance(path_to_fragments, dict)):
-			cisTopic_obj.addCellData(sample_id)
+			cistopic_obj.add_cell_data(sample_id)
 		else:
 			log.error('Provide path_to_fragments with keys matching levels in sample_id!')
-	return(cisTopic_obj)
+	return(cistopic_obj)
 
-def createcisTopicObjectFromFragments(path_to_fragments: str,
+def create_cistopic_object_from_fragments(path_to_fragments: str,
 									  path_to_regions: str,
 									  path_to_blacklist: Optional[str] = None,
 									  metrics: Optional[Union[str, pd.DataFrame]] = None,
@@ -527,7 +528,7 @@ def createcisTopicObjectFromFragments(path_to_fragments: str,
 									  partition: Optional[int] = 5,
 									  fragments_df: Optional[Union[pd.DataFrame, pr.PyRanges]] = None):
 	"""
-	Creates a cisTopicObject from a fragments file and defined genomic intervals (compatible with CellRangerATAC output)
+	Creates a CistopicObject from a fragments file and defined genomic intervals (compatible with CellRangerATAC output)
 	
 	Parameters
 	---------
@@ -552,14 +553,14 @@ def createcisTopicObjectFromFragments(path_to_fragments: str,
 	remove_duplicates: bool, optional
 		Whether to consider duplicates when counting fragments. Default: True
 	project: str, optional
-		Name of the cisTopic project. It will also be used as name for sample_id in the cell_data :class:`cisTopicObject.cell_data`. Default: 'cisTopic'
+		Name of the cisTopic project. It will also be used as name for sample_id in the cell_data :class:`CistopicObject.cell_data`. Default: 'cisTopic'
 	partition: int, optional
 		When using Pandas > 0.21, counting may fail (https://github.com/pandas-dev/pandas/issues/26314). In that case, the fragments data frame is divided in this number of partitions, and after counting data is merged.
 	fragments_df: pd.DataFrame or pr.PyRanges, optional
 		A PyRanges or DataFrame containing chromosome, start, end and assigned barcode for each read, corresponding to the data in path_to_fragments.
 	Return
 	------
-	cisTopicObject
+	CistopicObject
 	
 	References
 	------
@@ -626,8 +627,8 @@ def createcisTopicObjectFromFragments(path_to_fragments: str,
 		fragment_matrix.columns.names = [None, None]
 		fragment_matrix.columns=[x[1] for x in fragment_matrix.columns.values]
 
-	# Create cisTopicObject
-	cisTopic_obj = createcisTopicObject(fragment_matrix=fragment_matrix,
+	# Create CistopicObject
+	cistopic_obj = create_cistopic_object(fragment_matrix=fragment_matrix,
 										path_to_blacklist=path_to_blacklist,
 										min_frag=min_frag,
 										min_cell=min_cell,
@@ -636,23 +637,23 @@ def createcisTopicObjectFromFragments(path_to_fragments: str,
 										project=project)
 	if metrics is not None:
 		metrics['barcode']=metrics.index.tolist()
-		cisTopic_obj.addCellData(metrics)
+		cistopic_obj.add_cell_data(metrics)
 	else:
 		FPB_DF['barcode']=FPB_DF.index.tolist()
-		cisTopic_obj.addCellData(FPB_DF)
-	return(cisTopic_obj)
+		cistopic_obj.add_cell_data(FPB_DF)
+	return(cistopic_obj)
 
-def merge(cisTopic_obj_list: List['cisTopicObject'],
+def merge(cistopic_obj_list: List['CistopicObject'],
 		  is_acc: Optional[int] = 1,
 		  project: Optional[str] = 'cisTopic_merge'):
 	
 	"""
-	Merge a list of :class:`cisTopicObject` to the input :class:`cisTopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`cisTopicObject` are derived from the cells it contains.
+	Merge a list of :class:`CistopicObject` to the input :class:`CistopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`CistopicObject` are derived from the cells it contains.
 		
 	Parameters
 	---------
-	cisTopic_obj_list: list
-		A list containing one or more :class:`cisTopicObject` to merge.
+	cistopic_obj_list: list
+		A list containing one or more :class:`CistopicObject` to merge.
 	is_acc: int, optional
 		Minimal number of fragments for a region to be considered accessible. Default: 1.
 	project: str, optional
@@ -660,10 +661,10 @@ def merge(cisTopic_obj_list: List['cisTopicObject'],
 
 	Return
 	------
-	cisTopicObject
-		A combined :class:`cisTopicObject`. Two new columns in :attr:`cell_data` indicate the :class:`cisTopicObject` of origin (`cisTopic_id`) and the fragment file from which the cell comes from (`path_to_fragments`).
+	CistopicObject
+		A combined :class:`CistopicObject`. Two new columns in :attr:`cell_data` indicate the :class:`CistopicObject` of origin (`cisTopic_id`) and the fragment file from which the cell comes from (`path_to_fragments`).
 	"""
 
-	merged_cisTopic_obj = cisTopic_obj_list[0].merge(cisTopic_obj_list[1:], is_acc=is_acc, project=project, copy=True)
-	return merged_cisTopic_obj
+	merged_cistopic_obj = cistopic_obj_list[0].merge(cistopic_obj_list[1:], is_acc=is_acc, project=project, copy=True)
+	return merged_cistopic_obj
 

@@ -6,7 +6,7 @@ import ray
 import os
 import subprocess
 
-from pycisTopic.utils import *
+from .utils import *
 from IPython.display import HTML
 
 def homer_results(homer_dict, name, results='known'):
@@ -17,7 +17,7 @@ def homer_results(homer_dict, name, results='known'):
     inplace_change(file, 'width="505" height="50"', 'width="1010" height="200"')
     return HTML(file)
 
-def Homer_findMotifsGenome(homer_path, input_data, outdir, genome, size='given', mask=True, denovo=False, length='8,10,12', n_cpu=5):
+def homer_find_motifs_genome(homer_path, input_data, outdir, genome, size='given', mask=True, denovo=False, length='8,10,12', n_cpu=5):
     # Create logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -41,7 +41,7 @@ def Homer_findMotifsGenome(homer_path, input_data, outdir, genome, size='given',
         bed_paths[key] = bed_path
     # Run Homer
     ray.init(num_cpus=n_cpu)
-    homer_dict = ray.get([Homer_ray.remote(homer_path,
+    homer_dict = ray.get([homer_ray.remote(homer_path,
                                 bed_paths[name],
                                 name,
                                 outdir + name, 
@@ -55,7 +55,7 @@ def Homer_findMotifsGenome(homer_path, input_data, outdir, genome, size='given',
     return homer_dict
 
 @ray.remote
-def Homer_ray(homer_path, bed_path, name, outdir, genome, size='given', mask=True, denovo=False, length='8,10,12'):
+def homer_ray(homer_path, bed_path, name, outdir, genome, size='given', mask=True, denovo=False, length='8,10,12'):
     # Create logger
     level    = logging.INFO
     format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'

@@ -4,12 +4,12 @@ import pyranges as pr
 import scipy.sparse as sparse
 import logging
 import sys
-from pycisTopic.utils import *
-from pycisTopic.diffFeatures import *
+from .utils import *
+from .diff_features import *
 
 pd.options.mode.chained_assignment = None
 
-def geneActvity(imputed_acc_object,
+def gene_actvity(imputed_acc_object,
                 pr_annot,
                 chromsizes,
                 use_gene_boundaries=True,
@@ -34,7 +34,7 @@ def geneActvity(imputed_acc_object,
     logging.basicConfig(level = level, format = format, handlers = handlers)
     log = logging.getLogger('cisTopic')
     # Calculate region weights
-    region_weights = regionWeights(imputed_acc_object,
+    region_weights_df = region_weights(imputed_acc_object,
                                    pr_annot,
                                    chromsizes,
                                    use_gene_boundaries,
@@ -50,12 +50,12 @@ def geneActvity(imputed_acc_object,
                                    extend_tss,
                                    gini_weight)
                                    # Weigthed aggregation
-    region_weights.loc[:,'Index'] = getPositionIndex(region_weights.Name, imputed_acc_object.feature_names)
-    region_weights.loc[:,'Weight'] = region_weights.Gene_size_weight*region_weights.Distance_weight*region_weights.Gini_weight
-    region_weights = region_weights.loc[region_weights.Weight > 0,:]
-    genes = list(set(region_weights.Gene))
+    region_weights_df.loc[:,'Index'] = get_position_index(region_weights_df.Name, imputed_acc_object.feature_names)
+    region_weights_df.loc[:,'Weight'] = region_weights_df.Gene_size_weight*region_weights_df.Distance_weight*region_weights_df.Gini_weight
+    region_weights_df = region_weights_df.loc[region_weights_df.Weight > 0,:]
+    genes = list(set(region_weights_df.Gene))
     log.info('Getting gene activity scores')
-    gene_act = np.array([weightedAggregation(imputed_acc_object.mtx, region_weights[region_weights.Gene == gene]) for gene in genes])
+    gene_act = np.array([weighted_aggregation(imputed_acc_object.mtx, region_weights_df[region_weights_df.Gene == gene]) for gene in genes])
     log.info('Creating imputed features object')
     if scale_factor != 1:
         log.info('Scaling matrix')
@@ -64,18 +64,18 @@ def geneActvity(imputed_acc_object,
         gene_act=sparse.csr_matrix(gene_act)
         keep_features_index = nonZeroRows(gene_act)
         gene_act=gene_act[keep_features_index,]
-        genes=subsetList(genes, keep_features_index)
-    gene_act=cisTopicImputedFeatures(gene_act, genes, imputed_acc_object.cell_names, project)
+        genes=subset_list(genes, keep_features_index)
+    gene_act=CistopicImputedFeatures(gene_act, genes, imputed_acc_object.cell_names, project)
     if return_weights == True:
-        return gene_act, region_weights
+        return gene_act, region_weights_df
     else:
         return gene_act
 
-def weightedAggregation(imputed_acc_obj_mtx, region_weights_per_gene):
-    gene_act = imputed_acc_obj_mtx[region_weights_per_gene.Index,:].T.dot((region_weights_per_gene.Weight))
+def weighted_aggregation(imputed_acc_obj_mtx, region_weights_df_per_gene):
+    gene_act = imputed_acc_obj_mtx[region_weights_df_per_gene.Index,:].T.dot((region_weights_df_per_gene.Weight))
     return gene_act
 
-def regionWeights(imputed_acc_object,
+def region_weights(imputed_acc_object,
                   pr_annot,
                   chromsizes,
                   use_gene_boundaries=True,
@@ -97,7 +97,7 @@ def regionWeights(imputed_acc_object,
     logging.basicConfig(level = level, format = format, handlers = handlers)
     log = logging.getLogger('cisTopic')
     # Load regions
-    pr_regions = regionNamesToCoordinates(imputed_acc_object.feature_names)
+    pr_regions = region_names_to_coordinates(imputed_acc_object.feature_names)
     pr_regions.loc[:,'Name'] = imputed_acc_object.feature_names
     pr_regions = pr.PyRanges(pr_regions)
     # Add gene width
@@ -120,7 +120,7 @@ def regionWeights(imputed_acc_object,
     pd_promoters.columns = ['Chromosome', 'Start', 'Strand', 'Gene', 'End']
     pd_promoters = pd_promoters.loc[:, ['Chromosome', 'Start', 'End', 'Strand', 'Gene']]
     pr_promoters = pr.PyRanges(pd_promoters)
-    pr_promoters = extendPyRanges(pr_promoters, extend_tss[0], extend_tss[1])
+    pr_promoters = extend_pyranges(pr_promoters, extend_tss[0], extend_tss[1])
     
     if use_gene_boundaries == True:
         log.info('Calculating gene boundaries')
@@ -157,10 +157,10 @@ def regionWeights(imputed_acc_object,
         pr_annot_df.loc[pr_annot_df.Distance_downstream > downstream[1],'Distance_downstream'] = downstream[1]
         pr_annot=pr.PyRanges(pr_annot_df)
         # Extend to search space
-        extended_annot = extendPyRangesWithLimits(pr_annot)
+        extended_annot = extend_pyranges_with_limits(pr_annot)
         extended_annot = extended_annot[['Chromosome', 'Start', 'End', 'Strand', 'Gene', 'Gene_width', 'Gene_size_weight', 'Distance_upstream', 'Distance_downstream']]
     else:
-        extended_annot = extendPyRanges(pr_annot, upstream[1], downstream[1])
+        extended_annot = extend_pyranges(pr_annot, upstream[1], downstream[1])
         extended_annot = extended_annot[['Chromosome', 'Start', 'End', 'Strand', 'Gene', 'Gene_width', 'Gene_size_weight']]
     # Format search space
     extended_annot = extended_annot.drop_duplicate_positions()
@@ -172,11 +172,11 @@ def regionWeights(imputed_acc_object,
     # Calculate distance
     log.info('Calculating distances')
     if use_gene_boundaries == True:
-        regions_per_gene = reducePyRangesWithLimits_b(regions_per_gene)
-        regions_per_gene = calculateDistanceWithLimits_join(regions_per_gene)
+        regions_per_gene = reduce_pyranges_with_limits_b(regions_per_gene)
+        regions_per_gene = calculate_distance_with_limits_join(regions_per_gene)
     else:
-        regions_per_gene = reducePyRanges_b(regions_per_gene, upstream[1], downstream[1])
-        regions_per_gene = calculateDistance_join(regions_per_gene)
+        regions_per_gene = reduce_pyranges_b(regions_per_gene, upstream[1], downstream[1])
+        regions_per_gene = calculate_distance_join(regions_per_gene)
         regions_per_gene.Distance_weight = 1
     if distance_weight == True:
         log.info('Calculating distance weigths')
@@ -207,7 +207,7 @@ def regionWeights(imputed_acc_object,
     # Calculate variability weight
     if gini_weight == True:
         log.info('Calculating gini weights')
-        subset_imputed_acc_object = subsetImputedMatrix(imputed_acc_object, features=list(set(regions_per_gene.Name)))
+        subset_imputed_acc_object = subset_imputed_matrix(imputed_acc_object, features=list(set(regions_per_gene.Name)))
         x = subset_imputed_acc_object.mtx
         if sparse.issparse(x):
             gini_weight = [gini(x[i,:].toarray()) for i in range(x.shape[0])]
@@ -226,7 +226,7 @@ def regionWeights(imputed_acc_object,
         weights_df = regions_per_gene.df.loc[:, ['Name', 'Gene', 'Distance', 'Gene_size_weight', 'Distance_weight', 'Gini_weight']]
     return weights_df
 
-def extendPyRangesWithLimits(pr_obj):
+def extend_pyranges_with_limits(pr_obj):
     # Split per strand
     positive_pr = pr_obj[pr_obj.Strand == '+']
     negative_pr = pr_obj[pr_obj.Strand == '-']
@@ -240,7 +240,7 @@ def extendPyRangesWithLimits(pr_obj):
     extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
     return extended_pr
 
-def reducePyRangesWithLimits_b(pr_obj):
+def reduce_pyranges_with_limits_b(pr_obj):
     # Split per strand
     positive_pr = pr_obj[pr_obj.Strand == '+']
     negative_pr = pr_obj[pr_obj.Strand == '-']
@@ -254,7 +254,7 @@ def reducePyRangesWithLimits_b(pr_obj):
     extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
     return extended_pr
 
-def extendPyRanges(pr_obj, upstream, downstream):
+def extend_pyranges(pr_obj, upstream, downstream):
     # Split per strand
     positive_pr = pr_obj[pr_obj.Strand == '+']
     negative_pr = pr_obj[pr_obj.Strand == '-']
@@ -268,7 +268,7 @@ def extendPyRanges(pr_obj, upstream, downstream):
     extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
     return extended_pr
 
-def reducePyRanges_b(pr_obj, upstream, downstream):
+def reduce_pyranges_b(pr_obj, upstream, downstream):
     # Split per strand
     positive_pr = pr_obj[pr_obj.Strand == '+']
     negative_pr = pr_obj[pr_obj.Strand == '-']
@@ -282,7 +282,7 @@ def reducePyRanges_b(pr_obj, upstream, downstream):
     extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
     return extended_pr
 
-def calculateDistance_join(pr_obj):
+def calculate_distance_join(pr_obj):
     # Split per strand
     pr_obj_df = pr_obj.df
     distance_df = pd.DataFrame([pr_obj_df.Start_b-pr_obj_df.Start, pr_obj_df.End_b-pr_obj_df.Start, pr_obj_df.Strand], index=['start_dist', 'end_dist', 'strand'])
@@ -298,7 +298,7 @@ def calculateDistance_join(pr_obj):
     pr_obj =  pr_obj[['Chromosome', 'Start', 'End', 'Strand', 'Name', 'Gene', 'Gene_width', 'Gene_size_weight', 'Distance']]
     return pr_obj
 
-def calculateDistanceWithLimits_join(pr_obj):
+def calculate_distance_with_limits_join(pr_obj):
     # Split per strand
     pr_obj_df = pr_obj.df
     distance_df = pd.DataFrame([pr_obj_df.Start_b-pr_obj_df.Start, pr_obj_df.End_b-pr_obj_df.Start, pr_obj_df.Strand], index=['start_dist', 'end_dist', 'strand'])

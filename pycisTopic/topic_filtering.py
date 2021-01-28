@@ -5,8 +5,8 @@ import matplotlib.cm as cm
 from itertools import compress
 import numpy as np
 
-def topicSelection(cisTopic_obj, min_coherence=None, max_coherence=None, min_assignments=None, max_assignments=None, cmap=cm.viridis, save=None):
-    model=cisTopic_obj.selected_model
+def topic_selection(cistopic_obj, min_coherence=None, max_coherence=None, min_assignments=None, max_assignments=None, cmap=cm.viridis, save=None):
+    model=cistopic_obj.selected_model
     topic_coh=model.coherence
     topic_ass=model.topic_ass
     marginal_dist=model.marg_topic

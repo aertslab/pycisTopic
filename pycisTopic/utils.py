@@ -8,27 +8,27 @@ import pyranges as pr
 import re
 
 
-def regionNamesToCoordinates(regionNames):
-    chrom=pd.DataFrame([i.split(':', 1)[0] for i in regionNames])
-    coor=[i.split(':', 1)[1] for i in regionNames]
+def region_names_to_coordinates(region_names):
+    chrom=pd.DataFrame([i.split(':', 1)[0] for i in region_names])
+    coor=[i.split(':', 1)[1] for i in region_names]
     start=pd.DataFrame([int(i.split('-', 1)[0]) for i in coor])
     end=pd.DataFrame([int(i.split('-', 1)[1]) for i in coor])
     regiondf=pd.concat([chrom, start, end], axis=1, sort=False)
-    regiondf.index=regionNames
+    regiondf.index=region_names
     regiondf.columns=['Chromosome', 'Start', 'End']
     return(regiondf)
 
-def getPositionIndex(query_list, target_list):
+def get_position_index(query_list, target_list):
     d = {k:v for v,k in enumerate(target_list)}
     index=(d[k] for k in query_list)
     return list(index)
 
-def nonZeroRows(X):
+def non_zero_rows(X):
     nonzero_row_indice, _ = X.nonzero()
     unique_nonzero_indice = np.unique(nonzero_row_indice)
     return unique_nonzero_indice
 
-def subsetList(target_list, index_list):
+def subset_list(target_list, index_list):
     X = list(map(target_list.__getitem__, index_list))
     return X
 
@@ -83,7 +83,7 @@ def gini(array):
     n = array.shape[0]#number of array elements
     return ((np.sum((2 * index - n  - 1) * array)) / (n * np.sum(array))) #Gini coefficient
 
-def regionsOverlap(target, query):
+def regions_overlap(target, query):
     # Read input
     if isinstance(target, str):
         target_pr=pr.read_bed(target)
@@ -103,7 +103,7 @@ def regionsOverlap(target, query):
     selected_regions = [str(chrom) + ":" + str(start) + '-' + str(end) for chrom, start, end in zip(list(target_pr.Chromosome), list(target_pr.Start), list(target_pr.End))]
     return selected_regions
 
-def formatInputRegions(input_data):
+def format_input_regions(input_data):
     new_data = {}
     for key in input_data.keys():
         data = input_data[key]
@@ -126,7 +126,7 @@ def inplace_change(filename, old_string, new_string):
         s = s.replace(old_string, new_string)
         f.write(s)     
 
-def loadcisTopicModel(path_to_cisTopic_model_matrices):
+def load_cisTopic_model(path_to_cisTopic_model_matrices):
     metrics = None
     coherence = None
     marg_topic = None
