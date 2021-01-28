@@ -741,6 +741,7 @@ def evaluateModels(models: List['cisTopicLDAModel'],
                    metrics: Optional[str]=['Minmo_2011', 'loglikelihood', 'Cao_Juan_2009', 'Arun_2010'],
                    min_topics_coh: Optional[int]=5,
                    plot: Optional[bool]=True,
+                   figsize: Optional[Tuple[float, float]] = (6.4,4.8),
                    plot_metrics: Optional[bool]=False,
                    save: Optional[str]=None):
     """
@@ -765,6 +766,8 @@ def evaluateModels(models: List['cisTopicLDAModel'],
         Minimum number of topics on a topic to use its coherence for model selection. Default: 5.
     plot: bool, optional
         Whether to return plot to the console. Default: True.
+    figsize: tuple, optional
+		Size of the figure. Default: (6.4, 4.8)
     plot_metrics: bool, optional
         Whether to plot metrics independently. Default: False.
     save: str, optional
@@ -787,7 +790,7 @@ def evaluateModels(models: List['cisTopicLDAModel'],
     """
     all_topics=sorted([models[x].n_topic for x in range(0, len(models))])
     metrics_dict = {}
-    fig=plt.figure()
+    fig = plt.figure(figsize=figsize)
     if 'Minmo_2011' in metrics:
         in_index = [i for i in range(len(all_topics)) if all_topics[i] >= min_topics_coh]
     if 'Arun_2010' in metrics:
