@@ -8,7 +8,7 @@ conda create -n pycisTopic_env python=3.7.4
 conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
-conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart
+conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart scrublet
 conda install -c conda-forge loompy igraph python-igraph leidenalg lda IPython gensim networkx typing adjusttext gcc openssl 
 conda install ipykernel  # for Jupyter
 pip install ray # https://docs.ray.io/en/master/installation.html
