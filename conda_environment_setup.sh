@@ -8,7 +8,7 @@ conda create -n pycisTopic_env python=3.7.4
 conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
-conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart scrublet
+conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart 
 conda install -c conda-forge loompy igraph python-igraph leidenalg lda IPython gensim networkx typing adjusttext gcc openssl 
 conda install ipykernel  # for Jupyter
 pip install ray # https://docs.ray.io/en/master/installation.html
@@ -40,6 +40,9 @@ import pycisTopic
 conda install scikit-learn statsmodels numba pytables
 conda install -c conda-forge python-igraph louvain multicore-tsne
 # pip install scanpy   #  ERROR: anndata 0.7.5 has requirement pandas!=1.1,>=1.0, but you'll have pandas 0.25.3 which is incompatible.
+
+module load GCC
+pip install scrublet
 
 #########
 # trying to run tutorial... started complainin about missing...
