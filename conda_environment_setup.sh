@@ -39,7 +39,7 @@ import pycisTopic
 ## scanpy (https://scanpy.readthedocs.io/en/latest/installation.html) - not required?
 conda install scikit-learn statsmodels numba pytables
 conda install -c conda-forge python-igraph louvain multicore-tsne
-# pip install scanpy   #  ERROR: anndata 0.7.5 has requirement pandas!=1.1,>=1.0, but you'll have pandas 0.25.3 which is incompatible.
+pip install scanpy   #  requires pandas!=1.1,>=1.0
 
 module load GCC
 pip install scrublet
