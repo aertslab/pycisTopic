@@ -8,17 +8,21 @@ conda create -n pycisTopic_env python=3.7.4
 conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
+## pyscenic (required for pycisTopic)
+conda install -c anaconda xlrd cytoolz
+pip install pyscenic # requires early version of pandas, but only GRNBoost, ignore it...
+
+conda install pandas==1.2.0 
+conda install -c conda-forge loompy igraph python-igraph leidenalg lda IPython gensim networkx typing adjusttext gcc openssl python-annoy
 conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart 
-conda install -c conda-forge loompy igraph python-igraph leidenalg lda IPython gensim networkx typing adjusttext gcc openssl 
+
 conda install ipykernel  # for Jupyter
 pip install ray # https://docs.ray.io/en/master/installation.html
 pip install -U "tmtoolkit[recommended]"
 conda install -c conda-forge cython fftw # for fitsne
 pip install fitsne
 
-## pyscenic (required for pycisTopic)
-conda install -c anaconda xlrd cytoolz
-pip install pyscenic # incompatible version with the one required by tmtoolkit
+
 
 # conda list
 # These "imports" are not listed in conda but are available (i.e. default from python? or installed through another dependency?):
