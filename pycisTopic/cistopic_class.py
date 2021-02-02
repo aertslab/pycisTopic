@@ -67,7 +67,7 @@ class CistopicObject:
 	
 	
 	def __str__(self):
-		descr = f"CistopicObject from project {self.project} with nCells × nRegions = {len(self.cell_names)} × {len(self.region_names)}"
+		descr = f"CistopicObject from project {self.project} with n_cells × n_regions = {len(self.cell_names)} × {len(self.region_names)}"
 		return(descr)
 
 	def add_cell_data(self,
@@ -127,7 +127,7 @@ class CistopicObject:
 			print("Warning: Some regions in this CistopicObject are not present in this region_data. Values will be filled with Nan \n")
 		if len(set(self.region_data.columns.values) & set(region_data.columns.values)) > 0:
 			print(f"Columns {list(set(self.region_data.columns.values) & set(region_data.columns.values))} will be overwritten")
-			self.region_data = self.region_data.loc[:,list(set(self.region_data.columns.values).difference(set(self.columns.values)))]
+			self.region_data = self.region_data.loc[:,list(set(self.region_data.columns.values).difference(set(region_data.columns.values)))]
 		region_data = region_data.loc[list(set(self.region_names) & set(region_data.index)),]
 		new_region_data = pd.concat([self.region_data, region_data], axis=1, sort=False)
 		self.region_data = new_region_data.loc[self.region_names,:]

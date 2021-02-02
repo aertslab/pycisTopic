@@ -357,8 +357,8 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
 			emb_nan = embedding.loc[data_mat.copy().loc[:,var].dropna().index.tolist()]
 			label_pd = pd.concat([emb_nan, data_mat.loc[:,[var]].dropna()], axis=1, sort=False)
 		else:
-			var_data = data_mat.copy().fillna('NA').loc[:,var].to_list()
-			label_pd = pd.concat([embedding, data_mat.fillna('NA').loc[:,[var]]], axis=1, sort=False)
+			var_data = data_mat.copy().astype(str).fillna('NA').loc[:,var].to_list()
+			label_pd = pd.concat([embedding, data_mat.astype(str).fillna('NA').loc[:,[var]]], axis=1, sort=False)
 		if isinstance(var_data[0], str):
 			categories = set(var_data)
 			try:
@@ -377,7 +377,7 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
 				plt.xlabel(emb_nan.columns[0])
 				plt.ylabel(emb_nan.columns[1])
 			else:
-				plt.scatter(embedding.iloc[:, 0], embedding.iloc[:, 1], c=data_mat.fillna('NA').loc[:,var].apply(lambda x: color_dict[x]), s=dot_size, alpha=alpha)
+				plt.scatter(embedding.iloc[:, 0], embedding.iloc[:, 1], c=data_mat.astype(str).fillna('NA').loc[:,var].apply(lambda x: color_dict[x]), s=dot_size, alpha=alpha)
 				plt.xlabel(embedding.columns[0])
 				plt.ylabel(embedding.columns[1])
 				
@@ -410,7 +410,7 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
 			if num_columns > 1:
 				plt.subplot(num_rows, num_columns, i)
 				i = i + 1
-			plt.scatter(embedding.iloc[o, 0], embedding.iloc[o, 1], c=subsetList(var_data,o), cmap=cmap, s=dot_size,  alpha=alpha)
+			plt.scatter(embedding.iloc[o, 0], embedding.iloc[o, 1], c=subset_list(var_data,o), cmap=cmap, s=dot_size,  alpha=alpha)
 			plt.xlabel(embedding.columns[0])
 			plt.ylabel(embedding.columns[1])
 			plt.title(var)
@@ -532,10 +532,10 @@ def plot_topic(cistopic_obj: 'CistopicObject',
 			plt.subplot(num_rows, num_columns, i)
 			i = i + 1
 		if scale == False:
-			plt.scatter(embedding_plot.iloc[o, 0], embedding_plot.iloc[o, 1], c=subsetList(var_data,o), cmap=cmap, s=dot_size, alpha=alpha, vmin=0, vmax=max(var_data))
+			plt.scatter(embedding_plot.iloc[o, 0], embedding_plot.iloc[o, 1], c=subset_list(var_data,o), cmap=cmap, s=dot_size, alpha=alpha, vmin=0, vmax=max(var_data))
 			normalize = mcolors.Normalize(vmin=0, vmax=np.array(var_data).max())
 		else:
-			plt.scatter(embedding_plot.iloc[o, 0], embedding_plot.iloc[o, 1], c=subsetList(var_data,o), cmap=cmap, s=dot_size, alpha=alpha)
+			plt.scatter(embedding_plot.iloc[o, 0], embedding_plot.iloc[o, 1], c=subset_list(var_data,o), cmap=cmap, s=dot_size, alpha=alpha)
 			normalize = mcolors.Normalize(vmin=np.array(var_data).min(), vmax=np.array(var_data).max())
 		plt.xlabel(embedding_plot.columns[0])
 		plt.ylabel(embedding_plot.columns[1])
@@ -606,7 +606,7 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
 		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 		
 	if num_columns > 1:
-		num_rows = np.ceil(len(topic)/num_columns)
+		num_rows = np.ceil(len(features)/num_columns)
 		if figsize == (6.4, 4.8):
 			figsize = (6.4*num_columns, 4.8*num_rows)
 		i = 1
@@ -617,7 +617,7 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
 		embedding=cistopic_obj.projections['cell'][reduction_name]
 		if selected_cells != None:
 			embedding=embedding.loc[selected_cells]
-		feature_index = getPositionIndex([feature], imputed_data.feature_names)
+		feature_index = get_position_index([feature], imputed_data.feature_names)
 		feature_data = imputed_data.mtx[feature_index,:]
 		if scale == True:
 			feature_data=sklearn.preprocessing.scale(feature_data.todense(), axis=1)
@@ -629,7 +629,10 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
 		embedding = embedding.loc[color_data.index.tolist(),:]
 		var_data=color_data.iloc[:,0].to_list()
 		o = np.argsort(var_data)
-		plt.scatter(embedding.iloc[:, 0], embedding.iloc[:, 1], c=subsetList(var_data,o), s=dot_size, alpha=alpha)
+		if num_columns > 1:
+			plt.subplot(num_rows, num_columns, i)
+			i = i + 1
+		plt.scatter(embedding.iloc[:, 0], embedding.iloc[:, 1], c=subset_list(var_data,o), s=dot_size, alpha=alpha)
 		plt.xlabel(embedding.columns[0])
 		plt.ylabel(embedding.columns[1])
 		plt.title(feature)
@@ -641,7 +644,7 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
 		if num_columns == 1:
 			if save != None:
 				pdf.savefig(fig, bbox_inches='tight')
-		plt.show()
+			plt.show()
 		
 	if num_columns > 1:
 		plt.tight_layout()

@@ -203,7 +203,7 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
 		if remove_duplicates == True:
 			group_pr.to_bigwig(path=bigwig_path_group, chromosome_sizes=chromsizes, rpm=normalize_bigwig)
 		else:
-			group_pr.to_bigwig(group_pr, path=bigwig_path_group, chromsizes=chromsizes, rpm=normalize_bigwig, value_col='Score')
+			group_pr.to_bigwig(path=bigwig_path_group, chromsizes=chromsizes, rpm=normalize_bigwig, value_col='Score')
 	if isinstance(bed_path, str):
 		group_pr.to_bed(path=bed_path_group, keep=True, compression='infer', chain=False)
 	log.info(str(group)+' done!')
