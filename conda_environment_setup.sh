@@ -8,17 +8,22 @@ conda create -n pycisTopic_env python=3.7.4
 conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
-conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart
-conda install -c conda-forge loompy igraph python-igraph leidenalg lda IPython gensim networkx typing adjusttext gcc openssl 
+## pyscenic (required for pycisTopic)
+conda install -c anaconda xlrd cytoolz
+pip install pyscenic # requires early version of pandas, but only GRNBoost, ignore it...
+
+conda install pandas==1.2.0 
+conda install -c conda-forge loompy igraph python-igraph leidenalg lda IPython gensim networkx typing adjusttext gcc openssl python-annoy
+conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart 
+
 conda install ipykernel  # for Jupyter
 pip install ray # https://docs.ray.io/en/master/installation.html
 pip install -U "tmtoolkit[recommended]"
 conda install -c conda-forge cython fftw # for fitsne
 pip install fitsne
 
-## pyscenic (required for pycisTopic)
-conda install -c anaconda xlrd cytoolz
-pip install pyscenic # incompatible version with the one required by tmtoolkit
+pip3 install bbknn # from bioconda didn't work...
+
 
 # conda list
 # These "imports" are not listed in conda but are available (i.e. default from python? or installed through another dependency?):
@@ -39,7 +44,10 @@ import pycisTopic
 ## scanpy (https://scanpy.readthedocs.io/en/latest/installation.html) - not required?
 conda install scikit-learn statsmodels numba pytables
 conda install -c conda-forge python-igraph louvain multicore-tsne
-# pip install scanpy   #  ERROR: anndata 0.7.5 has requirement pandas!=1.1,>=1.0, but you'll have pandas 0.25.3 which is incompatible.
+pip install scanpy   #  requires pandas!=1.1,>=1.0
+
+module load GCC
+pip install scrublet
 
 #########
 # trying to run tutorial... started complainin about missing...
