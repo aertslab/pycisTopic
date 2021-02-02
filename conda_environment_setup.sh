@@ -22,6 +22,7 @@ pip install -U "tmtoolkit[recommended]"
 conda install -c conda-forge cython fftw # for fitsne
 pip install fitsne
 
+pip3 install bbknn # from bioconda didn't work...
 
 
 # conda list
