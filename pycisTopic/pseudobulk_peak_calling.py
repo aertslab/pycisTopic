@@ -24,7 +24,8 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 					 sample_id_col: Optional[str] = 'sample_id',
 					 n_cpu: Optional[int] = 1,
 					 normalize_bigwig: Optional[bool] = True,
-					 remove_duplicates: Optional[bool] = True):
+					 remove_duplicates: Optional[bool] = True,
+					 **kwargs):
 	"""
 	Create pseudobulks as bed and bigwig from single cell fragments file given a barcode annotation. 
 
@@ -96,7 +97,10 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 			else:	
 				log.info('Reading fragments from ' + path_to_fragments[sample_id])
 				fragments_df=pr.read_bed(path_to_fragments[sample_id], as_df=True)
-				fragments_df = fragments_df.loc[fragments_df['Name'].isin(prepare_tag_cells(cell_data.index.tolist()))]	
+				if 'barcode' in cell_data:
+					fragments_df = fragments_df.loc[fragments_df['Name'].isin(cell_data['barcode'].tolist())]	
+				else:
+					fragments_df = fragments_df.loc[fragments_df['Name'].isin(prepare_tag_cells(cell_data.index.tolist()))]	
 				fragments_df_dict[sample_id] = fragments_df
 
 	# Set groups
@@ -115,8 +119,8 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 	if not os.path.exists(bigwig_path):
 		os.makedirs(bigwig_path)
 	# Create pseudobulks
-	ray.init(num_cpus = n_cpu)
-	paths = ray.get([export_pseudobulk_ray.remote(cell_data,
+	ray.init(num_cpus = n_cpu, lru_evict=True, **kwargs)
+	ray_handle = [export_pseudobulk_ray.remote(cell_data,
 								group,
 								fragments_df_dict, 
 								chromsizes,
@@ -124,10 +128,10 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 								bed_path,
 								sample_id_col,
 								normalize_bigwig,
-								remove_duplicates) for group in groups])
+								remove_duplicates) for group in groups]
 	ray.shutdown()
-	bw_paths = {list(paths[x].keys())[0]:paths[x][list(paths[x].keys())[0]][0] for x in range(len(paths))}
-	bed_paths = {list(paths[x].keys())[0]:paths[x][list(paths[x].keys())[0]][1] for x in range(len(paths))}
+	bw_paths = {group: bigwig_path + str(group) + '.bw' for group in groups}
+	bed_paths = {group: bed_path + str(group) + '.bed.gz' for group in groups}
 	return bw_paths, bed_paths
 
 @ray.remote
@@ -164,11 +168,6 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
 		Whether bigwig files should be CPM normalized. Default: True.
 	remove_duplicates: bool, optional
 		Whether duplicates should be removed before converting the data to bigwig.
-		
-	Return
-	------
-	dict
-		A dictionary containing the path to the newly created bed and bigwig files.
 	"""
 	# Create logger
 	level	= logging.INFO
@@ -207,7 +206,7 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
 	if isinstance(bed_path, str):
 		group_pr.to_bed(path=bed_path_group, keep=True, compression='infer', chain=False)
 	log.info(str(group)+' done!')
-	return {group: [bigwig_path_group, bed_path_group]}
+
 
 def peak_calling(macs_path: str,
 				bed_paths: Dict,
@@ -218,7 +217,8 @@ def peak_calling(macs_path: str,
 			 	shift: Optional[int] = 73,
 			 	ext_size: Optional[int] = 146,
 			 	keep_dup: Optional[str] = 'all',
-			 	q_value: Optional[float] = 0.05):
+			 	q_value: Optional[float] = 0.05,
+			 	**kwargs):
 	"""
 	Performs pseudobulk peak calling with MACS2. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
 
@@ -253,7 +253,7 @@ def peak_calling(macs_path: str,
 	dict
 		A dictionary containing each group label as names and :class:`pr.PyRanges` with MACS2 narrow peaks as values.
 	"""
-	ray.init(num_cpus=n_cpu)
+	ray.init(num_cpus=n_cpu, **kwargs)
 	narrow_peaks = ray.get([macs_call_peak_ray.remote(macs_path,
 								bed_paths[name],
 								name,
