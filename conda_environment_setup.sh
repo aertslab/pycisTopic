@@ -5,6 +5,7 @@ my_conda_initialize
 conda create -n pycisTopic_env python=3.7.4
 
 # Install dependencies (& any extra packages)
+# Note: this ended up being a mess... TODO: cleanup the list. Keep each installation only once...
 conda activate pycisTopic_env
 
 conda install numpy pandas matplotlib seaborn scipy 
@@ -68,5 +69,22 @@ conda install pandas==1.2.0  # important
 #########
 # After installing any new package, check pandas version. It keeps getting downgraded:
 conda list | grep pandas
+
+# 11 Feb 2021: Update to  Arboreto (0.1.6) and pySCENIC (0.11.0)
+conda uninstall pyscenic
+pip uninstall pyscenic
+conda uninstall arboreto
+pip uninstall arboreto
+pip uninstall pandas
+conda uninstall pandas
+
+conda install pandas==1.2.0  # important
+pip install arboreto
+pip install pyscenic
+
+conda list | grep pandas
+conda list | grep pyscenic
+conda list | grep arboreto
+
 
 
