@@ -78,7 +78,7 @@ pip uninstall arboreto
 pip uninstall pandas
 conda uninstall pandas
 
-conda install pandas==1.2.0  # important
+conda install pandas==1.2.0
 pip install arboreto
 pip install pyscenic
 
