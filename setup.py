@@ -7,7 +7,8 @@ def read_requirements(fname):
 
 setup(
      name='pycisTopic',
-     version='0.1',
+     use_scm_version=True,
+     setup_requires=['setuptools_scm'],
      packages=find_packages(),
      include_dirs=["."],
      install_requires=read_requirements('requirements.txt'),
