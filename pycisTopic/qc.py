@@ -224,10 +224,11 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
 	y = FPB['Dupl_rate']
 	
 	fig = plt.figure()
-	xy = np.vstack([x,y])
+	xy = np.vstack([np.log(x),y])
 	z = gaussian_kde(xy)(xy)
 	idx = z.argsort()
 	x, y, z = x[idx], y[idx], z[idx]
+
 	plt.scatter(x, y, c=z, s=10,  edgecolor='', cmap=cmap)
 	plt.ylim(0,1)
 	plt.xscale("log")
@@ -1094,7 +1095,7 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 			x = plot_data['Unique_nr_frag']
 			y = plot_data['Dupl_rate']
 	
-			xy = np.vstack([x,y])
+			xy = np.vstack([np.log(x),y])
 			z = gaussian_kde(xy)(xy)
 			idx = z.argsort()
 			x, y, z = x[idx], y[idx], z[idx]
@@ -1106,6 +1107,7 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 			plt.xlabel("Number of (unique) fragments",fontsize=10)
 			plt.ylabel("Duplication rate",fontsize=10)
 			plt.colorbar().set_label('Density')
+			plt.xlim(min(x), max(x))
 
 
 def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
@@ -1400,10 +1402,6 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
 			# Take cell data
 			y=input_metrics[key][var_y]
 			# Color by density
-			xy = np.vstack([x,y])
-			z = gaussian_kde(xy)(xy)
-			idx = z.argsort()
-			x, y, z = x[idx], y[idx], z[idx]
 			xy = np.vstack([x,y])
 			z = gaussian_kde(xy)(xy)
 			idx = z.argsort()
