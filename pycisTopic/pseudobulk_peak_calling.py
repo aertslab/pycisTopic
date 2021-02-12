@@ -119,7 +119,7 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 	if not os.path.exists(bigwig_path):
 		os.makedirs(bigwig_path)
 	# Create pseudobulks
-	ray.init(num_cpus = n_cpu, lru_evict=True, **kwargs)
+	ray.init(num_cpus = n_cpu, **kwargs)
 	ray_handle = [export_pseudobulk_ray.remote(cell_data,
 								group,
 								fragments_df_dict, 
@@ -253,6 +253,9 @@ def peak_calling(macs_path: str,
 	dict
 		A dictionary containing each group label as names and :class:`pr.PyRanges` with MACS2 narrow peaks as values.
 	"""
+	if not os.path.exists(outdir):
+		os.makedirs(outdir)
+		
 	ray.init(num_cpus=n_cpu, **kwargs)
 	narrow_peaks = ray.get([macs_call_peak_ray.remote(macs_path,
 								bed_paths[name],
@@ -320,9 +323,6 @@ def macs_call_peak_ray(macs_path: str,
 	handlers = [logging.StreamHandler(stream=sys.stdout)]
 	logging.basicConfig(level = level, format = format, handlers = handlers)
 	log = logging.getLogger('cisTopic')
-	
-	if not os.path.exists(outdir):
-		os.makedirs(outdir)
 	
 	MACS_peak_calling = MACSCallPeak(macs_path, bed_path, name, outdir, genome_size, input_format=input_format, shift=shift, ext_size=ext_size, keep_dup = keep_dup, q_value = q_value)
 	log.info(name + ' done!')

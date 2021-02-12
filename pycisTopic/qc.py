@@ -713,6 +713,7 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 				   tss_window: Optional[int] = 50,
 				   tss_minimum_signal_window: Optional[int] = 100,
 				   tss_rolling_window: Optional[int] = 10,
+				   check_for_duplicates: Optional[bool] = True,
 				   remove_duplicates: Optional[bool] = True):
 	""""
 	Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
@@ -746,6 +747,8 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
 	tss_rolling_window: int, optional
 		Rolling window used to smooth signal. Default: 10.
+	check_for_duplicates: bool, optional
+		If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
 	remove_duplicates: bool, optional
 		Whether to remove duplicates. Default: True.
 		
@@ -761,7 +764,7 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 	handlers = [logging.StreamHandler(stream=sys.stdout)]
 	logging.basicConfig(level = level, format = format, handlers = handlers)
 	log = logging.getLogger('cisTopic')
-	# Gconver dictionaries to list
+	# Convert dictionaries to list
 	label_list = list(fragments_dict.keys())
 	fragments_list = [fragments_dict[key] for key in fragments_dict.keys()]
 	path_to_regions = [path_to_regions[key] for key in fragments_dict.keys()]
@@ -777,13 +780,23 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 			fragments_df=pr.read_bed(fragments, as_df=True)
 		else:
 			fragments_df=fragments
+		# Check for duplicates
+		if 'Score' not in fragments_df:
+			if check_for_duplicates == True:
+				log.info("Collapsing duplicates")
+				fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
+				dup_scores = fragments_df.groupby(["Read_id"]).size()
+				fragments_df = fragments_df.drop_duplicates()
+				fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()].tolist()
+			else:
+				fragments_df['Score'] = 1
 		# Prepare regions
 		if isinstance(path_to_regions, list):
 			path_to_regions = path_to_regions[i]
 		# Prepare valid barcodes
 		if valid_bc is not None:
 			if n_bc is not None or n_frag is not None:
-				valid_bc=None
+				valid_bc=None			
 		# Rank plot
 		if 'barcode_rank_plot' in stats:
 			# Rank plot
@@ -862,6 +875,7 @@ def plot_sample_metrics(profile_data_dict: Dict[str, pd.DataFrame],
 				ncol: Optional[int] = 1,
 				figsize: Optional[Tuple[int,int]] = None,
 				insert_size_distriubtion_xlim: Optional[List[int]] = None,
+				legend_outside: Optional[bool] = False,
 				plot: Optional[bool] = True,
 				save: Optional[str] = None):
 	
@@ -897,7 +911,8 @@ def plot_sample_metrics(profile_data_dict: Dict[str, pd.DataFrame],
 				remove_duplicates = remove_duplicates,
 				color = color,
 				cmap = cmap, 
-				insert_size_distriubtion_xlim = insert_size_distriubtion_xlim)
+				insert_size_distriubtion_xlim = insert_size_distriubtion_xlim,
+				legend_outside = legend_outside)
 	
 	multiplot_from_generator(g=plot_sample_metrics_generator_obj,
 							 num_columns=ncol,
@@ -912,7 +927,8 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 				remove_duplicates: Optional[bool] = True,
 				color: Optional[List[List[Union[str]]]] = None,
 				cmap: Optional[str] = None, 
-				insert_size_distriubtion_xlim: Optional[List[int]] = None):
+				insert_size_distriubtion_xlim: Optional[List[int]] = None,
+				legend_outside: Optional[bool] = False):
 	"""
 	Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample). This function creates the generator to pass to the multiplotting function.
 	
@@ -966,10 +982,10 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 				NF=plot_data['Unique_nr_frag']
 			
 			if color is None:
-				plt.plot(nosel, NF, sel, NF)
+				plt.plot(nosel, NF, sel, NF, 'grey')
 			else:
 				if len(color[i]) < 2:
-					plt.plot(nosel, NF, sel, NF)
+					plt.plot(nosel, NF, sel, NF, 'grey')
 				else:
 					plt.plot(nosel, NF, color[i][0], sel , NF, color[i][1])
 						
@@ -979,13 +995,15 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 			plt.ylabel("Number of fragments in regions",fontsize=10)
 			
 			if (len(label_list) > 1) | (label_list[0] != ''):
-				legend_labels.append(f'{label_list[i]} - Selected BC: {sum(sel.mask)}')
-				legend_labels.append(f'{label_list[i]} - Non-selected BC: {plot_data.shape[0]-sum(sel.mask)}')
+				legend_labels.append(f'{label_list[i]} ({sum(sel.mask)})')
 			else:
 				legend_labels.append(f'Selected BC: {sum(sel.mask)}')
 				legend_labels.append(f'Non-selected BC: {plot_data.shape[0]-sum(sel.mask)}')
-				
-			plt.legend(legend_labels)
+			
+			if legend_outside == True:
+				plt.legend(legend_labels, bbox_to_anchor=(1.04,1), loc="upper left")
+			else:	
+				plt.legend(legend_labels)
 
 	# Fragment size
 	if 'insert_size_distribution' in profile_list:
@@ -1009,7 +1027,10 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 			if insert_size_distriubtion_xlim != None:
 				plt.xlim(insert_size_distriubtion_xlim[0], insert_size_distriubtion_xlim[1])
 		if (len(label_list) > 1) | (label_list[0] != ''):
-			plt.legend(label_list)
+			if legend_outside == True:
+				plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
+			else:	
+				plt.legend(label_list)
 			
 	# TSS
 	if 'profile_tss' in profile_list:
@@ -1033,7 +1054,10 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 			plt.xlabel("Position from TSS",fontsize=10)
 			plt.ylabel("Normalized enrichment",fontsize=10)
 		if (len(label_list) > 1) | (label_list[0] != ''):
-			plt.legend(label_list)
+			if legend_outside == True:
+				plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
+			else:	
+				plt.legend(label_list)
 
 	# FRIP
 	if 'frip' in profile_list:
@@ -1050,9 +1074,14 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 					selected_color = None
 			else:
 				selected_color = None
+			
+			sns.distplot(plot_data['FRIP'], hist = False, kde = True, color=selected_color, label=label_list[i])
 
-			sns.distplot(plot_data['FRIP'], hist = False, kde = True, color=selected_color, label = label_list[i])
-			plt.xlabel("FRIP",fontsize=10)
+		if (len(label_list) > 1) | (label_list[0] != ''):
+			if legend_outside == True:
+				plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
+			else:	
+				plt.legend(label_list)
 			
 	# Duplicate rate		
 	if 'duplicate_rate' in profile_list:
@@ -1203,7 +1232,7 @@ def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObjec
 	return_cells: bool, optional
 		Whether to return selected cells based on user-given thresholds. Default: True.
 	return_fig: bool, optional
-		Whether to return the plot figure. Default: False.
+		Whether to return the plot figure; if several samples it will return a dictionary with the figures per sample. Default: False.
 
 	Return
 	---
@@ -1227,10 +1256,9 @@ def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObjec
 	# If there is only one sample
 	if var_group is None:
 		input_metrics={'Sample':input_metrics}
-		fig, selected_cells = plot_barcode_metrics_per_group(input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot, save)
+		fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot, save)
 	else:
 		input_metrics_dict={x:input_metrics[input_metrics.loc[:,var_group] == x] for x in list(set(input_metrics.loc[:,var_group]))}
-		selected_cells = {}
 		if combine_samples_ridgeline is True and var_y is None:
 			selected_cells=plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot=False, save=None)
 			if save is not None:
@@ -1262,20 +1290,25 @@ def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObjec
 				plt.show()
 			else:
 				plt.close(fig)
+			fig_dict = fig
 
 		else:
-			fig, selected_cells=plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot, save)
+			fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot, save)
 	
 	if return_cells == True:
 		if len(selected_cells) == 1:
 			selected_cells = selected_cells[list(selected_cells.keys())[0]]
-			if return_fig == True:
-				return fig, selected_cells
-			else:
-				return selected_cells	
+		if return_fig == True:
+			if len(fig_dict) == 1:
+				fig_dict = fig_dict[list(fig_dict.keys())[0]]
+			return fig_dict, selected_cells
+		else:
+			return selected_cells	
 	else:
 		if return_fig == True:
-			return fig
+			if len(fig_dict) == 1:
+				fig_dict = fig_dict[list(fig_dict.keys())[0]]
+			return fig_dict
 
 def merge_metadata(metadata_bc_dict: Dict):
 	"""
@@ -1358,7 +1391,7 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
 		If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
 	"""
 	selected_cells={}
-	
+	fig_dict={}
 	if save is not None:
 		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 	for key in input_metrics.keys():
@@ -1459,11 +1492,12 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
 				plt.close(fig)
 
 		selected_cells[key] = input_metrics[key].index.to_list()
-	
+		fig_dict[key] = fig
+
 	if save != None:
 		pdf.close()
 		
-	return fig, selected_cells
+	return fig_dict, selected_cells
 
 def ridgeline(data: List,
 			  overlap: Optional[float]=0,
