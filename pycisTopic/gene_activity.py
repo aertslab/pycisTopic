@@ -206,6 +206,8 @@ def region_weights(imputed_acc_object,
 		if len(regions_gene_list) > 0:
 			regions_per_gene = pr.PyRanges(pd.concat(regions_gene_list, axis=0, sort=False))
 			log.info('Distance weights done')
+	else:
+		regions_per_gene.Distance_weight = 1
 	# Remove promoters
 	if remove_promoters == True:
 		log.info('Removing distal regions overlapping promoters')
