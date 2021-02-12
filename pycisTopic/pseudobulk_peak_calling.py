@@ -120,7 +120,7 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 		os.makedirs(bigwig_path)
 	# Create pseudobulks
 	ray.init(num_cpus = n_cpu, **kwargs)
-	ray_handle = [export_pseudobulk_ray.remote(cell_data,
+	ray_handle = ray.wait([export_pseudobulk_ray.remote(cell_data,
 								group,
 								fragments_df_dict, 
 								chromsizes,
@@ -128,7 +128,7 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 								bed_path,
 								sample_id_col,
 								normalize_bigwig,
-								remove_duplicates) for group in groups]
+								remove_duplicates) for group in groups], num_returns=len(groups))
 	ray.shutdown()
 	bw_paths = {group: bigwig_path + str(group) + '.bw' for group in groups}
 	bed_paths = {group: bed_path + str(group) + '.bed.gz' for group in groups}
