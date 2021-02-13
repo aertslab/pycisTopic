@@ -1,5 +1,7 @@
 ssh ...
 my_conda_initialize
+# source /etc/profile.d/z01_modules.sh 
+# source /staging/leuven/stg_00002/lcb/saibar/software/anaconda3/etc/profile.d/conda.sh
 
 # Create conda environment 
 conda create -n pycisTopic_env python=3.7.4
