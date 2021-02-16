@@ -782,7 +782,7 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 		else:
 			fragments_df=fragments
 		# Check for duplicates
-		if 'Score' not in fragments_df:
+		if 'Score' not in fragments:
 			if check_for_duplicates == True:
 				log.info("Collapsing duplicates")
 				fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
@@ -1264,6 +1264,8 @@ def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObjec
 		if combine_samples_ridgeline is True and var_y is None:
 			selected_cells=plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot=False, save=None)
 			if save is not None:
+				if not os.path.exists(os.path.dirname(save)):
+					os.makedirs(os.path.dirname(save))
 				pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 			plt.close()
 			fig = plt.figure()
@@ -1392,10 +1394,19 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
 	dict or list
 		If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
 	"""
+	# Create logger
+	level	= logging.INFO
+	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+	handlers = [logging.StreamHandler(stream=sys.stdout)]
+	logging.basicConfig(level = level, format = format, handlers = handlers)
+	log = logging.getLogger('cisTopic')
+	
 	selected_cells={}
 	fig_dict={}
 	if save is not None:
 		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
+		if not os.path.exists(os.path.dirname(save)):
+			os.makedirs(os.path.dirname(save))
 	for key in input_metrics.keys():
 		x=input_metrics[key][var_x]
 		if var_y in (set(input_metrics[key].columns)):

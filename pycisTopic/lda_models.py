@@ -50,6 +50,12 @@ class CistopicLDAModel:
         :class:`pd.DataFrame` containing the topic cell distributions, with topics as columns, regions as rows and the probability of each region in each topic as values.
     parameters: pd.DataFrame
         :class:`pd.DataFrame` containing parameters used for the model.
+    n_cells: int
+        Number of cells in the model.
+    n_regions: int
+        Number of regions in the model.
+    n_topic: int
+        Number of topics in the model.
         
     References
     ----------
@@ -96,7 +102,8 @@ def run_cgs_models(cistopic_obj:'cisTopicObject',
                  eta: Optional[float] = 0.1,
                  eta_by_topic: Optional[bool] = False,
                  top_topics_coh: Optional[int] = 5,
-                 save_path: Optional[str] = None):
+                 save_path: Optional[str] = None,
+                 **kwargs):
     """
     Run Latent Dirichlet Allocation using Gibbs Sampling as described in Griffiths and Steyvers, 2004.
         
@@ -138,7 +145,7 @@ def run_cgs_models(cistopic_obj:'cisTopicObject',
     binary_matrix = cistopic_obj.binary_matrix.transpose()
     region_names = cistopic_obj.region_names
     cell_names = cistopic_obj.cell_names
-    ray.init(num_cpus=n_cpu)
+    ray.init(num_cpus=n_cpu, **kwargs)
     model_list=ray.get([run_cgs_model.remote(binary_matrix,
                               n_topics=n_topic,
                               cell_names=cell_names,
@@ -595,12 +602,25 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
     ----------
     McCallum, A. K. (2002). Mallet: A machine learning for language toolkit. http://mallet.cs.umass.edu.
     """
+    # Create cisTopic logger
+    level    = logging.INFO
+    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level = level, format = format, handlers = handlers)
+    log = logging.getLogger('cisTopic')
     
     binary_matrix = cistopic_obj.binary_matrix
     region_names = cistopic_obj.region_names
     cell_names = cistopic_obj.cell_names
     
+    log.info(f"Formatting input to corpus")
+    corpus = matutils.Sparse2Corpus(binary_matrix)
+    names_dict = {x:x for x in range(len(region_names))}
+    id2word = corpora.Dictionary.from_corpus(corpus, names_dict)
+    
     model_list=[run_cgs_model_mallet(path_to_mallet_binary, binary_matrix,
+    							  corpus,
+    							  id2word,
                                   n_topics=n_topic,
                                   cell_names=cell_names,
                                   region_names=region_names,
@@ -618,6 +638,8 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
 
 def run_cgs_model_mallet(path_to_mallet_binary: str,
                       binary_matrix: sparse.csr_matrix,
+                      corpus: Iterable,
+                      id2word: 'gensim.corpora.dictionary.Dictionary',
                       n_topics: List[int],
                       cell_names: List[str],
                       region_names: List[str],
@@ -684,12 +706,6 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
     logging.basicConfig(level = level, format = format, handlers = handlers)
     log = logging.getLogger('cisTopic')
     
-    # Suppress dict logger
-    dict_log = logging.getLogger('gensim.corpora.dictionary')
-    dict_log.addHandler(logging.NullHandler())
-    dict_log.propagate = False
-    warnings.filterwarnings('ignore')
-    
     # Set models
     if alpha_by_topic == False:
         alpha=alpha*n_topics
@@ -698,8 +714,6 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
     
     # Running model
     log.info(f"Running model with {n_topics} topics")
-    corpus = matutils.Sparse2Corpus(binary_matrix)
-    id2word = corpora.Dictionary.from_corpus(corpus)
     model = LDAMallet(path_to_mallet_binary, corpus=corpus, id2word=id2word, num_topics=n_topics, iterations=n_iter, alpha=alpha, eta=eta, n_cpu=n_cpu, tmp_dir=tmp_path, random_seed=random_state)
 
     # Get distributions
@@ -788,6 +802,7 @@ def evaluate_models(models: List['CistopicLDAModel'],
         
     Arun, R., Suresh, V., Madhavan, C. V., & Murthy, M. N. (2010). On finding the natural number of topics with latent dirichlet allocation: Some observations. In Pacific-Asia conference on knowledge discovery and data mining (pp. 391-402). Springer, Berlin, Heidelberg.
     """
+    models=[models[i] for i in np.argsort([m.n_topic for m in models])]
     all_topics=sorted([models[x].n_topic for x in range(0, len(models))])
     metrics_dict = {}
     fig = plt.figure(figsize=figsize)

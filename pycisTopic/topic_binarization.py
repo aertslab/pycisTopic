@@ -83,7 +83,7 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
 			thr = threshold_yen(l_norm, nbins=nbins)
 		elif method == 'li':
 			thresholds = np.arange(np.min(l_norm) + 0.01, np.max(l_norm) - 0.01, 0.01)
-			entropies = [_cross_entropy(l_norm, t, nbins=nbins) for t in thresholds]
+			entropies = [cross_entropy(l_norm, t, nbins=nbins) for t in thresholds]
 			thr = thresholds[np.argmin(entropies)]
 		elif method == 'ntop':
 			data =  pd.DataFrame(l_norm).sort_values(0, ascending=False)
@@ -137,9 +137,42 @@ def smooth_topics(topic_region):
 	return topic_region
 
 def norm(x):
+	"""
+	Smooth topic-region distributions.
+	
+	Parameters
+	---------
+	x: `class::pd.Series`
+		A pandas series with the topic-region distribution for a topic
+
+	Return
+	---------
+	numpy.array
+	"""
 	return x*(np.log(x+1e-05) - np.sum(np.log(x+1e-05))/len(x))
 
-def threshold_yen(array, nbins=100):
+def threshold_yen(array: np.array,
+				  nbins: Optional[int] =100):
+	"""
+	Apply Yen threshold on topic-region distributions [Yen et al., 1995].
+	
+	Parameters
+	---------
+	array: `class::np.array`
+		Array containing the region values for the topic to be binarized.
+	nbins: int
+		Number of bins to use in the binarization histogram
+		
+	Return
+	---------
+	float 
+		Binarization threshold.
+		
+	Reference
+	---------
+	Yen, J.C., Chang, F.J. and Chang, S., 1995. A new criterion for automatic multilevel thresholding. IEEE Transactions on 
+	Image Processing, 4(3), pp.370-378.
+	"""
 	hist, bin_centers = histogram(array, nbins)
 	# Calculate probability mass function
 	pmf = hist.astype(np.float32) / hist.sum()
@@ -154,12 +187,32 @@ def threshold_yen(array, nbins=100):
 	return bin_centers[crit.argmax()]
 
 def threshold_otsu(array, nbins=100):
+	"""
+	Apply Otsu threshold on topic-region distributions [Otsu, 1979].
+	
+	Parameters
+	---------
+	array: `class::np.array`
+		Array containing the region values for the topic to be binarized.
+	nbins: int
+		Number of bins to use in the binarization histogram
+		
+	Return
+	---------
+	float 
+		Binarization threshold.
+		
+	Reference
+	---------
+	Otsu, N., 1979. A threshold selection method from gray-level histograms. IEEE transactions on systems, man, and 
+	cybernetics, 9(1), pp.62-66.
+	"""
 	hist, bin_centers = histogram(array, nbins)
 	hist = hist.astype(float)
-	# class probabilities for all possible thresholds
+	# Class probabilities for all possible thresholds
 	weight1 = np.cumsum(hist)
 	weight2 = np.cumsum(hist[::-1])[::-1]
-	# class means for all possible thresholds
+	# Class means for all possible thresholds
 	mean1 = np.cumsum(hist * bin_centers) / weight1
 	mean2 = (np.cumsum((hist * bin_centers)[::-1]) / weight2[::-1])[::-1]
 	# Clip ends to align class 1 and class 2 variables:
@@ -170,10 +223,29 @@ def threshold_otsu(array, nbins=100):
 	threshold = bin_centers[:-1][idx]
 	return threshold
 	
-# Computing a histogram using np.histogram on a uint8 image with bins=256
-# doesn't work and results in aliasing problems. We use a fully specified set
-# of bins to ensure that each uint8 value false into its own bin.
-def _cross_entropy(array, threshold, nbins=100):
+
+def cross_entropy(array, threshold, nbins=100):
+	"""
+	Calculate entropies for Li thresholding on topic-region distributions [Li & Lee, 1993].
+	
+	Parameters
+	---------
+	array: `class::np.array`
+		Array containing the region values for the topic to be binarized.
+	threshold: float
+		Distribution threshold to calculate entropy from.
+	nbins: int
+		Number of bins to use in the binarization histogram
+		
+	Return
+	---------
+	float 
+		Entropy for the given threshold. 
+		
+	Reference
+	---------
+	Li, C.H. and Lee, C.K., 1993. Minimum cross entropy thresholding. Pattern recognition, 26(4), pp.617-625.
+	"""
 	hist, bin_centers = histogram(array, nbins=nbins)
 	t = np.flatnonzero(bin_centers > threshold)[0]
 	m0a = np.sum(hist[:t])  # 0th moment, background
@@ -185,43 +257,24 @@ def _cross_entropy(array, threshold, nbins=100):
 	nu = -m1a * np.log(mua) - m1b * np.log(mub)
 	return nu
 	
-def threshold_li(array, tolerance=None, initial_guess=None,
-				 iter_callback=None):
-
-	# Get tolerance
-	tolerance = tolerance or np.min(np.diff(np.unique(image))) / 2
-	# Initial estimate for iteration. See "initial_guess" in the parameter list
-	if initial_guess is None:
-		t_next = np.mean(array)
-	elif callable(initial_guess):
-		t_next = initial_guess(array)
-	else:
-		raise TypeError('Incorrect type for `initial_guess`; should be '
-						'a floating point value, or a function mapping an '
-						'array to a floating point value.')
-	# initial value for t_curr must be different from t_next by at
-	# least the tolerance. Since the image is positive, we ensure this
-	# by setting to a large-enough negative number
-	t_curr = -0.01*tolerance
-	# Callback on initial iterations
-	if iter_callback is not None:
-		iter_callback(t_next)
-	# Stop the iterations when the difference between the
-	# new and old threshold values is less than the tolerance
-	while abs(t_next - t_curr) > tolerance:
-		t_curr = t_next
-		foreground = (array > t_curr)
-		mean_fore = np.mean(array[foreground])
-		mean_back = np.mean(array[~foreground])
-		t_next = ((mean_back - mean_fore) /
-				  (np.log(mean_back) - np.log(mean_fore)))
-		if iter_callback is not None:
-			iter_callback(t_next)
-	threshold = t_next
-	return threshold
 
 
 def histogram(array, nbins=100):
+	"""
+	Draw histogram from distribution and identify centers.
+	
+	Parameters
+	---------
+	array: `class::np.array`
+		Scores distribution
+	nbins: int
+		Number of bins to use in the histogram
+
+	Return
+	---------
+	float
+		Histogram values and bin centers.
+	"""
 	array = array.ravel().flatten()
 	hist, bin_edges = np.histogram(array, bins=nbins, range=None)
 	bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.

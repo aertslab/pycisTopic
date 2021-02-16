@@ -352,14 +352,16 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
 	fig = plt.figure(figsize=figsize)
 	
 	for var in variables:
-		if (remove_nan == True) & (data_mat[var].isnull().sum() > 0):
-			var_data = data_mat.copy().loc[:,var].dropna().to_list()
-			emb_nan = embedding.loc[data_mat.copy().loc[:,var].dropna().index.tolist()]
-			label_pd = pd.concat([emb_nan, data_mat.loc[:,[var]].dropna()], axis=1, sort=False)
-		else:
-			var_data = data_mat.copy().astype(str).fillna('NA').loc[:,var].to_list()
-			label_pd = pd.concat([embedding, data_mat.astype(str).fillna('NA').loc[:,[var]]], axis=1, sort=False)
+		var_data = data_mat.copy().loc[:,var].dropna().to_list()
 		if isinstance(var_data[0], str):
+			if (remove_nan == True) & (data_mat[var].isnull().sum() > 0):
+				var_data = data_mat.copy().loc[:,var].dropna().to_list()
+				emb_nan = embedding.loc[data_mat.copy().loc[:,var].dropna().index.tolist()]
+				label_pd = pd.concat([emb_nan, data_mat.loc[:,[var]].dropna()], axis=1, sort=False)
+			else:
+				var_data = data_mat.copy().astype(str).fillna('NA').loc[:,var].to_list()
+				label_pd = pd.concat([embedding, data_mat.astype(str).fillna('NA').loc[:,[var]]], axis=1, sort=False)
+				
 			categories = set(var_data)
 			try:
 				color_dict = color_dictionary[var]

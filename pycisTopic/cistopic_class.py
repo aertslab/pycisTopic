@@ -523,7 +523,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
 									  min_frag: Optional[int] = 1,
 									  min_cell: Optional[int] = 1,
 									  is_acc: Optional[int] = 1,
-									  remove_duplicates: Optional[bool] = True,
+									  check_for_duplicates: Optional[bool] = True,
 									  project: Optional[str] = 'cisTopic',
 									  partition: Optional[int] = 5,
 									  fragments_df: Optional[Union[pd.DataFrame, pr.PyRanges]] = None):
@@ -550,8 +550,8 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
 		Minimal number of cell in which a region is detected to be kept. Default: 1
 	is_acc: int, optional
 		Minimal number of fragments for a region to be considered accessible. Default: 1
-	remove_duplicates: bool, optional
-		Whether to consider duplicates when counting fragments. Default: True
+	check_for_duplicates: bool, optional
+		If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
 	project: str, optional
 		Name of the cisTopic project. It will also be used as name for sample_id in the cell_data :class:`CistopicObject.cell_data`. Default: 'cisTopic'
 	partition: int, optional
@@ -581,6 +581,19 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
 			log.info('Using fragments of provided pandas data frame')
 	else:
 		fragments = pr.read_bed(path_to_fragments)
+		
+	if 'Score' not in fragments.df:
+		fragments_df = fragments.df
+		if check_for_duplicates == True:
+			log.info("Collapsing duplicates")
+			fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
+			dup_scores = fragments_df.groupby(["Read_id"]).size()
+			fragments_df = fragments_df.drop_duplicates()
+			fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()].tolist()
+		else:
+			fragments_df['Score'] = 1
+		fragments = pr.PyRanges(fragments_df)
+		
 	regions = pr.read_bed(path_to_regions)
 	regions = regions[['Chromosome', 'Start', 'End']]
 	regions.regionID= [str(chrom) + ":" + str(start) + '-' + str(end) for chrom, start, end in zip(list(regions.Chromosome), list(regions.Start), list(regions.End))]
@@ -610,22 +623,18 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
 	fragments_in_regions=regions.join(fragments, nb_cpu=n_cpu)
 	# Convert to pandas
 	counts_df = pd.concat([fragments_in_regions.regionID, fragments_in_regions.Name, fragments_in_regions.Score.astype(dtype)], axis=1, sort=False)
-	if remove_duplicates == True:
-		log.info('Duplicate removal')
-		counts_df.Score = 1
+
 	log.info('Creating fragment matrix')
 	try:
-		fragment_matrix = counts_df.groupby(["Name", "regionID"]).agg({"Score": np.sum}).unstack(level="Name").fillna(0).astype(dtype)
-		fragment_matrix.columns.names = [None, None]
-		fragment_matrix.columns=[x[1] for x in fragment_matrix.columns.values]
+		fragment_matrix = counts_df.groupby(["Name", "regionID"]).size().unstack(level="Name").fillna(0).astype(dtype)
+		fragment_matrix.columns.names = [None]
 	except ValueError:
 		log.info('Data is too big, making partitions. This is a reported error in Pandas versions > 0.21 (https://github.com/pandas-dev/pandas/issues/26314)')
 		barcode_list = np.array_split(list(set(counts_df.Name.to_list())), partition)
 		dfList = [counts_df[counts_df.Name.isin(set(barcode_list[x]))] for x in range(0,partition)]
-		dfList = [x.groupby(["Name", "regionID"]).agg({"Score": np.sum}).unstack(level="Name").fillna(0).astype(dtype) for x in dfList]
+		dfList = [x.groupby(["Name", "regionID"]).size().unstack(level="Name").fillna(0).astype(dtype) for x in dfList]
 		fragment_matrix  = pd.concat(dfList, axis=1, sort=False).fillna(0).astype(dtype)
-		fragment_matrix.columns.names = [None, None]
-		fragment_matrix.columns=[x[1] for x in fragment_matrix.columns.values]
+		fragment_matrix.columns.names = [None]
 
 	# Create CistopicObject
 	cistopic_obj = create_cistopic_object(fragment_matrix=fragment_matrix,
@@ -642,6 +651,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
 		FPB_DF['barcode']=FPB_DF.index.tolist()
 		cistopic_obj.add_cell_data(FPB_DF)
 	return(cistopic_obj)
+
 
 def merge(cistopic_obj_list: List['CistopicObject'],
 		  is_acc: Optional[int] = 1,
