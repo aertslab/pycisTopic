@@ -615,7 +615,7 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
     
     log.info(f"Formatting input to corpus")
     corpus = matutils.Sparse2Corpus(binary_matrix)
-    names_dict = {x:x for x in range(len(region_names))}
+    names_dict = {x:str(x) for x in range(len(region_names))}
     id2word = corpora.Dictionary.from_corpus(corpus, names_dict)
     
     model_list=[run_cgs_model_mallet(path_to_mallet_binary, binary_matrix,
