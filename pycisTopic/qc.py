@@ -317,17 +317,17 @@ def insert_size_distribution(fragments: Union[str, pd.DataFrame],
 			FPW_DF = fragments.groupby(["Name"]).agg({"Score": np.sum}).rename_axis(None).reset_index().rename(columns={"index": "Width", "Score":"Nr_frag"})
 		else:
 			FPW_DF=fragments.groupby(["Width"]).size().to_frame(name = 'Nr_frag').rename_axis(None).reset_index().rename(columns={"index": "Width"})
-		FPW_DF['Perc_frag']=(FPW_DF['Nr_frag'].values/np.sum(FPW_DF['Nr_frag']))*100
+		FPW_DF['Ratio_frag']=(FPW_DF['Nr_frag'].values/np.sum(FPW_DF['Nr_frag']))
 		FPW_DF=FPW_DF.sort_values(by=['Width'],  ascending=False)
 
 	W = FPW_DF.loc[:,'Width']
-	pF = FPW_DF.loc[:,'Perc_frag']
+	pF = FPW_DF.loc[:,'Ratio_frag']
 	
 	
 	fig, ax = plt.subplots()
 	ax.plot(W, pF, color=color)
 	plt.xlabel("Fragment size",fontsize=10)
-	plt.ylabel("Percentage of fragments",fontsize=10)
+	plt.ylabel("Fragments ratio",fontsize=10)
 	if xlim != None:
 		plt.xlim(xlim[0], xlim[1])
 	if save != None:
@@ -1023,9 +1023,9 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 			else:
 				selected_color = None
 
-			plt.plot(plot_data['Width'], plot_data['Perc_frag'], color=selected_color)
+			plt.plot(plot_data['Width'], plot_data['Ratio_frag'], color=selected_color)
 			plt.xlabel("Fragment size",fontsize=10)
-			plt.ylabel("Percentage of fragments",fontsize=10)
+			plt.ylabel("Fragments ratio",fontsize=10)
 			if insert_size_distriubtion_xlim != None:
 				plt.xlim(insert_size_distriubtion_xlim[0], insert_size_distriubtion_xlim[1])
 		if (len(label_list) > 1) | (label_list[0] != ''):
