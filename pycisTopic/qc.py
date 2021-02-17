@@ -783,7 +783,7 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 		else:
 			fragments_df=fragments
 		# Check for duplicates
-		if 'Score' not in fragments:
+		if 'Score' not in fragments_df:
 			if check_for_duplicates == True:
 				log.info("Collapsing duplicates")
 				fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
