@@ -108,6 +108,8 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 		cell_data = cell_data.loc[:,[variable, sample_id_col, 'barcode']]
 	else:
 		cell_data = cell_data.loc[:,[variable, sample_id_col]]
+	cell_data[variable] = cell_data[variable].replace(' ', '', regex=True)
+	cell_data[variable] = cell_data[variable].replace('[^A-Za-z0-9]+', '_', regex=True)
 	groups = sorted(list(set(cell_data[variable])))
 	# Check chromosome sizes
 	if isinstance(chromsizes, pd.DataFrame):
@@ -130,8 +132,8 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 								normalize_bigwig,
 								remove_duplicates) for group in groups], num_returns=len(groups))
 	ray.shutdown()
-	bw_paths = {group: bigwig_path + str(group) + '.bw' for group in groups}
-	bed_paths = {group: bed_path + str(group) + '.bed.gz' for group in groups}
+	bw_paths = {group: os.path.join(bigwig_path, str(group) + '.bw') for group in groups}
+	bed_paths = {group: os.path.join(bed_path, str(group) + '.bed.gz') for group in groups}
 	return bw_paths, bed_paths
 
 @ray.remote
@@ -196,8 +198,8 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
 		group_fragments = group_fragments_list[0].append(group_fragments_list[1:])
 		
 	group_pr=pr.PyRanges(group_fragments)
-	bigwig_path_group = bigwig_path + str(group) + '.bw'
-	bed_path_group = bed_path + str(group) + '.bed.gz'
+	bigwig_path_group = os.path.join(bigwig_path, str(group) + '.bw')
+	bed_path_group = os.path.join(bed_path, str(group) + '.bed.gz')
 	if isinstance(bigwig_path, str):
 		if remove_duplicates == True:
 			group_pr.to_bigwig(path=bigwig_path_group, chromosome_sizes=chromsizes, rpm=normalize_bigwig)
@@ -409,7 +411,7 @@ class MACSCallPeak():
 		"""
 		Load MACS2 narrow peak files as :class:`pr.PyRanges`.
 		"""
-		narrow_peak = pd.read_csv(self.outdir + self.name + '_peaks.narrowPeak', sep='\t', header = None)
+		narrow_peak = pd.read_csv(os.path.join(self.outdir, self.name + '_peaks.narrowPeak'), sep='\t', header = None)
 		narrow_peak.columns = ['Chromosome', 'Start', 'End', 'Name', 'Score', 'Strand', 'FC_summit', '-log10_pval', '-log10_qval', 'Summit']
 		narrow_peak_pr = pr.PyRanges(narrow_peak)
 		return narrow_peak_pr

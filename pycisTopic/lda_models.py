@@ -282,7 +282,7 @@ def run_cgs_model(binary_matrix: sparse.csr_matrix,
     log.info(f"Model with {n_topics} topics done!")
     if isinstance(save_path, str):
         log.info(f"Saving model with {n_topics} topics at {save_path}")
-        with open(save_path+'Topic'+str(n_topics)+'.pkl', 'wb') as f:
+        with open(os.path.join(save_path, 'Topic' + str(n_topics) + '.pkl'), 'wb') as f:
             pickle.dump(model, f)
     return model
 
@@ -746,7 +746,7 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
     log.info(f"Model with {n_topics} topics done!")
     if isinstance(save_path, str):
         log.info(f"Saving model with {n_topics} topics at {save_path}")
-        with open(save_path+'Topic'+str(n_topics)+'.pkl', 'wb') as f:
+        with open(os.path.join(save_path, 'Topic' + str(n_topics) + '.pkl'), 'wb') as f:
             pickle.dump(model, f)
     return model
 
