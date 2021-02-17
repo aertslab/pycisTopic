@@ -614,9 +614,9 @@ def frip(fragments: Union[str, pd.DataFrame],
 		FPB_FPBIR_DF = pd.concat([FPB_DF,  FPBIR_DF], axis=1, sort=False)
 		
 		if remove_duplicates == False:
-			FPB_FPBIR_DF['FRIP'] = (FPB_FPBIR_DF.Total_nr_frag_in_regions/FPB_FPBIR_DF.Total_nr_frag)*100
+			FPB_FPBIR_DF['FRIP'] = (FPB_FPBIR_DF.Total_nr_frag_in_regions/FPB_FPBIR_DF.Total_nr_frag)
 		else:
-			FPB_FPBIR_DF['FRIP'] = (FPB_FPBIR_DF.Unique_nr_frag_in_regions/FPB_FPBIR_DF.Unique_nr_frag)*100
+			FPB_FPBIR_DF['FRIP'] = (FPB_FPBIR_DF.Unique_nr_frag_in_regions/FPB_FPBIR_DF.Unique_nr_frag)
 
 		fig = plt.figure()
 		if as_density == True:
