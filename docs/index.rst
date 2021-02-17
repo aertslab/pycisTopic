@@ -8,6 +8,7 @@
    :hidden:
 
    Home <self>
+   api
 
 .. include:: ../README.rst
 
