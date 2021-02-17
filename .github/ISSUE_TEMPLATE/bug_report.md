@@ -13,6 +13,9 @@ A clear and concise description of what the bug is.
 **To Reproduce**
 Commands relevant to reproduce the error.
 
+**Error output**
+Paste the entire output of the command, including log information prior to the error.
+
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
