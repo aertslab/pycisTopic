@@ -604,7 +604,8 @@ def frip(fragments: Union[str, pd.DataFrame],
 		FPB_DF = pd.concat([fragments_per_barcode_dup, fragments_per_barcode_nodup], axis=1)
 
 		log.info('Intersecting fragments with regions')
-		fragments_in_regions=regions.join(fragments, nb_cpu=n_cpu)
+		fragments_in_regions = fragments.join(regions, nb_cpu=n_cpu)
+		fragments_in_regions = fragments_in_regions[['Name', 'Score']].drop_duplicate_positions()
 		fragments_in_regions_dup = fragments_in_regions.df.groupby(["Name"]).agg({"Score": np.sum}).rename_axis(None)
 		fragments_in_regions_dup.columns = ['Total_nr_frag_in_regions']
 		fragments_in_regions_nodup = fragments_in_regions.df.groupby(["Name"]).size().to_frame(name = 'Unique_nr_frag_in_regions').rename_axis(None)

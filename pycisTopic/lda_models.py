@@ -428,8 +428,9 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             self.finferencer(), self.topic_threshold, str(self.random_seed)
         )
         logger.info("Training MALLET LDA with %s", cmd)
+        cmd = cmd.split()
         try:
-            subprocess.check_output(args=cmd, shell=True, stderr=subprocess.STDOUT)
+            subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             raise RuntimeError("command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
         self.word_topics = self.load_word_topics()
