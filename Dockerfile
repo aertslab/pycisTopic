@@ -18,18 +18,23 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # install dependencies:
-COPY requirements.txt /tmp/
+COPY pycisTopic/requirements.txt /tmp/
 RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir Cython numpy && \
     pip install --no-cache-dir fitsne && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
-# install pycisTopic from local copy for now:
-COPY . /tmp/pycisTopic
+# install pycisTopic from local copy:
+COPY pycisTopic /tmp/pycisTopic
 RUN  cd /tmp/pycisTopic && \
      pip install . && \
      cd .. && rm -rf pycisTopic
 
+# install loomxpy from local copy:
+COPY LoomXpy /tmp/LoomXpy
+RUN  cd /tmp/LoomXpy && \
+     pip install . && \
+     cd .. && rm -rf LoomXpy
 
 FROM python:3.8-slim AS build-image
 
