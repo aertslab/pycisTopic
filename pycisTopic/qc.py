@@ -915,15 +915,18 @@ def plot_sample_metrics(profile_data_dict: Dict[str, pd.DataFrame],
 				cmap = cmap, 
 				insert_size_distriubtion_xlim = insert_size_distriubtion_xlim,
 				legend_outside = legend_outside)
-	
+	label_list = list(profile_data_dict.keys())
+	if ('duplicate_rate' in profile_list) & (not isinstance(profile_data_dict[label_list[0]], pd.DataFrame)):
+		n_plots= len(profile_list)-1+len(profile_data_dict)   
+	else:
+		n_plots = len(profile_list)
+    
 	multiplot_from_generator(g=plot_sample_metrics_generator_obj,
 							 num_columns=ncol,
-							 n_plots=len(profile_list),
+							 n_plots=n_plots,
 							 figsize=figsize,
 							 plot=plot,
 							 save=save)
-
-
 def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 				profile_list: Optional[Union['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip']] = ['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
 				remove_duplicates: Optional[bool] = True,
