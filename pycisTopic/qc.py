@@ -1185,340 +1185,331 @@ def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
 	else:
 		plt.close(fig)
 
-def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObject'],
-					   var_x: str,
-					   var_group: Optional[str] = None,
-					   var_y: Optional[str] = None,
-					   min_x: Optional[float] = None,
-					   max_x: Optional[float] = None,
-					   min_y: Optional[float] = None,
-					   max_y: Optional[float] = None,
-					   color: Optional[str] = None,
-					   cmap: Optional[str] = 'Blues',
-					   as_density: Optional[bool] = True,
-					   add_hist: Optional[bool] = True,
-					   n_bins: Optional[int] = 100,
-					   combine_samples_ridgeline: Optional[bool] = True,
-					   overlap_ridgeline: Optional[float] =.85,
-					   plot: Optional[bool] = True,
-					   save: Optional[str] = None,
-					   return_cells: Optional[bool] = True,
-					   return_fig: Optional[bool] = False):
-	""""
-	Plot barcode metrics and filter based on used-provided thresholds.
-		
-	Parameters
-	---
-	input_metrics: dictionary, pd.DataFrame or CistopicObject
-	A dictionary with group labels as keys and barcode metrics per sample as values, a dataframe with barcode metrics (for one or more samples) or a cisTopicObjbect with metrics in `class::CistopicObject.cell_data`.
-	var_x: str
-		Metric to plot.
-	var_group: str, optional
-		Variable to divide the plot by groups. Default: None.
-	var_y: str, optional
-		A second metric to plot in combination with `var_x`. When provided, the function returns a 2D plot with `var_x` and `var_y` as axes, if not provided the function returns and histogram or density plot for `var_x`. Default: None.
-	min_x: float, optional
-		Minimum value on `var_x` to keep the barcode/cell. Default: None.
-	max_x: float, optional
-		Maximum value on `var_x` to keep the barcode/cell. Default: None.
-	min_y: float, optional
-		Minimum value on `var_y` to keep the barcode/cell. Default: None.
-	max_y: float, optional
-		Maximum value on `var_y` to keep the barcode/cell. Default: None.
-	color: str, optional
-		Color to use on histograms and/or density plots. Default: None.
-	cmap: str, optional
-		Color map to color 2D dot plots by density. Default: None.
-	as_density: bool, optional
-		Whether to plot variables as density plots rather than histograms. Default: True.
-	add_hist: bool, optional
-		Whether to show the histogram together with the density plots when `as_density=True`. Default: True.
-	n_bins: int, optional
-		Number of bins to use when plotting the variable histogram. Default: 100.
-	combine_samples_ridgeline: bool, optional
-		When a group variable is provided and only one metric is given, the distribution of the metric can be plotted in all groups using a ridgeline plot. If False, an histogram per sample will be returned. Default: True.
-	overlap_ridgeline: float, optional
-		Overlap between the ridgeline plot tracks. Default=.85
-	plot: bool, optional
-		Whether the plots should be returned to the console. Default: True.
-	save: bool, optional
-		Path to save plots as a file. Default: None.
-	return_cells: bool, optional
-		Whether to return selected cells based on user-given thresholds. Default: True.
-	return_fig: bool, optional
-		Whether to return the plot figure; if several samples it will return a dictionary with the figures per sample. Default: False.
-
-	Return
-	---
-	dict or list
-		If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
-	"""
-	# Create logger
-	level	= logging.INFO
-	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-	handlers = [logging.StreamHandler(stream=sys.stdout)]
-	logging.basicConfig(level = level, format = format, handlers = handlers)
-	log = logging.getLogger('cisTopic')
-	
-	# Take cell data
-	if isinstance(input_metrics, CistopicObject):
-		input_metrics = input_metrics.cell_data
-	if isinstance(input_metrics, dict):
-		input_metrics = merge_metadata(input_metrics)
-		var_group = 'Sample'
-
-	# If there is only one sample
-	if var_group is None:
-		input_metrics={'Sample':input_metrics}
-		fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot, save)
-	else:
-		input_metrics_dict={x:input_metrics[input_metrics.loc[:,var_group] == x] for x in list(set(input_metrics.loc[:,var_group]))}
-		if combine_samples_ridgeline is True and var_y is None:
-			selected_cells=plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot=False, save=None)
-			if save is not None:
-				if not os.path.exists(os.path.dirname(save)):
-					os.makedirs(os.path.dirname(save))
-				pdf = matplotlib.backends.backend_pdf.PdfPages(save)
-			plt.close()
-			fig = plt.figure()
-			grouped = [(v, d.loc[:,var_x].dropna().values) for v, d in input_metrics.groupby(var_group)]
-			sample, data = zip(*grouped)
-			if color is None:
-				color='skyblue'
-			ridgeline(data, labels=sample, overlap=overlap_ridgeline, fill=color)
-			plt.xlabel(var_x)
-			plt.grid(zorder=0)
-			# Add limits
-			if min_x != None:
-				plt.axvline(x=min_x, color='skyblue', linestyle='--')
-			if max_x != None:
-				plt.axvline(x=max_x, color='tomato', linestyle='--')
-			if min_y != None:
-				plt.axhline(y=min_y, color='skyblue', linestyle='--')
-			if max_y != None:
-				plt.axhline(y=max_y, color='tomato', linestyle='--')
-				
-			if save != None:
-				pdf.savefig(fig, bbox_inches='tight')
-				pdf.close()
-
-			if plot is not False:
-				plt.show()
-			else:
-				plt.close(fig)
-			fig_dict = fig
-
-		else:
-			fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot, save)
-	
-	if return_cells == True:
-		if len(selected_cells) == 1:
-			selected_cells = selected_cells[list(selected_cells.keys())[0]]
-		if return_fig == True:
-			if len(fig_dict) == 1:
-				fig_dict = fig_dict[list(fig_dict.keys())[0]]
-			return fig_dict, selected_cells
-		else:
-			return selected_cells	
-	else:
-		if return_fig == True:
-			if len(fig_dict) == 1:
-				fig_dict = fig_dict[list(fig_dict.keys())[0]]
-			return fig_dict
-
-def merge_metadata(metadata_bc_dict: Dict):
-	"""
-	Merge barcode-level statistics from different samples.
-	
-	Parameters
-	---
-	metadata_bc_dict: dict
-		Dictionary containing `class::pd.DataFrame` with the barcode-level statistics for each sample
-		
-	Return
-	---
-	pd.DataFrame
-		A data frame containing the combined barcode statistics with an additional column called sample.
-	"""
-	
-	for key in metadata_bc_dict.keys():
-		metadata_bc_dict[key]['Sample'] = [key]*metadata_bc_dict[key].shape[0]
-	
-	metadata_bc_list = [metadata_bc_dict[key] for key in metadata_bc_dict.keys()]
-	metadata_bc_combined = pd.concat(metadata_bc_list, axis=0, sort=False)
-	return metadata_bc_combined
-
 def plot_barcode_metrics_per_group(input_metrics: Dict,
-								var_x: str,
-								var_y: Optional[str] = None,
-								min_x: Optional[int] = None,
-								max_x: Optional[int] = None,
-								min_y: Optional[int] = None,
-								max_y: Optional[int] = None,
-								color: Optional[str] = None,
-								cmap: Optional[str] = 'Blues',
-								as_density: Optional[bool] = False,
-								add_hist: Optional[bool] = True,
-								n_bins: Optional[int] = 100,
-								plot: Optional[bool]= True,
-								save: Optional[str] = None):
-	
-	""""
-	Plot barcode metrics and filter based on used-provided thresholds.
-		
-	Parameters
-	---
-	input_metrics: dictionary
-		A dictionary with group labels as keys and barcode metrics per sample as values.
-	var_x: str
-		Metric to plot.
-	var_group: str, optional
-		Variable to divide the plot by groups. Default: None.
-	var_y: str, optional
-		A second metric to plot in combination with `var_x`. When provided, the function returns a 2D plot with `var_x` and `var_y` as axes, if not provided the function returns and histogram or density plot for `var_x`. Default: None.
-	min_x: float, optional
-		Minimum value on `var_x` to keep the barcode/cell. Default: None.
-	max_x: float, optional
-		Maximum value on `var_x` to keep the barcode/cell. Default: None.
-	min_y: float, optional
-		Minimum value on `var_y` to keep the barcode/cell. Default: None.
-	max_y: float, optional
-		Maximum value on `var_y` to keep the barcode/cell. Default: None.
-	color: str, optional
-		Color to use on histograms and/or density plots. Default: None.
-	cmap: str, optional
-		Color map to color 2D dot plots by density. Default: None.
-	as_density: bool, optional
-		Whether to plot variables as density plots rather than histograms. Default: True.
-	add_hist: bool, optional
-		Whether to show the histogram together with the density plots when `as_density=True`. Default: True.
-	n_bins: int, optional
-		Number of bins to use when plotting the variable histogram. Default: 100.
-	plot: bool, optional
-		Whether the plots should be returned to the console. Default: True.
-	save: bool, optional
-		Path to save plots as a file. Default: None.
-	return_cells: bool, optional
-		Whether to return selected cells based on user-given thresholds. Default: True.
-		
-	Return
-	---
-	dict or list
-		If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
-	"""
-	# Create logger
-	level	= logging.INFO
-	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-	handlers = [logging.StreamHandler(stream=sys.stdout)]
-	logging.basicConfig(level = level, format = format, handlers = handlers)
-	log = logging.getLogger('cisTopic')
-	
-	selected_cells={}
-	fig_dict={}
-	if save is not None:
-		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
-		if not os.path.exists(os.path.dirname(save)):
-			os.makedirs(os.path.dirname(save))
-	for key in input_metrics.keys():
-		x=input_metrics[key][var_x]
-		if var_y in (set(input_metrics[key].columns)):
-			# Take cell data
-			y=input_metrics[key][var_y]
-			# Color by density
-			xy = np.vstack([x,y])
-			z = gaussian_kde(xy)(xy)
-			idx = z.argsort()
-			x, y, z = x[idx], y[idx], z[idx]
-			#Plot xy
-			plt.close()
-			fig = plt.figure(figsize=(5, 5))
-			fig.add_axes([0, 0, 0.8, 0.8])
-			plt.scatter(x, y, c=z, s=10,  edgecolor=None, cmap=cmap)
-			plt.xlabel(var_x, fontsize=10)
-			plt.ylabel(var_y, fontsize=10)
-			plt.xlim(min(x), max(x))
-			plt.ylim(min(y), max(y))
-			
-			if len(input_metrics) > 1:
-				plt.legend([key])
-			# Add limits
-			if min_x != None:
-				plt.axvline(x=min_x, color='skyblue', linestyle='--')
-				input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_x] > min_x,:]
-			if max_x != None:
-				plt.axvline(x=max_x, color='tomato', linestyle='--')
-				input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_x] < max_x,:]
-			if min_y != None:
-				plt.axhline(y=min_y, color='skyblue', linestyle='--')
-				input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_y] > min_y,:]
-			if max_y != None:
-				plt.axhline(y=max_y, color='tomato', linestyle='--')
-				input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_y] < max_y,:]
-			
-			# first barplot on axis
-			fig.add_axes([0, 0.8, 0.8, 0.2])
-			if as_density == True:
-				sns.distplot(x, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, bins=n_bins)
-			else:
-				plt.hist(x, bins = n_bins, color=color)
-			plt.xlim(min(x), max(x))
-			plt.axis('off')
-			# second barplot on axis
-			fig.add_axes([0.8, 0, 0.2, 0.8])
-			if as_density == True:
-				sns.distplot(y, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, vertical=True, bins=n_bins)
-			else:
-				plt.hist(y, bins = n_bins, orientation='horizontal', color=color)
-			plt.ylim(min(y), max(y))
-			plt.axis('off')
-			
-			if save != None:
-				pdf.savefig(fig, bbox_inches='tight')
-			
-			if plot is not False:
-				plt.show()
-			else:
-				plt.close(fig)
+                                var_x: str,
+                                var_y: Optional[str] = None,
+                                min_x: Optional[int] = None,
+                                max_x: Optional[int] = None,
+                                min_y: Optional[int] = None,
+                                max_y: Optional[int] = None,
+                                color: Optional[str] = None,
+                                cmap: Optional[str] = 'Blues',
+                                as_density: Optional[bool] = False,
+                                add_hist: Optional[bool] = True,
+                                n_bins: Optional[int] = 100,
+                                plot_as_hexbin: Optional[bool] = False,
+                                plot: Optional[bool]= True,
+                                save: Optional[str] = None):
+    
+    """"
+    Plot barcode metrics and filter based on used-provided thresholds.
+        
+    Parameters
+    ---
+    input_metrics: dictionary
+        A dictionary with group labels as keys and barcode metrics per sample as values.
+    var_x: str
+        Metric to plot.
+    var_group: str, optional
+        Variable to divide the plot by groups. Default: None.
+    var_y: str, optional
+        A second metric to plot in combination with `var_x`. When provided, the function returns a 2D plot with `var_x` and `var_y` as axes, if not provided the function returns and histogram or density plot for `var_x`. Default: None.
+    min_x: float, optional
+        Minimum value on `var_x` to keep the barcode/cell. Default: None.
+    max_x: float, optional
+        Maximum value on `var_x` to keep the barcode/cell. Default: None.
+    min_y: float, optional
+        Minimum value on `var_y` to keep the barcode/cell. Default: None.
+    max_y: float, optional
+        Maximum value on `var_y` to keep the barcode/cell. Default: None.
+    color: str, optional
+        Color to use on histograms and/or density plots. Default: None.
+    cmap: str, optional
+        Color map to color 2D dot plots by density. Default: None.
+    as_density: bool, optional
+        Whether to plot variables as density plots rather than histograms. Default: True.
+    add_hist: bool, optional
+        Whether to show the histogram together with the density plots when `as_density=True`. Default: True.
+    n_bins: int, optional
+        Number of bins to use when plotting the variable histogram. Default: 100.
+    plot_as_hexbin: bool, optional
+        A boolean indicating if the data should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
+        when dealing with a large number of points. Default: False.
+    plot: bool, optional
+        Whether the plots should be returned to the console. Default: True.
+    save: bool, optional
+        Path to save plots as a file. Default: None.
+    return_cells: bool, optional
+        Whether to return selected cells based on user-given thresholds. Default: True.
+        
+    Return
+    ---
+    dict or list
+        If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
+    """
+    # Create logger
+    level    = logging.INFO
+    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level = level, format = format, handlers = handlers)
+    log = logging.getLogger('cisTopic')
+    
+    selected_cells={}
+    fig_dict={}
+    if save is not None:
+        pdf = matplotlib.backends.backend_pdf.PdfPages(save)
+        if not os.path.exists(os.path.dirname(save)):
+            if os.path.dirname(save) != '':
+                os.makedirs(os.path.dirname(save))
+    for key in input_metrics.keys():
+        x=input_metrics[key][var_x]
+        if var_y in (set(input_metrics[key].columns)):
+            # Take cell data
+            y=input_metrics[key][var_y]
+            #Plot xy
+            plt.close()
+            fig = plt.figure(figsize=(5, 5))
+            fig.add_axes([0, 0, 0.8, 0.8])
+            if plot_as_hexbin == False:
+                # Color by density
+                xy = np.vstack([x,y])
+                z = gaussian_kde(xy)(xy)
+                idx = z.argsort()
+                x, y, z = x[idx], y[idx], z[idx]
+                plt.scatter(x, y, c=z, s=10,  edgecolor=None, cmap=cmap)
+            else:
+                plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, mincnt=0.1)
+            plt.xlabel(var_x, fontsize=10)
+            plt.ylabel(var_y, fontsize=10)
+            plt.xlim(min(x), max(x))
+            plt.ylim(min(y), max(y))
+            
+            if len(input_metrics) > 1:
+                plt.legend([key])
+            # Add limits
+            if min_x != None:
+                plt.axvline(x=min_x, color='skyblue', linestyle='--')
+                input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_x] > min_x,:]
+            if max_x != None:
+                plt.axvline(x=max_x, color='tomato', linestyle='--')
+                input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_x] < max_x,:]
+            if min_y != None:
+                plt.axhline(y=min_y, color='skyblue', linestyle='--')
+                input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_y] > min_y,:]
+            if max_y != None:
+                plt.axhline(y=max_y, color='tomato', linestyle='--')
+                input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_y] < max_y,:]
+            
+            # first barplot on axis
+            fig.add_axes([0, 0.8, 0.8, 0.2])
+            if as_density == True:
+                sns.distplot(x, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, bins=n_bins)
+            else:
+                plt.hist(x, bins = n_bins, color=color)
+            plt.xlim(min(x), max(x))
+            plt.axis('off')
+            # second barplot on axis
+            fig.add_axes([0.8, 0, 0.2, 0.8])
+            if as_density == True:
+                sns.distplot(y, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, vertical=True, bins=n_bins)
+            else:
+                plt.hist(y, bins = n_bins, orientation='horizontal', color=color)
+            plt.ylim(min(y), max(y))
+            plt.axis('off')
+            
+            if save != None:
+                pdf.savefig(fig, bbox_inches='tight')
+            
+            if plot is not False:
+                plt.show()
+            else:
+                plt.close(fig)
 
-		else:
-			plt.close()
-			fig = plt.figure()
-			if isinstance(var_y, str):
-				log.info('The given var_y is not a column in cistopic_obj.cell_data')
-					
-			# first barplot on axis
-			if as_density == True:
-				sns.distplot(x, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, bins=n_bins)
-			else:
-				plt.hist(x, bins = n_bins, color=color)
-				plt.xlim(min(x), max(x))
-					
-			if len(input_metrics) > 1:
-				plt.legend([key])
-				
-			# Add limits
-			if min_x != None:
-				plt.axvline(x=min_x, color='skyblue', linestyle='--')
-				input_metrics[key]=input_metrics[key].loc[input_metrics[key][var_x] > min_x,:]
-				if max_x != None:
-					plt.axvline(x=max_x, color='tomato', linestyle='--')
-					input_metrics[key]=input_metrics[key].loc[input_metrics[key][var_x] < max_x,:]
-			
-			if save != None:
-				pdf.savefig(fig, bbox_inches='tight')
-				
-			if plot is not False:
-				plt.show()
-			else:
-				plt.close(fig)
+        else:
+            plt.close()
+            fig = plt.figure()
+            if isinstance(var_y, str):
+                log.info('The given var_y is not a column in cistopic_obj.cell_data')
+                    
+            # first barplot on axis
+            if as_density == True:
+                sns.distplot(x, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, bins=n_bins)
+            else:
+                plt.hist(x, bins = n_bins, color=color)
+                plt.xlim(min(x), max(x))
+                    
+            if len(input_metrics) > 1:
+                plt.legend([key])
+                
+            # Add limits
+            if min_x != None:
+                plt.axvline(x=min_x, color='skyblue', linestyle='--')
+                input_metrics[key]=input_metrics[key].loc[input_metrics[key][var_x] > min_x,:]
+                if max_x != None:
+                    plt.axvline(x=max_x, color='tomato', linestyle='--')
+                    input_metrics[key]=input_metrics[key].loc[input_metrics[key][var_x] < max_x,:]
+            
+            if save != None:
+                pdf.savefig(fig, bbox_inches='tight')
+                
+            if plot is not False:
+                plt.show()
+            else:
+                plt.close(fig)
 
-		selected_cells[key] = input_metrics[key].index.to_list()
-		fig_dict[key] = fig
+        selected_cells[key] = input_metrics[key].index.to_list()
+        fig_dict[key] = fig
 
-	if save != None:
-		pdf.close()
-		
-	return fig_dict, selected_cells
+    if save != None:
+        pdf.close()
+        
+    return fig_dict, selected_cells
+
+
+def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObject'],
+                       var_x: str,
+                       var_group: Optional[str] = None,
+                       var_y: Optional[str] = None,
+                       min_x: Optional[float] = None,
+                       max_x: Optional[float] = None,
+                       min_y: Optional[float] = None,
+                       max_y: Optional[float] = None,
+                       color: Optional[str] = None,
+                       cmap: Optional[str] = 'Blues',
+                       as_density: Optional[bool] = True,
+                       add_hist: Optional[bool] = True,
+                       n_bins: Optional[int] = 100,
+                       plot_as_hexbin: Optional[bool] = False,
+                       combine_samples_ridgeline: Optional[bool] = True,
+                       overlap_ridgeline: Optional[float] =.85,
+                       plot: Optional[bool] = True,
+                       save: Optional[str] = None,
+                       return_cells: Optional[bool] = True,
+                       return_fig: Optional[bool] = False):
+    """"
+    Plot barcode metrics and filter based on used-provided thresholds.
+        
+    Parameters
+    ---
+    input_metrics: dictionary, pd.DataFrame or CistopicObject
+    A dictionary with group labels as keys and barcode metrics per sample as values, a dataframe with barcode metrics (for one or more samples) or a cisTopicObjbect with metrics in `class::CistopicObject.cell_data`.
+    var_x: str
+        Metric to plot.
+    var_group: str, optional
+        Variable to divide the plot by groups. Default: None.
+    var_y: str, optional
+        A second metric to plot in combination with `var_x`. When provided, the function returns a 2D plot with `var_x` and `var_y` as axes, if not provided the function returns and histogram or density plot for `var_x`. Default: None.
+    min_x: float, optional
+        Minimum value on `var_x` to keep the barcode/cell. Default: None.
+    max_x: float, optional
+        Maximum value on `var_x` to keep the barcode/cell. Default: None.
+    min_y: float, optional
+        Minimum value on `var_y` to keep the barcode/cell. Default: None.
+    max_y: float, optional
+        Maximum value on `var_y` to keep the barcode/cell. Default: None.
+    color: str, optional
+        Color to use on histograms and/or density plots. Default: None.
+    cmap: str, optional
+        Color map to color 2D dot plots by density. Default: None.
+    as_density: bool, optional
+        Whether to plot variables as density plots rather than histograms. Default: True.
+    add_hist: bool, optional
+        Whether to show the histogram together with the density plots when `as_density=True`. Default: True.
+    n_bins: int, optional
+        Number of bins to use when plotting the variable histogram. Default: 100.
+    plot_as_hexbin: bool, optional
+        A boolean indicating if the data should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
+        when dealing with a large number of points. Default: False.
+    combine_samples_ridgeline: bool, optional
+        When a group variable is provided and only one metric is given, the distribution of the metric can be plotted in all groups using a ridgeline plot. If False, an histogram per sample will be returned. Default: True.
+    overlap_ridgeline: float, optional
+        Overlap between the ridgeline plot tracks. Default=.85
+    plot: bool, optional
+        Whether the plots should be returned to the console. Default: True.
+    save: bool, optional
+        Path to save plots as a file. Default: None.
+    return_cells: bool, optional
+        Whether to return selected cells based on user-given thresholds. Default: True.
+    return_fig: bool, optional
+        Whether to return the plot figure; if several samples it will return a dictionary with the figures per sample. Default: False.
+
+    Return
+    ---
+    dict or list
+        If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
+    """
+    # Create logger
+    level    = logging.INFO
+    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level = level, format = format, handlers = handlers)
+    log = logging.getLogger('cisTopic')
+    
+    # Take cell data
+    if isinstance(input_metrics, CistopicObject):
+        input_metrics = input_metrics.cell_data
+    if isinstance(input_metrics, dict):
+        input_metrics = merge_metadata(input_metrics)
+        var_group = 'Sample'
+
+    # If there is only one sample
+    if var_group is None:
+        input_metrics={'Sample':input_metrics}
+        fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot, save)
+    else:
+        input_metrics_dict={x:input_metrics[input_metrics.loc[:,var_group] == x] for x in list(set(input_metrics.loc[:,var_group]))}
+        if combine_samples_ridgeline is True and var_y is None:
+            selected_cells=plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot=False, save=None)
+            if save is not None:
+                if not os.path.exists(os.path.dirname(save)):
+                    os.makedirs(os.path.dirname(save))
+                pdf = matplotlib.backends.backend_pdf.PdfPages(save)
+            plt.close()
+            fig = plt.figure()
+            grouped = [(v, d.loc[:,var_x].dropna().values) for v, d in input_metrics.groupby(var_group)]
+            sample, data = zip(*grouped)
+            if color is None:
+                color='skyblue'
+            ridgeline(data, labels=sample, overlap=overlap_ridgeline, fill=color)
+            plt.xlabel(var_x)
+            plt.grid(zorder=0)
+            # Add limits
+            if min_x != None:
+                plt.axvline(x=min_x, color='skyblue', linestyle='--')
+            if max_x != None:
+                plt.axvline(x=max_x, color='tomato', linestyle='--')
+            if min_y != None:
+                plt.axhline(y=min_y, color='skyblue', linestyle='--')
+            if max_y != None:
+                plt.axhline(y=max_y, color='tomato', linestyle='--')
+                
+            if save != None:
+                pdf.savefig(fig, bbox_inches='tight')
+                pdf.close()
+
+            if plot is not False:
+                plt.show()
+            else:
+                plt.close(fig)
+            fig_dict = fig
+
+        else:
+            fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot, save)
+    
+    if return_cells == True:
+        if len(selected_cells) == 1:
+            selected_cells = selected_cells[list(selected_cells.keys())[0]]
+        if return_fig == True:
+            if len(fig_dict) == 1:
+                fig_dict = fig_dict[list(fig_dict.keys())[0]]
+            return fig_dict, selected_cells
+        else:
+            return selected_cells    
+    else:
+        if return_fig == True:
+            if len(fig_dict) == 1:
+                fig_dict = fig_dict[list(fig_dict.keys())[0]]
+            return fig_dict
 
 def ridgeline(data: List,
 			  overlap: Optional[float]=0,
