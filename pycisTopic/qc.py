@@ -245,7 +245,6 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
 
 	output = {}
 	if return_plot_data == True:
-		log.info('Returning valid barcodes')
 		output.update({'duplicate_rate_plot_data' : FPB})
 		return output
 
@@ -709,171 +708,250 @@ def metrics2data(metrics: Optional[Dict]):
 	return metadata_bc, profile_dict
 
 def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
-				   tss_annotation: Union[pd.DataFrame, pr.PyRanges],
-				   stats: Optional[List[str]]=['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
-				   label_list: Optional[List[str]] = None,
-				   path_to_regions: Optional[Dict[str,str]] = None,
-				   n_cpu: Optional[int] = 1,
-				   valid_bc: Optional[List[str]] = None,
-				   n_frag: Optional[int] = None,
-				   n_bc: Optional[int] = None,
-				   tss_flank_window: Optional[int] = 1000,
-				   tss_window: Optional[int] = 50,
-				   tss_minimum_signal_window: Optional[int] = 100,
-				   tss_rolling_window: Optional[int] = 10,
-				   check_for_duplicates: Optional[bool] = True,
-				   remove_duplicates: Optional[bool] = True):
-	""""
-	Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
-	
-	Parameters
-	---
-	fragments_dict: dict
-		Dictionary containing the path/s to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)) or data frames
-		containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a fragments is found assigned to that barcode.
-	tss_annotation: pd.DataFrame or pr.PyRanges
-		A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored).
-	stats: list, optional
-		A list with the statistics that have to be computed. Default: All ('barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'FRIP).
-	label_list: list, optional
-		A list containing the labels for each sample. By default, samples will be called 'Sample_number' (e.g.'Sample_1'). Default: None.
-	path_to_regions: dict, optional
-		A dictionary containing the regions to be used for each sample when calculating the rank plot and the Fraction of Reads In Peaks (FRIP).
-	n_cpu: int, optional
-		Number of cores to use. Default: 1.
-	valid_bc: list, optional
-		A list containing selected barcodes. This parameter is ignored if n_frag or n_bc are specified. Default: None.
-	n_frag: int, optional
-		Minimal number of fragments assigned to a barcode to be kept. Either n_frag or n_bc can be specified. Default: None.
-	n_bc: int, optional
-		Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
-	tss_window: int, optional
-		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
-	tss_flank_window: int, optional
-		Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
-	tss_minimum_signal_window: int, optional
-		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
-	tss_rolling_window: int, optional
-		Rolling window used to smooth signal. Default: 10.
-	check_for_duplicates: bool, optional
-		If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
-	remove_duplicates: bool, optional
-		Whether to remove duplicates. Default: True.
-		
-	Return
-	---
-	pd.DataFrame or list and list
-		A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
-	"""
-	
-	# Create logger
-	level	= logging.INFO
-	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-	handlers = [logging.StreamHandler(stream=sys.stdout)]
-	logging.basicConfig(level = level, format = format, handlers = handlers)
-	log = logging.getLogger('cisTopic')
-	# Convert dictionaries to list
-	label_list = list(fragments_dict.keys())
-	fragments_list = [fragments_dict[key] for key in fragments_dict.keys()]
-	path_to_regions = [path_to_regions[key] for key in fragments_dict.keys()]
-	# Compute stats
-	metrics={}
-	metadata_bc_dict={}
-	profile_data_dict={}
-	for i in range(len(fragments_list)):
-		# Prepare fragments
-		fragments = fragments_list[i]
-		if isinstance(fragments, str):
-			log.info('Reading ' + label_list[i])
-			fragments_df=pr.read_bed(fragments, as_df=True)
-		else:
-			fragments_df=fragments
-		# Check for duplicates
-		if 'Score' not in fragments_df:
-			if check_for_duplicates == True:
-				log.info("Collapsing duplicates")
-				fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
-				dup_scores = fragments_df.groupby(["Read_id"]).size()
-				fragments_df = fragments_df.drop_duplicates()
-				fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()].tolist()
-			else:
-				fragments_df['Score'] = 1
-		# Prepare regions
-		if isinstance(path_to_regions, list):
-			path_to_regions = path_to_regions[i]
-		# Prepare valid barcodes
-		if valid_bc is not None:
-			if n_bc is not None or n_frag is not None:
-				valid_bc=None			
-		# Rank plot
-		if 'barcode_rank_plot' in stats:
-			# Rank plot
-			log.info('Computing barcode rank plot for ' + label_list[i])
-			metrics['barcode_rank_plot'] = barcode_rank_plot(fragments = fragments_df,
-														 valid_bc = valid_bc,
-														 n_frag = n_frag,
-														 n_bc = n_bc,
-														 remove_duplicates = remove_duplicates,
-														 plot = False,
-														 return_bc = True,
-														 return_plot_data = True)
-			if valid_bc is None:
-				valid_bc=metrics['barcode_rank_plot']['valid_bc']
-				
-		# Duplicate rate		
-		if 'duplicate_rate' in stats:
-			# Duplicate rate
-			log.info('Computing duplicate rate plot for ' + label_list[i])
-			metrics['duplicate_rate'] = duplicate_rate(fragments=fragments_df,
-					valid_bc = valid_bc,
-					plot = False,
-					return_plot_data = True)
-		
-		# Fragment size
-		if 'insert_size_distribution' in stats:
-			# Fragment size
-			log.info('Computing insert size distribution for ' + label_list[i])
-			metrics['insert_size_distribution'] = insert_size_distribution(fragments=fragments_df,
-																	   valid_bc=valid_bc,
-																	   remove_duplicates=remove_duplicates,
-																	   plot=False,
-																	   return_plot_data=True)
-		# TSS
-		if 'profile_tss' in stats:
-			# TSS
-			log.info('Computing TSS profile for ' + label_list[i])
-			profile_tss_metrics = profile_tss(fragments=fragments_df,
-											   annotation=tss_annotation,
-											   valid_bc=valid_bc,
-											   plot=False,
-											   n_cpu=n_cpu,
-											   flank_window=tss_flank_window,
-											   tss_window=tss_window,
-											   minimum_signal_window = tss_minimum_signal_window,
-											   rolling_window = tss_rolling_window,
-											   return_TSS_enrichment_per_barcode=True,
-											   return_TSS_coverage_matrix_per_barcode=True,
-											   return_plot_data=True)
-			if profile_tss_metrics != None:
-				metrics['profile_tss'] = profile_tss_metrics
-		# FRIP
-		if 'frip' in stats:
-			# FRIP
-			log.info('Computing FRIP profile for ' + label_list[i])
-			metrics['frip'] = frip(fragments=fragments_df,
-								   path_to_regions=path_to_regions,
-								   valid_bc=valid_bc,
-								   remove_duplicates=remove_duplicates,
-								   n_cpu=n_cpu,
-								   plot=False,
-								   return_plot_data=True)
-	
-		metadata_bc, profile_data = metrics2data(metrics)
-		metadata_bc_dict[label_list[i]] = metadata_bc.fillna(0)
-		profile_data_dict[label_list[i]] = profile_data
-		log.info('Sample ' + label_list[i] + ' done!')
+                   tss_annotation: Union[pd.DataFrame, pr.PyRanges],
+                   stats: Optional[List[str]]=['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
+                   label_list: Optional[List[str]] = None,
+                   path_to_regions: Optional[Dict[str,str]] = None,
+                   n_cpu: Optional[int] = 1,
+                   valid_bc: Optional[List[str]] = None,
+                   n_frag: Optional[int] = None,
+                   n_bc: Optional[int] = None,
+                   tss_flank_window: Optional[int] = 1000,
+                   tss_window: Optional[int] = 50,
+                   tss_minimum_signal_window: Optional[int] = 100,
+                   tss_rolling_window: Optional[int] = 10,
+                   check_for_duplicates: Optional[bool] = True,
+                   remove_duplicates: Optional[bool] = True,
+                   **kwargs):
+    """"
+    Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
+    
+    Parameters
+    ---
+    fragments_dict: dict
+        Dictionary containing the path/s to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)) or data frames
+        containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a fragments is found assigned to that barcode.
+    tss_annotation: pd.DataFrame or pr.PyRanges
+        A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored).
+    stats: list, optional
+        A list with the statistics that have to be computed. Default: All ('barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'FRIP).
+    label_list: list, optional
+        A list containing the labels for each sample. By default, samples will be called 'Sample_number' (e.g.'Sample_1'). Default: None.
+    path_to_regions: dict, optional
+        A dictionary containing the regions to be used for each sample when calculating the rank plot and the Fraction of Reads In Peaks (FRIP).
+    n_cpu: int, optional
+        Number of cores to use. Default: 1.
+    valid_bc: list, optional
+        A list containing selected barcodes. This parameter is ignored if n_frag or n_bc are specified. Default: None.
+    n_frag: int, optional
+        Minimal number of fragments assigned to a barcode to be kept. Either n_frag or n_bc can be specified. Default: None.
+    n_bc: int, optional
+        Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
+    tss_window: int, optional
+        Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+    tss_flank_window: int, optional
+        Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
+    tss_minimum_signal_window: int, optional
+        Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
+    tss_rolling_window: int, optional
+        Rolling window used to smooth signal. Default: 10.
+    check_for_duplicates: bool, optional
+        If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
+    remove_duplicates: bool, optional
+        Whether to remove duplicates. Default: True.
+    **kwargs
+        Additional parameters for ray.init.
+        
+    Return
+    ---
+    pd.DataFrame or list and list
+        A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
+    """
+    # Create logger
+    level    = logging.INFO
+    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level = level, format = format, handlers = handlers)
+    log = logging.getLogger('cisTopic')
+    # Convert dictionaries to list
+    label_list = list(fragments_dict.keys())
+    fragments_list = [fragments_dict[key] for key in fragments_dict.keys()]
+    path_to_regions = [path_to_regions[key] for key in fragments_dict.keys()]
+    
+    ray.init(num_cpus=n_cpu, **kwargs)
+    qc_stats =ray.get([compute_qc_stats_ray.remote(fragments_list[i],
+                              tss_annotation=tss_annotation,
+                              stats=stats,
+                              label=label_list[i],
+                              path_to_regions=path_to_regions[i],
+                              valid_bc=valid_bc,
+                              n_frag=n_frag,
+                              n_bc=n_bc,
+                              tss_flank_window=tss_flank_window,
+                              tss_rolling_window=tss_rolling_window,
+                              check_for_duplicates=check_for_duplicates,
+                              remove_duplicates=remove_duplicates) for i in list(range(len(fragments_list)))])
+    ray.shutdown()
+    metadata_dict = {key:x[key] for x in list(list(zip(*qc_stats))[0]) for key in x.keys()}
+    profile_data_dict = {key:x[key] for x in list(list(zip(*qc_stats))[1]) for key in x.keys()}
+    return metadata_dict, profile_data_dict
+    
 
-	return metadata_bc_dict, profile_data_dict
+@ray.remote
+def compute_qc_stats_ray(fragments,
+                   tss_annotation: Union[pd.DataFrame, pr.PyRanges],
+                   stats: Optional[List[str]]=['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
+                   label: Optional[str] = None,
+                   path_to_regions: Optional[str] = None,
+                   valid_bc: Optional[List[str]] = None,
+                   n_frag: Optional[int] = None,
+                   n_bc: Optional[int] = None,
+                   tss_flank_window: Optional[int] = 1000,
+                   tss_window: Optional[int] = 50,
+                   tss_minimum_signal_window: Optional[int] = 100,
+                   tss_rolling_window: Optional[int] = 10,
+                   check_for_duplicates: Optional[bool] = True,
+                   remove_duplicates: Optional[bool] = True):
+    """"
+    Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
+    
+    Parameters
+    ---
+    fragments: str
+        Path to fragments file.
+    tss_annotation: pd.DataFrame or pr.PyRanges
+        A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored).
+    stats: list, optional
+        A list with the statistics that have to be computed. Default: All ('barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'FRIP).
+    label: str
+        Sample label. Default: None.
+    path_to_regions: str
+        Path to regions file to use for FRIP.
+    valid_bc: list, optional
+        A list containing selected barcodes. This parameter is ignored if n_frag or n_bc are specified. Default: None.
+    n_frag: int, optional
+        Minimal number of fragments assigned to a barcode to be kept. Either n_frag or n_bc can be specified. Default: None.
+    n_bc: int, optional
+        Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
+    tss_window: int, optional
+        Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+    tss_flank_window: int, optional
+        Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
+    tss_minimum_signal_window: int, optional
+        Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
+    tss_rolling_window: int, optional
+        Rolling window used to smooth signal. Default: 10.
+    check_for_duplicates: bool, optional
+        If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
+    remove_duplicates: bool, optional
+        Whether to remove duplicates. Default: True.
+        
+    Return
+    ---
+    pd.DataFrame or list and list
+        A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
+    """
+    
+    # Create logger
+    level    = logging.INFO
+    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level = level, format = format, handlers = handlers)
+    log = logging.getLogger('cisTopic')
+    # Compute stats
+    metrics={}
+    metadata_bc_dict={}
+    profile_data_dict={}
+    # Prepare fragments
+    if isinstance(fragments, str):
+        log.info('Reading ' + label)
+        fragments_df=pr.read_bed(fragments, as_df=True)
+    else:
+        fragments_df=fragments
+    # Check for duplicates
+    if 'Score' not in fragments_df:
+        if check_for_duplicates == True:
+            log.info("Collapsing duplicates")
+            fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
+            dup_scores = fragments_df.groupby(["Read_id"]).size()
+            fragments_df = fragments_df.drop_duplicates()
+            fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()].tolist()
+        else:
+            fragments_df['Score'] = 1
+    # Prepare valid barcodes
+    if valid_bc is not None:
+        if n_bc is not None or n_frag is not None:
+            valid_bc=None            
+    # Rank plot
+    if 'barcode_rank_plot' in stats:
+        # Rank plot
+        log.info('Computing barcode rank plot for ' + label)
+        metrics['barcode_rank_plot'] = barcode_rank_plot(fragments = fragments_df,
+                                                         valid_bc = valid_bc,
+                                                         n_frag = n_frag,
+                                                         n_bc = n_bc,
+                                                         remove_duplicates = remove_duplicates,
+                                                         plot = False,
+                                                         return_bc = True,
+                                                         return_plot_data = True)
+        if valid_bc is None:
+            valid_bc=metrics['barcode_rank_plot']['valid_bc']
+                
+    # Duplicate rate        
+    if 'duplicate_rate' in stats:
+        # Duplicate rate
+        log.info('Computing duplicate rate plot for ' + label)
+        metrics['duplicate_rate'] = duplicate_rate(fragments=fragments_df,
+                    valid_bc = valid_bc,
+                    plot = False,
+                    return_plot_data = True)
+        
+    # Fragment size
+    if 'insert_size_distribution' in stats:
+        # Fragment size
+        log.info('Computing insert size distribution for ' + label)
+        metrics['insert_size_distribution'] = insert_size_distribution(fragments=fragments_df,
+                                                                       valid_bc=valid_bc,
+                                                                       remove_duplicates=remove_duplicates,
+                                                                       plot=False,
+                                                                       return_plot_data=True)
+    # TSS
+    if 'profile_tss' in stats:
+        # TSS
+        log.info('Computing TSS profile for ' + label)
+        profile_tss_metrics = profile_tss(fragments=fragments_df,
+                                               annotation=tss_annotation,
+                                               valid_bc=valid_bc,
+                                               plot=False,
+                                               n_cpu=1,
+                                               flank_window=tss_flank_window,
+                                               tss_window=tss_window,
+                                               minimum_signal_window = tss_minimum_signal_window,
+                                               rolling_window = tss_rolling_window,
+                                               return_TSS_enrichment_per_barcode=True,
+                                               return_TSS_coverage_matrix_per_barcode=True,
+                                               return_plot_data=True)
+        if profile_tss_metrics != None:
+            metrics['profile_tss'] = profile_tss_metrics
+    # FRIP
+    if 'frip' in stats:
+        # FRIP
+        log.info('Computing FRIP profile for ' + label)
+        metrics['frip'] = frip(fragments=fragments_df,
+                                   path_to_regions=path_to_regions,
+                                   valid_bc=valid_bc,
+                                   remove_duplicates=remove_duplicates,
+                                   n_cpu=1,
+                                   plot=False,
+                                   return_plot_data=True)
+    
+    metadata_bc, profile_data = metrics2data(metrics)
+    metadata_bc = metadata_bc.fillna(0)
+    metadata_bc_dict = {label : metadata_bc}
+    profile_data_dict = {label :  profile_data}
+    log.info('Sample ' + label + ' done!')
+
+    return metadata_bc_dict, profile_data_dict
 
 def plot_sample_metrics(profile_data_dict: Dict[str, pd.DataFrame],
                 profile_list: Optional[Union['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip']] = ['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
@@ -1198,8 +1276,8 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
                                 max_x: Optional[int] = None,
                                 min_y: Optional[int] = None,
                                 max_y: Optional[int] = None,
-                                color: Optional[str] = None,
-                                cmap: Optional[str] = 'Blues',
+                                color: Optional[str] = '#440154FF',
+                                cmap: Optional[str] = 'viridis',
                                 as_density: Optional[bool] = False,
                                 add_hist: Optional[bool] = True,
                                 n_bins: Optional[int] = 100,
@@ -1291,7 +1369,7 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
             plt.ylim(min(y), max(y))
             
             if len(input_metrics) > 1:
-                plt.legend([key])
+                plt.title(key, y=-0.2, fontsize=10, fontweight="bold")
             # Add limits
             if min_x != None:
                 plt.axvline(x=min_x, color='skyblue', linestyle='--')
@@ -1380,8 +1458,8 @@ def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObjec
                        max_x: Optional[float] = None,
                        min_y: Optional[float] = None,
                        max_y: Optional[float] = None,
-                       color: Optional[str] = None,
-                       cmap: Optional[str] = 'Blues',
+                       color: Optional[str] = '#440154FF',
+                       cmap: Optional[str] = 'viridis',
                        as_density: Optional[bool] = True,
                        add_hist: Optional[bool] = True,
                        n_bins: Optional[int] = 100,
