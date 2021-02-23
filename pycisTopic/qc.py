@@ -344,175 +344,181 @@ def insert_size_distribution(fragments: Union[str, pd.DataFrame],
 		return(output)
 
 def profile_tss(fragments: Union[str, pd.DataFrame],
-			   annotation: Union[pd.DataFrame, pr.PyRanges],
-			   valid_bc: Optional[List[str]] = None,
-			   plot: Optional[bool] = True,
-			   plot_data: Optional[pd.DataFrame] = None,
-			   n_cpu: Optional[int] = 1,
-			   flank_window: Optional[int] = 1000,
-			   tss_window: Optional[int] = 50,
-			   minimum_signal_window: Optional[int] = 100,
-			   rolling_window: Optional[int] = 10,
-			   min_norm: Optional[int] = 0.2,
-			   color: Optional[str] = None,
-			   save: Optional[str] = None,
-			   return_TSS_enrichment_per_barcode: Optional[bool] = False,
-			   return_TSS_coverage_matrix_per_barcode: Optional[bool] = False,
-			   return_plot_data: Optional[bool] = False):
-	"""
-	Plot the Transcription Start Site (TSS) profile. It is computed as the summed accessibility signal (sample-level), or the number of cut sites per base (barcode-level), in a space around the full set of annotated TSSs and is normalized by the minimum signal in the window. This profile is helpful to assess the signal-to-noise ratio of the library, as it is well known that TSSs and the promoter regions around them have, on average, a high degree of chromatin accessibility compared to the intergenic and intronic regions of the genome.
-		
-	Parameters
-	---------
-	fragments: str or pd.DataFrame
-		The path to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)) or a data frame
-		containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a fragments is found assigned to that barcode. The fragments data
-		frame can be obtained using PyRanges:
-			import pyranges as pr
-			fragments = pr.read_bed(fragments_file, as_df=True))
-	annotation: pd.DataFrame or pyRanges
-		A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored). This data frame can be easily obtained via pybiomart:
-			# Get TSS annotations
-			import pybiomart as pbm
-			# For mouse
-			dataset = pbm.Dataset(name='mmusculus_gene_ensembl',  host='http://www.ensembl.org')
-			# For human
-			dataset = pbm.Dataset(name='hsapiens_gene_ensembl',  host='http://www.ensembl.org')
-			# For fly
-			dataset = pbm.Dataset(name='dmelanogaster_gene_ensembl',  host='http://www.ensembl.org')
-			# Query TSS list and format
-			annot = dataset.query(attributes=['chromosome_name', 'transcription_start_site', 'strand', 'external_gene_name', 'transcript_biotype'])
-			filter = annot['Chromosome/scaffold name'].str.contains('CHR|GL|JH|MT')
-			annot = annot[~filter]
-			annot['Chromosome/scaffold name'] = annot['Chromosome/scaffold name'].str.replace(r'(\b\S)', r'chr\1')
-			annot.columns=['Chromosome', 'Start', 'Strand', 'Gene', 'Transcript_type']
-			# Select TSSs of protein coding genes
-			annot = annot[annot.Transcript_type == 'protein_coding']
-	valid_bc: list, optional
-		A list containing selected barcodes. Default: None,
-	plot: bool, optional
-		Whether to return the plot to the console. Default: True.
-	plot_data: pd.DataFrame, optional
-		Data frame containing precomputed plot data. Default: None.
-	flank_window: int, optional
-		Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
-	tss_window: int, optional
-		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
-	minimum_signal_window: int, optional
-		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
-	rolling_window: int, optional
-		Rolling window used to smooth signal. Default: 10.
-	min_norm: int, optional
-		Minimum normalization score. If the average minimum signal value is below this value, this number is used to normalize the TSS signal. This approach penalizes cells with fewer reads.
-	color: str, optional
-		Line color for the plot. Default: None.
-	save: str, optional
-		Output file to save plot. Default: None.
-	remove_duplicates: bool, optional
-		Whether to remove duplicates. Default: True.
-	return_TSS_enrichment_per_barcode: bool, optional
-		Whether to return a data frame containing the normalized enrichment score on the TSS for each barcode. Default: False.
-	return_TSS_coverage_matrix_per_barcode: bool, optional
-		Whether to return a matrix containing the normalized enrichment in each position in the window for each barcode, with positions as columns and barcodes as rows. Default: False.
-	return_plot_data: bool, optional
-			Whether to return the TSS profile plot data. Default: False.
-		
-	Return
-	------
-	dict
-	A dictionary containing a :class:`pd.DataFrame` with the normalized enrichment score on the TSS for each barcode, a :class:`pd.DataFrame` with the normalized enrichment scores in each position for each barcode and/or a :class:`pd.DataFrame` with the TSS profile plot data.
-	"""
-	# Create logger
-	level	= logging.INFO
-	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-	handlers = [logging.StreamHandler(stream=sys.stdout)]
-	logging.basicConfig(level = level, format = format, handlers = handlers)
-	log = logging.getLogger('cisTopic')
-	
-	if isinstance(plot_data, pd.DataFrame):
-		log.info('Using plot_data. TSS enrichment per barcode will not be computed')
-		fig, ax = plt.subplots()
-		ax.plot(plot_data.Position, plot_data.TSSEnrichment)
-		plt.xlim(-space_TSS, space_TSS)
-		plt.xlabel("Position from TSS",fontsize=10)
-		plt.ylabel("Normalized enrichment",fontsize=10)
-	else:
-		if isinstance(fragments, str):
-			log.info('Reading fragments file')
-			fragments = pr.read_bed(fragments)
-		else:
-			fragments = pr.PyRanges(fragments)
-		
-		if valid_bc is not None:
-			log.info('Using provided valid barcodes')
-			fragments = fragments[fragments.Name.isin(set(valid_bc))]
-		
-		log.info('Formatting annnotation')
-		if isinstance(annotation, pr.PyRanges):
-			annotation = annotation.df
-		tss_space_annotation = annotation[['Chromosome', 'Start', 'Strand']]
-		tss_space_annotation['End']=tss_space_annotation['Start']+flank_window
-		tss_space_annotation['Start']=tss_space_annotation['Start']-flank_window
-		tss_space_annotation = tss_space_annotation[["Chromosome", "Start", "End", "Strand"]]
-		tss_space_annotation = pr.PyRanges(tss_space_annotation)
-		log.info('Overlapping fragments with TSS')
-		overlap_with_TSS  = fragments.join(tss_space_annotation, nb_cpu=n_cpu)
-		if len(overlap_with_TSS) == 0:
-			log.error('There is no overlap with any TSS! Please, check your fragments file.')
-			return
-		log.info('Getting cut sites')
-		overlap_with_TSS = overlap_with_TSS.df
-		overlap_with_TSS['Strand'] = overlap_with_TSS['Strand'].astype(int)
-		overlap_with_TSS['start_pos'] = -(overlap_with_TSS['Start_b'].values+flank_window-overlap_with_TSS['Start'].values)*overlap_with_TSS['Strand'].values
-		overlap_with_TSS['end_pos'] = -(overlap_with_TSS['Start_b'].values+flank_window-overlap_with_TSS['End'].values)*overlap_with_TSS['Strand'].values
-		overlap_with_TSS = overlap_with_TSS[(overlap_with_TSS['start_pos'].values <= flank_window) & (overlap_with_TSS['start_pos'].values >= -flank_window)]
-		overlap_with_TSS = overlap_with_TSS[(overlap_with_TSS['end_pos'].values <= flank_window) & (overlap_with_TSS['end_pos'].values >= -flank_window)]
-		overlap_with_TSS['rel_start_pos'] = overlap_with_TSS['start_pos'].values+flank_window
-		overlap_with_TSS['rel_end_pos'] = overlap_with_TSS['end_pos'].values+flank_window
-		
-		log.info('Creating coverage matrix')
-		#Make sure that all positions appear in the matrix
-		cut_sites_TSS_space= pd.DataFrame([list(range(2*flank_window+1)),['Space']*(2*flank_window+1)], index=['Position', 'Barcode']).T
-		cut_sites_TSS = pd.concat([overlap_with_TSS[['Name', 'rel_start_pos']].rename(columns={'Name': 'Barcode', 'rel_start_pos': 'Position'}), overlap_with_TSS[['Name', 'rel_end_pos']].rename(columns={'Name': 'Barcode', 'rel_end_pos': 'Position'}), cut_sites_TSS_space], axis=0)
-		TSS_matrix = cut_sites_TSS.groupby(["Position", "Barcode"]).size().unstack(level="Position").drop('Space').fillna(0).astype(dtype)
+               annotation: Union[pd.DataFrame, pr.PyRanges],
+               valid_bc: Optional[List[str]] = None,
+               plot: Optional[bool] = True,
+               plot_data: Optional[pd.DataFrame] = None,
+               n_cpu: Optional[int] = 1,
+               flank_window: Optional[int] = 1000,
+               tss_window: Optional[int] = 50,
+               minimum_signal_window: Optional[int] = 100,
+               rolling_window: Optional[int] = 10,
+               min_norm: Optional[int] = 0.2,
+               color: Optional[str] = None,
+               save: Optional[str] = None,
+               return_TSS_enrichment_per_barcode: Optional[bool] = False,
+               return_TSS_coverage_matrix_per_barcode: Optional[bool] = False,
+               return_plot_data: Optional[bool] = False):
+    """
+    Plot the Transcription Start Site (TSS) profile. It is computed as the summed accessibility signal (sample-level), or the number of cut sites per base (barcode-level), in a space around the full set of annotated TSSs and is normalized by the minimum signal in the window. This profile is helpful to assess the signal-to-noise ratio of the library, as it is well known that TSSs and the promoter regions around them have, on average, a high degree of chromatin accessibility compared to the intergenic and intronic regions of the genome.
+        
+    Parameters
+    ---------
+    fragments: str or pd.DataFrame
+        The path to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)) or a data frame
+        containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a fragments is found assigned to that barcode. The fragments data
+        frame can be obtained using PyRanges:
+            import pyranges as pr
+            fragments = pr.read_bed(fragments_file, as_df=True))
+    annotation: pd.DataFrame or pyRanges
+        A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored). This data frame can be easily obtained via pybiomart:
+            # Get TSS annotations
+            import pybiomart as pbm
+            # For mouse
+            dataset = pbm.Dataset(name='mmusculus_gene_ensembl',  host='http://www.ensembl.org')
+            # For human
+            dataset = pbm.Dataset(name='hsapiens_gene_ensembl',  host='http://www.ensembl.org')
+            # For fly
+            dataset = pbm.Dataset(name='dmelanogaster_gene_ensembl',  host='http://www.ensembl.org')
+            # Query TSS list and format
+            annot = dataset.query(attributes=['chromosome_name', 'transcription_start_site', 'strand', 'external_gene_name', 'transcript_biotype'])
+            filter = annot['Chromosome/scaffold name'].str.contains('CHR|GL|JH|MT')
+            annot = annot[~filter]
+            annot['Chromosome/scaffold name'] = annot['Chromosome/scaffold name'].str.replace(r'(\b\S)', r'chr\1')
+            annot.columns=['Chromosome', 'Start', 'Strand', 'Gene', 'Transcript_type']
+            # Select TSSs of protein coding genes
+            annot = annot[annot.Transcript_type == 'protein_coding']
+    valid_bc: list, optional
+        A list containing selected barcodes. Default: None,
+    plot: bool, optional
+        Whether to return the plot to the console. Default: True.
+    plot_data: pd.DataFrame, optional
+        Data frame containing precomputed plot data. Default: None.
+    flank_window: int, optional
+        Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
+    tss_window: int, optional
+        Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+    minimum_signal_window: int, optional
+        Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
+    rolling_window: int, optional
+        Rolling window used to smooth signal. Default: 10.
+    min_norm: int, optional
+        Minimum normalization score. If the average minimum signal value is below this value, this number is used to normalize the TSS signal. This approach penalizes cells with fewer reads.
+    color: str, optional
+        Line color for the plot. Default: None.
+    save: str, optional
+        Output file to save plot. Default: None.
+    remove_duplicates: bool, optional
+        Whether to remove duplicates. Default: True.
+    return_TSS_enrichment_per_barcode: bool, optional
+        Whether to return a data frame containing the normalized enrichment score on the TSS for each barcode. Default: False.
+    return_TSS_coverage_matrix_per_barcode: bool, optional
+        Whether to return a matrix containing the normalized enrichment in each position in the window for each barcode, with positions as columns and barcodes as rows. Default: False.
+    return_plot_data: bool, optional
+            Whether to return the TSS profile plot data. Default: False.
+        
+    Return
+    ------
+    dict
+    A dictionary containing a :class:`pd.DataFrame` with the normalized enrichment score on the TSS for each barcode, a :class:`pd.DataFrame` with the normalized enrichment scores in each position for each barcode and/or a :class:`pd.DataFrame` with the TSS profile plot data.
+    """
+    # Create logger
+    level    = logging.INFO
+    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level = level, format = format, handlers = handlers)
+    log = logging.getLogger('cisTopic')
+    
+    if isinstance(plot_data, pd.DataFrame):
+        log.info('Using plot_data. TSS enrichment per barcode will not be computed')
+        fig, ax = plt.subplots()
+        ax.plot(plot_data.Position, plot_data.TSSEnrichment)
+        plt.xlim(-space_TSS, space_TSS)
+        plt.xlabel("Position from TSS",fontsize=10)
+        plt.ylabel("Normalized enrichment",fontsize=10)
+    else:
+        if isinstance(fragments, str):
+            log.info('Reading fragments file')
+            fragments = pr.read_bed(fragments)
+        else:
+            fragments = pr.PyRanges(fragments)
+        
+        if valid_bc is not None:
+            log.info('Using provided valid barcodes')
+            fragments = fragments[fragments.Name.isin(set(valid_bc))]
+        
+        log.info('Formatting annnotation')
+        if isinstance(annotation, pr.PyRanges):
+            annotation = annotation.df
+        tss_space_annotation = annotation[['Chromosome', 'Start', 'Strand']]
+        tss_space_annotation['End']=tss_space_annotation['Start']+flank_window
+        tss_space_annotation['Start']=tss_space_annotation['Start']-flank_window
+        tss_space_annotation = tss_space_annotation[["Chromosome", "Start", "End", "Strand"]]
+        tss_space_annotation = pr.PyRanges(tss_space_annotation)
+        log.info('Overlapping fragments with TSS')
+        overlap_with_TSS  = fragments.join(tss_space_annotation, nb_cpu=5)
+        overlap_with_TSS_save=overlap_with_TSS
+        overlap_with_TSS = overlap_with_TSS_save
+        if len(overlap_with_TSS) == 0:
+            log.error('There is no overlap with any TSS! Please, check your fragments file.')
+            return
+        log.info('Getting cut sites')
+        overlap_with_TSS = overlap_with_TSS.df
+        overlap_with_TSS['Strand'] = overlap_with_TSS['Strand'].astype(int)
+        overlap_with_TSS['start_pos'] = -(overlap_with_TSS['Start_b'].values+flank_window-overlap_with_TSS['Start'].values)*overlap_with_TSS['Strand'].values
+        overlap_with_TSS['end_pos'] = -(overlap_with_TSS['Start_b'].values+flank_window-overlap_with_TSS['End'].values)*overlap_with_TSS['Strand'].values
+        # We split them to also keep the start position of reads whose start is in the space and their end not and viceversa
+        overlap_with_TSS_start = overlap_with_TSS[(overlap_with_TSS['start_pos'].values <= flank_window) & (overlap_with_TSS['start_pos'].values >= -flank_window)]
+        overlap_with_TSS_end = overlap_with_TSS[(overlap_with_TSS['end_pos'].values <= flank_window) & (overlap_with_TSS['end_pos'].values >= -flank_window)]
+        overlap_with_TSS_start['rel_start_pos'] = overlap_with_TSS_start['start_pos'].values+flank_window
+        overlap_with_TSS_end['rel_end_pos'] = overlap_with_TSS_end['end_pos'].values+flank_window
+        #Make sure that all positions appear in the matrix
+        log.info('Creating coverage matrix')
+        cut_sites_TSS = pd.concat([overlap_with_TSS_start[['Name', 'rel_start_pos']].rename(columns={'Name': 'Barcode', 'rel_start_pos': 'Position'}), overlap_with_TSS_end[['Name', 'rel_end_pos']].rename(columns={'Name': 'Barcode', 'rel_end_pos': 'Position'})], axis=0)
+        TSS_matrix = cut_sites_TSS.groupby(["Position", "Barcode"]).size().unstack(level="Position").fillna(0)
+        if not TSS_matrix.columns.tolist() == list(range(2*flank_window + 1)):
+            missing_values =  list(set(TSS_matrix.columns.tolist()).symmetric_difference(list(range(2*flank_window + 1))))
+            for x in missing_values:
+                TSS_matrix[x] = 0  
+            TSS_matrix = TSS_matrix.reindex(sorted(TSS_matrix.columns), axis=1)
+        
+        if rolling_window != None:
+            TSS_matrix = TSS_matrix.rolling(window=rolling_window, min_periods=0, axis=1).mean()
+        TSS_counts=TSS_matrix.values.sum(axis=0)
+        div=max((np.mean(TSS_counts[-minimum_signal_window:])+np.mean(TSS_counts[0:minimum_signal_window]))/2, min_norm)
+        fig, ax = plt.subplots()
+        ax.plot(range(-flank_window-1,flank_window),TSS_counts/div, color=color)
+        plt.xlim(-flank_window, flank_window)
+        plt.xlabel("Position from TSS",fontsize=10)
+        plt.ylabel("Normalized enrichment",fontsize=10)
+        if save != None:
+            fig.savefig(save)
+        if plot == True:
+            log.info('Plotting normalized sample TSS enrichment')
+            plt.show()
+        else:
+            plt.close(fig)
 
-		if rolling_window != None:
-			TSS_matrix = TSS_matrix.rolling(window=rolling_window, min_periods=0, axis=1).mean()
-		TSS_counts=TSS_matrix.values.sum(axis=0)
-		div=max((np.mean(TSS_counts[-minimum_signal_window:])+np.mean(TSS_counts[0:minimum_signal_window]))/2, min_norm)
-		fig, ax = plt.subplots()
-		ax.plot(range(-flank_window-1,flank_window),TSS_counts/div, color=color)
-		plt.xlim(-flank_window, flank_window)
-		plt.xlabel("Position from TSS",fontsize=10)
-		plt.ylabel("Normalized enrichment",fontsize=10)
-		if save != None:
-			fig.savefig(save)
-		if plot == True:
-			log.info('Plotting normalized sample TSS enrichment')
-			plt.show()
-		else:
-			plt.close(fig)
+    output={}
+    flag=False
+    if return_TSS_enrichment_per_barcode == True:
+        TSS_enrich = TSS_matrix.apply(lambda x: x/max([((np.mean(x[-minimum_signal_window:])+np.mean(x[0:minimum_signal_window]))/2), min_norm]), axis=1)
+        TSS_enrich = pd.DataFrame(TSS_enrich.iloc[:,range(flank_window-tss_window, flank_window+tss_window)].mean(axis=1))
+        TSS_enrich.columns = ['TSS_enrichment']
+        output.update({'TSS_enrichment' : TSS_enrich})
+        flag = True
+    if return_TSS_coverage_matrix_per_barcode == True:
+        log.info('Returning normalized TSS coverage matrix per barcode')
+        TSS_mat = TSS_matrix.apply(lambda x: x/max([((np.mean(x[-minimum_signal_window:])+np.mean(x[0:minimum_signal_window]))/2), min_norm]), axis=1)
+        output.update({'TSS_coverage_mat' : TSS_mat})
+        flag = True
+    if return_plot_data == True:
+        log.info('Returning normalized sample TSS enrichment data')
+        output.update({'TSS_plot_data' : pd.DataFrame({'Position': range(-flank_window-1,flank_window), 'TSS_enrichment': TSS_counts/div})})
+        flag = True
 
-	output={}
-	flag=False
-	if return_TSS_enrichment_per_barcode == True:
-		TSS_enrich = TSS_matrix.apply(lambda x: x/max([((np.mean(x[-minimum_signal_window:])+np.mean(x[0:minimum_signal_window]))/2), min_norm]), axis=1)
-		TSS_enrich = pd.DataFrame(TSS_enrich.iloc[:,range(flank_window-tss_window, flank_window+tss_window)].mean(axis=1))
-		TSS_enrich.columns = ['TSS_enrichment']
-		output.update({'TSS_enrichment' : TSS_enrich})
-		flag = True
-	if return_TSS_coverage_matrix_per_barcode == True:
-		log.info('Returning normalized TSS coverage matrix per barcode')
-		TSS_mat = TSS_matrix.apply(lambda x: x/max([((np.mean(x[-minimum_signal_window:])+np.mean(x[0:minimum_signal_window]))/2), min_norm]), axis=1)
-		output.update({'TSS_coverage_mat' : TSS_mat})
-		flag = True
-	if return_plot_data == True:
-		log.info('Returning normalized sample TSS enrichment data')
-		output.update({'TSS_plot_data' : pd.DataFrame({'Position': range(-flank_window-1,flank_window), 'TSS_enrichment': TSS_counts/div})})
-		flag = True
-
-	if flag == True:
-		return output
+    if flag == True:
+        return output
 
 def frip(fragments: Union[str, pd.DataFrame],
 		 path_to_regions: str,
@@ -1510,6 +1516,28 @@ def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObjec
             if len(fig_dict) == 1:
                 fig_dict = fig_dict[list(fig_dict.keys())[0]]
             return fig_dict
+            
+def merge_metadata(metadata_bc_dict: Dict):
+	"""
+	Merge barcode-level statistics from different samples.
+	
+	Parameters
+	---
+	metadata_bc_dict: dict
+		Dictionary containing `class::pd.DataFrame` with the barcode-level statistics for each sample
+		
+	Return
+	---
+	pd.DataFrame
+		A data frame containing the combined barcode statistics with an additional column called sample.
+	"""
+	
+	for key in metadata_bc_dict.keys():
+		metadata_bc_dict[key]['Sample'] = [key]*metadata_bc_dict[key].shape[0]
+	
+	metadata_bc_list = [metadata_bc_dict[key] for key in metadata_bc_dict.keys()]
+	metadata_bc_combined = pd.concat(metadata_bc_list, axis=0, sort=False)
+	return metadata_bc_combined
 
 def ridgeline(data: List,
 			  overlap: Optional[float]=0,
