@@ -455,7 +455,7 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
         tss_space_annotation = tss_space_annotation[["Chromosome", "Start", "End", "Strand"]]
         tss_space_annotation = pr.PyRanges(tss_space_annotation)
         log.info('Overlapping fragments with TSS')
-        overlap_with_TSS  = fragments.join(tss_space_annotation, nb_cpu=5)
+        overlap_with_TSS  = fragments.join(tss_space_annotation, nb_cpu=n_cpu)
         overlap_with_TSS_save=overlap_with_TSS
         overlap_with_TSS = overlap_with_TSS_save
         if len(overlap_with_TSS) == 0:
