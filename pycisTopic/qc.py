@@ -343,181 +343,181 @@ def insert_size_distribution(fragments: Union[str, pd.DataFrame],
 		return(output)
 
 def profile_tss(fragments: Union[str, pd.DataFrame],
-               annotation: Union[pd.DataFrame, pr.PyRanges],
-               valid_bc: Optional[List[str]] = None,
-               plot: Optional[bool] = True,
-               plot_data: Optional[pd.DataFrame] = None,
-               n_cpu: Optional[int] = 1,
-               flank_window: Optional[int] = 1000,
-               tss_window: Optional[int] = 50,
-               minimum_signal_window: Optional[int] = 100,
-               rolling_window: Optional[int] = 10,
-               min_norm: Optional[int] = 0.2,
-               color: Optional[str] = None,
-               save: Optional[str] = None,
-               return_TSS_enrichment_per_barcode: Optional[bool] = False,
-               return_TSS_coverage_matrix_per_barcode: Optional[bool] = False,
-               return_plot_data: Optional[bool] = False):
-    """
-    Plot the Transcription Start Site (TSS) profile. It is computed as the summed accessibility signal (sample-level), or the number of cut sites per base (barcode-level), in a space around the full set of annotated TSSs and is normalized by the minimum signal in the window. This profile is helpful to assess the signal-to-noise ratio of the library, as it is well known that TSSs and the promoter regions around them have, on average, a high degree of chromatin accessibility compared to the intergenic and intronic regions of the genome.
-        
-    Parameters
-    ---------
-    fragments: str or pd.DataFrame
-        The path to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)) or a data frame
-        containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a fragments is found assigned to that barcode. The fragments data
-        frame can be obtained using PyRanges:
-            import pyranges as pr
-            fragments = pr.read_bed(fragments_file, as_df=True))
-    annotation: pd.DataFrame or pyRanges
-        A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored). This data frame can be easily obtained via pybiomart:
-            # Get TSS annotations
-            import pybiomart as pbm
-            # For mouse
-            dataset = pbm.Dataset(name='mmusculus_gene_ensembl',  host='http://www.ensembl.org')
-            # For human
-            dataset = pbm.Dataset(name='hsapiens_gene_ensembl',  host='http://www.ensembl.org')
-            # For fly
-            dataset = pbm.Dataset(name='dmelanogaster_gene_ensembl',  host='http://www.ensembl.org')
-            # Query TSS list and format
-            annot = dataset.query(attributes=['chromosome_name', 'transcription_start_site', 'strand', 'external_gene_name', 'transcript_biotype'])
-            filter = annot['Chromosome/scaffold name'].str.contains('CHR|GL|JH|MT')
-            annot = annot[~filter]
-            annot['Chromosome/scaffold name'] = annot['Chromosome/scaffold name'].str.replace(r'(\b\S)', r'chr\1')
-            annot.columns=['Chromosome', 'Start', 'Strand', 'Gene', 'Transcript_type']
-            # Select TSSs of protein coding genes
-            annot = annot[annot.Transcript_type == 'protein_coding']
-    valid_bc: list, optional
-        A list containing selected barcodes. Default: None,
-    plot: bool, optional
-        Whether to return the plot to the console. Default: True.
-    plot_data: pd.DataFrame, optional
-        Data frame containing precomputed plot data. Default: None.
-    flank_window: int, optional
-        Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
-    tss_window: int, optional
-        Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
-    minimum_signal_window: int, optional
-        Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
-    rolling_window: int, optional
-        Rolling window used to smooth signal. Default: 10.
-    min_norm: int, optional
-        Minimum normalization score. If the average minimum signal value is below this value, this number is used to normalize the TSS signal. This approach penalizes cells with fewer reads.
-    color: str, optional
-        Line color for the plot. Default: None.
-    save: str, optional
-        Output file to save plot. Default: None.
-    remove_duplicates: bool, optional
-        Whether to remove duplicates. Default: True.
-    return_TSS_enrichment_per_barcode: bool, optional
-        Whether to return a data frame containing the normalized enrichment score on the TSS for each barcode. Default: False.
-    return_TSS_coverage_matrix_per_barcode: bool, optional
-        Whether to return a matrix containing the normalized enrichment in each position in the window for each barcode, with positions as columns and barcodes as rows. Default: False.
-    return_plot_data: bool, optional
-            Whether to return the TSS profile plot data. Default: False.
-        
-    Return
-    ------
-    dict
-    A dictionary containing a :class:`pd.DataFrame` with the normalized enrichment score on the TSS for each barcode, a :class:`pd.DataFrame` with the normalized enrichment scores in each position for each barcode and/or a :class:`pd.DataFrame` with the TSS profile plot data.
-    """
-    # Create logger
-    level    = logging.INFO
-    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level = level, format = format, handlers = handlers)
-    log = logging.getLogger('cisTopic')
-    
-    if isinstance(plot_data, pd.DataFrame):
-        log.info('Using plot_data. TSS enrichment per barcode will not be computed')
-        fig, ax = plt.subplots()
-        ax.plot(plot_data.Position, plot_data.TSSEnrichment)
-        plt.xlim(-space_TSS, space_TSS)
-        plt.xlabel("Position from TSS",fontsize=10)
-        plt.ylabel("Normalized enrichment",fontsize=10)
-    else:
-        if isinstance(fragments, str):
-            log.info('Reading fragments file')
-            fragments = pr.read_bed(fragments)
-        else:
-            fragments = pr.PyRanges(fragments)
-        
-        if valid_bc is not None:
-            log.info('Using provided valid barcodes')
-            fragments = fragments[fragments.Name.isin(set(valid_bc))]
-        
-        log.info('Formatting annnotation')
-        if isinstance(annotation, pr.PyRanges):
-            annotation = annotation.df
-        tss_space_annotation = annotation[['Chromosome', 'Start', 'Strand']]
-        tss_space_annotation['End']=tss_space_annotation['Start']+flank_window
-        tss_space_annotation['Start']=tss_space_annotation['Start']-flank_window
-        tss_space_annotation = tss_space_annotation[["Chromosome", "Start", "End", "Strand"]]
-        tss_space_annotation = pr.PyRanges(tss_space_annotation)
-        log.info('Overlapping fragments with TSS')
-        overlap_with_TSS  = fragments.join(tss_space_annotation, nb_cpu=n_cpu)
-        overlap_with_TSS_save=overlap_with_TSS
-        overlap_with_TSS = overlap_with_TSS_save
-        if len(overlap_with_TSS) == 0:
-            log.error('There is no overlap with any TSS! Please, check your fragments file.')
-            return
-        log.info('Getting cut sites')
-        overlap_with_TSS = overlap_with_TSS.df
-        overlap_with_TSS['Strand'] = overlap_with_TSS['Strand'].astype(int)
-        overlap_with_TSS['start_pos'] = -(overlap_with_TSS['Start_b'].values+flank_window-overlap_with_TSS['Start'].values)*overlap_with_TSS['Strand'].values
-        overlap_with_TSS['end_pos'] = -(overlap_with_TSS['Start_b'].values+flank_window-overlap_with_TSS['End'].values)*overlap_with_TSS['Strand'].values
-        # We split them to also keep the start position of reads whose start is in the space and their end not and viceversa
-        overlap_with_TSS_start = overlap_with_TSS[(overlap_with_TSS['start_pos'].values <= flank_window) & (overlap_with_TSS['start_pos'].values >= -flank_window)]
-        overlap_with_TSS_end = overlap_with_TSS[(overlap_with_TSS['end_pos'].values <= flank_window) & (overlap_with_TSS['end_pos'].values >= -flank_window)]
-        overlap_with_TSS_start['rel_start_pos'] = overlap_with_TSS_start['start_pos'].values+flank_window
-        overlap_with_TSS_end['rel_end_pos'] = overlap_with_TSS_end['end_pos'].values+flank_window
-        #Make sure that all positions appear in the matrix
-        log.info('Creating coverage matrix')
-        cut_sites_TSS = pd.concat([overlap_with_TSS_start[['Name', 'rel_start_pos']].rename(columns={'Name': 'Barcode', 'rel_start_pos': 'Position'}), overlap_with_TSS_end[['Name', 'rel_end_pos']].rename(columns={'Name': 'Barcode', 'rel_end_pos': 'Position'})], axis=0)
-        TSS_matrix = cut_sites_TSS.groupby(["Position", "Barcode"]).size().unstack(level="Position").fillna(0)
-        if not TSS_matrix.columns.tolist() == list(range(2*flank_window + 1)):
-            missing_values =  list(set(TSS_matrix.columns.tolist()).symmetric_difference(list(range(2*flank_window + 1))))
-            for x in missing_values:
-                TSS_matrix[x] = 0  
-            TSS_matrix = TSS_matrix.reindex(sorted(TSS_matrix.columns), axis=1)
-        
-        if rolling_window != None:
-            TSS_matrix = TSS_matrix.rolling(window=rolling_window, min_periods=0, axis=1).mean()
-        TSS_counts=TSS_matrix.values.sum(axis=0)
-        div=max((np.mean(TSS_counts[-minimum_signal_window:])+np.mean(TSS_counts[0:minimum_signal_window]))/2, min_norm)
-        fig, ax = plt.subplots()
-        ax.plot(range(-flank_window-1,flank_window),TSS_counts/div, color=color)
-        plt.xlim(-flank_window, flank_window)
-        plt.xlabel("Position from TSS",fontsize=10)
-        plt.ylabel("Normalized enrichment",fontsize=10)
-        if save != None:
-            fig.savefig(save)
-        if plot == True:
-            log.info('Plotting normalized sample TSS enrichment')
-            plt.show()
-        else:
-            plt.close(fig)
+			   annotation: Union[pd.DataFrame, pr.PyRanges],
+			   valid_bc: Optional[List[str]] = None,
+			   plot: Optional[bool] = True,
+			   plot_data: Optional[pd.DataFrame] = None,
+			   n_cpu: Optional[int] = 1,
+			   flank_window: Optional[int] = 1000,
+			   tss_window: Optional[int] = 50,
+			   minimum_signal_window: Optional[int] = 100,
+			   rolling_window: Optional[int] = 10,
+			   min_norm: Optional[int] = 0.2,
+			   color: Optional[str] = None,
+			   save: Optional[str] = None,
+			   return_TSS_enrichment_per_barcode: Optional[bool] = False,
+			   return_TSS_coverage_matrix_per_barcode: Optional[bool] = False,
+			   return_plot_data: Optional[bool] = False):
+	"""
+	Plot the Transcription Start Site (TSS) profile. It is computed as the summed accessibility signal (sample-level), or the number of cut sites per base (barcode-level), in a space around the full set of annotated TSSs and is normalized by the minimum signal in the window. This profile is helpful to assess the signal-to-noise ratio of the library, as it is well known that TSSs and the promoter regions around them have, on average, a high degree of chromatin accessibility compared to the intergenic and intronic regions of the genome.
+		
+	Parameters
+	---------
+	fragments: str or pd.DataFrame
+		The path to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)) or a data frame
+		containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a fragments is found assigned to that barcode. The fragments data
+		frame can be obtained using PyRanges:
+			import pyranges as pr
+			fragments = pr.read_bed(fragments_file, as_df=True))
+	annotation: pd.DataFrame or pyRanges
+		A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored). This data frame can be easily obtained via pybiomart:
+			# Get TSS annotations
+			import pybiomart as pbm
+			# For mouse
+			dataset = pbm.Dataset(name='mmusculus_gene_ensembl',  host='http://www.ensembl.org')
+			# For human
+			dataset = pbm.Dataset(name='hsapiens_gene_ensembl',  host='http://www.ensembl.org')
+			# For fly
+			dataset = pbm.Dataset(name='dmelanogaster_gene_ensembl',  host='http://www.ensembl.org')
+			# Query TSS list and format
+			annot = dataset.query(attributes=['chromosome_name', 'transcription_start_site', 'strand', 'external_gene_name', 'transcript_biotype'])
+			filter = annot['Chromosome/scaffold name'].str.contains('CHR|GL|JH|MT')
+			annot = annot[~filter]
+			annot['Chromosome/scaffold name'] = annot['Chromosome/scaffold name'].str.replace(r'(\b\S)', r'chr\1')
+			annot.columns=['Chromosome', 'Start', 'Strand', 'Gene', 'Transcript_type']
+			# Select TSSs of protein coding genes
+			annot = annot[annot.Transcript_type == 'protein_coding']
+	valid_bc: list, optional
+		A list containing selected barcodes. Default: None,
+	plot: bool, optional
+		Whether to return the plot to the console. Default: True.
+	plot_data: pd.DataFrame, optional
+		Data frame containing precomputed plot data. Default: None.
+	flank_window: int, optional
+		Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
+	tss_window: int, optional
+		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+	minimum_signal_window: int, optional
+		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
+	rolling_window: int, optional
+		Rolling window used to smooth signal. Default: 10.
+	min_norm: int, optional
+		Minimum normalization score. If the average minimum signal value is below this value, this number is used to normalize the TSS signal. This approach penalizes cells with fewer reads.
+	color: str, optional
+		Line color for the plot. Default: None.
+	save: str, optional
+		Output file to save plot. Default: None.
+	remove_duplicates: bool, optional
+		Whether to remove duplicates. Default: True.
+	return_TSS_enrichment_per_barcode: bool, optional
+		Whether to return a data frame containing the normalized enrichment score on the TSS for each barcode. Default: False.
+	return_TSS_coverage_matrix_per_barcode: bool, optional
+		Whether to return a matrix containing the normalized enrichment in each position in the window for each barcode, with positions as columns and barcodes as rows. Default: False.
+	return_plot_data: bool, optional
+			Whether to return the TSS profile plot data. Default: False.
+		
+	Return
+	------
+	dict
+	A dictionary containing a :class:`pd.DataFrame` with the normalized enrichment score on the TSS for each barcode, a :class:`pd.DataFrame` with the normalized enrichment scores in each position for each barcode and/or a :class:`pd.DataFrame` with the TSS profile plot data.
+	"""
+	# Create logger
+	level	= logging.INFO
+	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+	handlers = [logging.StreamHandler(stream=sys.stdout)]
+	logging.basicConfig(level = level, format = format, handlers = handlers)
+	log = logging.getLogger('cisTopic')
+	
+	if isinstance(plot_data, pd.DataFrame):
+		log.info('Using plot_data. TSS enrichment per barcode will not be computed')
+		fig, ax = plt.subplots()
+		ax.plot(plot_data.Position, plot_data.TSSEnrichment)
+		plt.xlim(-space_TSS, space_TSS)
+		plt.xlabel("Position from TSS",fontsize=10)
+		plt.ylabel("Normalized enrichment",fontsize=10)
+	else:
+		if isinstance(fragments, str):
+			log.info('Reading fragments file')
+			fragments = pr.read_bed(fragments)
+		else:
+			fragments = pr.PyRanges(fragments)
+		
+		if valid_bc is not None:
+			log.info('Using provided valid barcodes')
+			fragments = fragments[fragments.Name.isin(set(valid_bc))]
+		
+		log.info('Formatting annnotation')
+		if isinstance(annotation, pr.PyRanges):
+			annotation = annotation.df
+		tss_space_annotation = annotation[['Chromosome', 'Start', 'Strand']]
+		tss_space_annotation['End']=tss_space_annotation['Start']+flank_window
+		tss_space_annotation['Start']=tss_space_annotation['Start']-flank_window
+		tss_space_annotation = tss_space_annotation[["Chromosome", "Start", "End", "Strand"]]
+		tss_space_annotation = pr.PyRanges(tss_space_annotation)
+		log.info('Overlapping fragments with TSS')
+		overlap_with_TSS  = fragments.join(tss_space_annotation, nb_cpu=n_cpu)
+		overlap_with_TSS_save=overlap_with_TSS
+		overlap_with_TSS = overlap_with_TSS_save
+		if len(overlap_with_TSS) == 0:
+			log.error('There is no overlap with any TSS! Please, check your fragments file.')
+			return
+		log.info('Getting cut sites')
+		overlap_with_TSS = overlap_with_TSS.df
+		overlap_with_TSS['Strand'] = overlap_with_TSS['Strand'].astype(int)
+		overlap_with_TSS['start_pos'] = -(overlap_with_TSS['Start_b'].values+flank_window-overlap_with_TSS['Start'].values)*overlap_with_TSS['Strand'].values
+		overlap_with_TSS['end_pos'] = -(overlap_with_TSS['Start_b'].values+flank_window-overlap_with_TSS['End'].values)*overlap_with_TSS['Strand'].values
+		# We split them to also keep the start position of reads whose start is in the space and their end not and viceversa
+		overlap_with_TSS_start = overlap_with_TSS[(overlap_with_TSS['start_pos'].values <= flank_window) & (overlap_with_TSS['start_pos'].values >= -flank_window)]
+		overlap_with_TSS_end = overlap_with_TSS[(overlap_with_TSS['end_pos'].values <= flank_window) & (overlap_with_TSS['end_pos'].values >= -flank_window)]
+		overlap_with_TSS_start['rel_start_pos'] = overlap_with_TSS_start['start_pos'].values+flank_window
+		overlap_with_TSS_end['rel_end_pos'] = overlap_with_TSS_end['end_pos'].values+flank_window
+		#Make sure that all positions appear in the matrix
+		log.info('Creating coverage matrix')
+		cut_sites_TSS = pd.concat([overlap_with_TSS_start[['Name', 'rel_start_pos']].rename(columns={'Name': 'Barcode', 'rel_start_pos': 'Position'}), overlap_with_TSS_end[['Name', 'rel_end_pos']].rename(columns={'Name': 'Barcode', 'rel_end_pos': 'Position'})], axis=0)
+		TSS_matrix = cut_sites_TSS.groupby(["Position", "Barcode"]).size().unstack(level="Position").fillna(0)
+		if not TSS_matrix.columns.tolist() == list(range(2*flank_window + 1)):
+			missing_values =  list(set(TSS_matrix.columns.tolist()).symmetric_difference(list(range(2*flank_window + 1))))
+			for x in missing_values:
+				TSS_matrix[x] = 0  
+			TSS_matrix = TSS_matrix.reindex(sorted(TSS_matrix.columns), axis=1)
+		
+		if rolling_window != None:
+			TSS_matrix = TSS_matrix.rolling(window=rolling_window, min_periods=0, axis=1).mean()
+		TSS_counts=TSS_matrix.values.sum(axis=0)
+		div=max((np.mean(TSS_counts[-minimum_signal_window:])+np.mean(TSS_counts[0:minimum_signal_window]))/2, min_norm)
+		fig, ax = plt.subplots()
+		ax.plot(range(-flank_window-1,flank_window),TSS_counts/div, color=color)
+		plt.xlim(-flank_window, flank_window)
+		plt.xlabel("Position from TSS",fontsize=10)
+		plt.ylabel("Normalized enrichment",fontsize=10)
+		if save != None:
+			fig.savefig(save)
+		if plot == True:
+			log.info('Plotting normalized sample TSS enrichment')
+			plt.show()
+		else:
+			plt.close(fig)
 
-    output={}
-    flag=False
-    if return_TSS_enrichment_per_barcode == True:
-        TSS_enrich = TSS_matrix.apply(lambda x: x/max([((np.mean(x[-minimum_signal_window:])+np.mean(x[0:minimum_signal_window]))/2), min_norm]), axis=1)
-        TSS_enrich = pd.DataFrame(TSS_enrich.iloc[:,range(flank_window-tss_window, flank_window+tss_window)].mean(axis=1))
-        TSS_enrich.columns = ['TSS_enrichment']
-        output.update({'TSS_enrichment' : TSS_enrich})
-        flag = True
-    if return_TSS_coverage_matrix_per_barcode == True:
-        log.info('Returning normalized TSS coverage matrix per barcode')
-        TSS_mat = TSS_matrix.apply(lambda x: x/max([((np.mean(x[-minimum_signal_window:])+np.mean(x[0:minimum_signal_window]))/2), min_norm]), axis=1)
-        output.update({'TSS_coverage_mat' : TSS_mat})
-        flag = True
-    if return_plot_data == True:
-        log.info('Returning normalized sample TSS enrichment data')
-        output.update({'TSS_plot_data' : pd.DataFrame({'Position': range(-flank_window-1,flank_window), 'TSS_enrichment': TSS_counts/div})})
-        flag = True
+	output={}
+	flag=False
+	if return_TSS_enrichment_per_barcode == True:
+		TSS_enrich = TSS_matrix.apply(lambda x: x/max([((np.mean(x[-minimum_signal_window:])+np.mean(x[0:minimum_signal_window]))/2), min_norm]), axis=1)
+		TSS_enrich = pd.DataFrame(TSS_enrich.iloc[:,range(flank_window-tss_window, flank_window+tss_window)].mean(axis=1))
+		TSS_enrich.columns = ['TSS_enrichment']
+		output.update({'TSS_enrichment' : TSS_enrich})
+		flag = True
+	if return_TSS_coverage_matrix_per_barcode == True:
+		log.info('Returning normalized TSS coverage matrix per barcode')
+		TSS_mat = TSS_matrix.apply(lambda x: x/max([((np.mean(x[-minimum_signal_window:])+np.mean(x[0:minimum_signal_window]))/2), min_norm]), axis=1)
+		output.update({'TSS_coverage_mat' : TSS_mat})
+		flag = True
+	if return_plot_data == True:
+		log.info('Returning normalized sample TSS enrichment data')
+		output.update({'TSS_plot_data' : pd.DataFrame({'Position': range(-flank_window-1,flank_window), 'TSS_enrichment': TSS_counts/div})})
+		flag = True
 
-    if flag == True:
-        return output
+	if flag == True:
+		return output
 
 def frip(fragments: Union[str, pd.DataFrame],
 		 path_to_regions: str,
@@ -708,506 +708,506 @@ def metrics2data(metrics: Optional[Dict]):
 	return metadata_bc, profile_dict
 
 def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
-                   tss_annotation: Union[pd.DataFrame, pr.PyRanges],
-                   stats: Optional[List[str]]=['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
-                   label_list: Optional[List[str]] = None,
-                   path_to_regions: Optional[Dict[str,str]] = None,
-                   n_cpu: Optional[int] = 1,
-                   valid_bc: Optional[List[str]] = None,
-                   n_frag: Optional[int] = None,
-                   n_bc: Optional[int] = None,
-                   tss_flank_window: Optional[int] = 1000,
-                   tss_window: Optional[int] = 50,
-                   tss_minimum_signal_window: Optional[int] = 100,
-                   tss_rolling_window: Optional[int] = 10,
-                   check_for_duplicates: Optional[bool] = True,
-                   remove_duplicates: Optional[bool] = True,
-                   **kwargs):
-    """"
-    Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
-    
-    Parameters
-    ---
-    fragments_dict: dict
-        Dictionary containing the path/s to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)) or data frames
-        containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a fragments is found assigned to that barcode.
-    tss_annotation: pd.DataFrame or pr.PyRanges
-        A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored).
-    stats: list, optional
-        A list with the statistics that have to be computed. Default: All ('barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'FRIP).
-    label_list: list, optional
-        A list containing the labels for each sample. By default, samples will be called 'Sample_number' (e.g.'Sample_1'). Default: None.
-    path_to_regions: dict, optional
-        A dictionary containing the regions to be used for each sample when calculating the rank plot and the Fraction of Reads In Peaks (FRIP).
-    n_cpu: int, optional
-        Number of cores to use. Default: 1.
-    valid_bc: list, optional
-        A list containing selected barcodes. This parameter is ignored if n_frag or n_bc are specified. Default: None.
-    n_frag: int, optional
-        Minimal number of fragments assigned to a barcode to be kept. Either n_frag or n_bc can be specified. Default: None.
-    n_bc: int, optional
-        Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
-    tss_window: int, optional
-        Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
-    tss_flank_window: int, optional
-        Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
-    tss_minimum_signal_window: int, optional
-        Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
-    tss_rolling_window: int, optional
-        Rolling window used to smooth signal. Default: 10.
-    check_for_duplicates: bool, optional
-        If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
-    remove_duplicates: bool, optional
-        Whether to remove duplicates. Default: True.
-    **kwargs
-        Additional parameters for ray.init.
-        
-    Return
-    ---
-    pd.DataFrame or list and list
-        A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
-    """
-    # Create logger
-    level    = logging.INFO
-    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level = level, format = format, handlers = handlers)
-    log = logging.getLogger('cisTopic')
-    # Convert dictionaries to list
-    label_list = list(fragments_dict.keys())
-    fragments_list = [fragments_dict[key] for key in fragments_dict.keys()]
-    path_to_regions = [path_to_regions[key] for key in fragments_dict.keys()]
-    
-    ray.init(num_cpus=n_cpu, **kwargs)
-    qc_stats =ray.get([compute_qc_stats_ray.remote(fragments_list[i],
-                              tss_annotation=tss_annotation,
-                              stats=stats,
-                              label=label_list[i],
-                              path_to_regions=path_to_regions[i],
-                              valid_bc=valid_bc,
-                              n_frag=n_frag,
-                              n_bc=n_bc,
-                              tss_flank_window=tss_flank_window,
-                              tss_rolling_window=tss_rolling_window,
-                              check_for_duplicates=check_for_duplicates,
-                              remove_duplicates=remove_duplicates) for i in list(range(len(fragments_list)))])
-    ray.shutdown()
-    metadata_dict = {key:x[key] for x in list(list(zip(*qc_stats))[0]) for key in x.keys()}
-    profile_data_dict = {key:x[key] for x in list(list(zip(*qc_stats))[1]) for key in x.keys()}
-    return metadata_dict, profile_data_dict
-    
+				   tss_annotation: Union[pd.DataFrame, pr.PyRanges],
+				   stats: Optional[List[str]]=['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
+				   label_list: Optional[List[str]] = None,
+				   path_to_regions: Optional[Dict[str,str]] = None,
+				   n_cpu: Optional[int] = 1,
+				   valid_bc: Optional[List[str]] = None,
+				   n_frag: Optional[int] = None,
+				   n_bc: Optional[int] = None,
+				   tss_flank_window: Optional[int] = 1000,
+				   tss_window: Optional[int] = 50,
+				   tss_minimum_signal_window: Optional[int] = 100,
+				   tss_rolling_window: Optional[int] = 10,
+				   check_for_duplicates: Optional[bool] = True,
+				   remove_duplicates: Optional[bool] = True,
+				   **kwargs):
+	""""
+	Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
+	
+	Parameters
+	---
+	fragments_dict: dict
+		Dictionary containing the path/s to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)) or data frames
+		containing 'Chromosome', 'Start', 'End', 'Name', and 'Score', which indicates the number of times that a fragments is found assigned to that barcode.
+	tss_annotation: pd.DataFrame or pr.PyRanges
+		A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored).
+	stats: list, optional
+		A list with the statistics that have to be computed. Default: All ('barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'FRIP).
+	label_list: list, optional
+		A list containing the labels for each sample. By default, samples will be called 'Sample_number' (e.g.'Sample_1'). Default: None.
+	path_to_regions: dict, optional
+		A dictionary containing the regions to be used for each sample when calculating the rank plot and the Fraction of Reads In Peaks (FRIP).
+	n_cpu: int, optional
+		Number of cores to use. Default: 1.
+	valid_bc: list, optional
+		A list containing selected barcodes. This parameter is ignored if n_frag or n_bc are specified. Default: None.
+	n_frag: int, optional
+		Minimal number of fragments assigned to a barcode to be kept. Either n_frag or n_bc can be specified. Default: None.
+	n_bc: int, optional
+		Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
+	tss_window: int, optional
+		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+	tss_flank_window: int, optional
+		Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
+	tss_minimum_signal_window: int, optional
+		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
+	tss_rolling_window: int, optional
+		Rolling window used to smooth signal. Default: 10.
+	check_for_duplicates: bool, optional
+		If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
+	remove_duplicates: bool, optional
+		Whether to remove duplicates. Default: True.
+	**kwargs
+		Additional parameters for ray.init.
+		
+	Return
+	---
+	pd.DataFrame or list and list
+		A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
+	"""
+	# Create logger
+	level	= logging.INFO
+	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+	handlers = [logging.StreamHandler(stream=sys.stdout)]
+	logging.basicConfig(level = level, format = format, handlers = handlers)
+	log = logging.getLogger('cisTopic')
+	# Convert dictionaries to list
+	label_list = list(fragments_dict.keys())
+	fragments_list = [fragments_dict[key] for key in fragments_dict.keys()]
+	path_to_regions = [path_to_regions[key] for key in fragments_dict.keys()]
+	
+	ray.init(num_cpus=n_cpu, **kwargs)
+	qc_stats =ray.get([compute_qc_stats_ray.remote(fragments_list[i],
+							  tss_annotation=tss_annotation,
+							  stats=stats,
+							  label=label_list[i],
+							  path_to_regions=path_to_regions[i],
+							  valid_bc=valid_bc,
+							  n_frag=n_frag,
+							  n_bc=n_bc,
+							  tss_flank_window=tss_flank_window,
+							  tss_rolling_window=tss_rolling_window,
+							  check_for_duplicates=check_for_duplicates,
+							  remove_duplicates=remove_duplicates) for i in list(range(len(fragments_list)))])
+	ray.shutdown()
+	metadata_dict = {key:x[key] for x in list(list(zip(*qc_stats))[0]) for key in x.keys()}
+	profile_data_dict = {key:x[key] for x in list(list(zip(*qc_stats))[1]) for key in x.keys()}
+	return metadata_dict, profile_data_dict
+	
 
 @ray.remote
 def compute_qc_stats_ray(fragments,
-                   tss_annotation: Union[pd.DataFrame, pr.PyRanges],
-                   stats: Optional[List[str]]=['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
-                   label: Optional[str] = None,
-                   path_to_regions: Optional[str] = None,
-                   valid_bc: Optional[List[str]] = None,
-                   n_frag: Optional[int] = None,
-                   n_bc: Optional[int] = None,
-                   tss_flank_window: Optional[int] = 1000,
-                   tss_window: Optional[int] = 50,
-                   tss_minimum_signal_window: Optional[int] = 100,
-                   tss_rolling_window: Optional[int] = 10,
-                   check_for_duplicates: Optional[bool] = True,
-                   remove_duplicates: Optional[bool] = True):
-    """"
-    Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
-    
-    Parameters
-    ---
-    fragments: str
-        Path to fragments file.
-    tss_annotation: pd.DataFrame or pr.PyRanges
-        A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored).
-    stats: list, optional
-        A list with the statistics that have to be computed. Default: All ('barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'FRIP).
-    label: str
-        Sample label. Default: None.
-    path_to_regions: str
-        Path to regions file to use for FRIP.
-    valid_bc: list, optional
-        A list containing selected barcodes. This parameter is ignored if n_frag or n_bc are specified. Default: None.
-    n_frag: int, optional
-        Minimal number of fragments assigned to a barcode to be kept. Either n_frag or n_bc can be specified. Default: None.
-    n_bc: int, optional
-        Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
-    tss_window: int, optional
-        Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
-    tss_flank_window: int, optional
-        Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
-    tss_minimum_signal_window: int, optional
-        Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
-    tss_rolling_window: int, optional
-        Rolling window used to smooth signal. Default: 10.
-    check_for_duplicates: bool, optional
-        If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
-    remove_duplicates: bool, optional
-        Whether to remove duplicates. Default: True.
-        
-    Return
-    ---
-    pd.DataFrame or list and list
-        A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
-    """
-    
-    # Create logger
-    level    = logging.INFO
-    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level = level, format = format, handlers = handlers)
-    log = logging.getLogger('cisTopic')
-    # Compute stats
-    metrics={}
-    metadata_bc_dict={}
-    profile_data_dict={}
-    # Prepare fragments
-    if isinstance(fragments, str):
-        log.info('Reading ' + label)
-        fragments_df=pr.read_bed(fragments, as_df=True)
-    else:
-        fragments_df=fragments
-    # Check for duplicates
-    if 'Score' not in fragments_df or all(fragments_df['Score'] == '.'):
-    	fragments_df = fragments_df[['Chromosome', 'Start', 'End']]
-        if check_for_duplicates == True:
-            log.info("Collapsing duplicates")
-            fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
-            dup_scores = fragments_df.groupby(["Read_id"]).size()
-            fragments_df = fragments_df.drop_duplicates()
-            fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()].tolist()
-        else:
-            fragments_df['Score'] = 1
-    else:
-    	fragments_df = fragments_df[['Chromosome', 'Start', 'End', 'Score']]
-    # Prepare valid barcodes
-    if valid_bc is not None:
-        if n_bc is not None or n_frag is not None:
-            valid_bc=None            
-    # Rank plot
-    if 'barcode_rank_plot' in stats:
-        # Rank plot
-        log.info('Computing barcode rank plot for ' + label)
-        metrics['barcode_rank_plot'] = barcode_rank_plot(fragments = fragments_df,
-                                                         valid_bc = valid_bc,
-                                                         n_frag = n_frag,
-                                                         n_bc = n_bc,
-                                                         remove_duplicates = remove_duplicates,
-                                                         plot = False,
-                                                         return_bc = True,
-                                                         return_plot_data = True)
-        if valid_bc is None:
-            valid_bc=metrics['barcode_rank_plot']['valid_bc']
-                
-    # Duplicate rate        
-    if 'duplicate_rate' in stats:
-        # Duplicate rate
-        log.info('Computing duplicate rate plot for ' + label)
-        metrics['duplicate_rate'] = duplicate_rate(fragments=fragments_df,
-                    valid_bc = valid_bc,
-                    plot = False,
-                    return_plot_data = True)
-        
-    # Fragment size
-    if 'insert_size_distribution' in stats:
-        # Fragment size
-        log.info('Computing insert size distribution for ' + label)
-        metrics['insert_size_distribution'] = insert_size_distribution(fragments=fragments_df,
-                                                                       valid_bc=valid_bc,
-                                                                       remove_duplicates=remove_duplicates,
-                                                                       plot=False,
-                                                                       return_plot_data=True)
-    # TSS
-    if 'profile_tss' in stats:
-        # TSS
-        log.info('Computing TSS profile for ' + label)
-        profile_tss_metrics = profile_tss(fragments=fragments_df,
-                                               annotation=tss_annotation,
-                                               valid_bc=valid_bc,
-                                               plot=False,
-                                               n_cpu=1,
-                                               flank_window=tss_flank_window,
-                                               tss_window=tss_window,
-                                               minimum_signal_window = tss_minimum_signal_window,
-                                               rolling_window = tss_rolling_window,
-                                               return_TSS_enrichment_per_barcode=True,
-                                               return_TSS_coverage_matrix_per_barcode=True,
-                                               return_plot_data=True)
-        if profile_tss_metrics != None:
-            metrics['profile_tss'] = profile_tss_metrics
-    # FRIP
-    if 'frip' in stats:
-        # FRIP
-        log.info('Computing FRIP profile for ' + label)
-        metrics['frip'] = frip(fragments=fragments_df,
-                                   path_to_regions=path_to_regions,
-                                   valid_bc=valid_bc,
-                                   remove_duplicates=remove_duplicates,
-                                   n_cpu=1,
-                                   plot=False,
-                                   return_plot_data=True)
-    
-    metadata_bc, profile_data = metrics2data(metrics)
-    metadata_bc = metadata_bc.fillna(0)
-    metadata_bc_dict = {label : metadata_bc}
-    profile_data_dict = {label :  profile_data}
-    log.info('Sample ' + label + ' done!')
+				   tss_annotation: Union[pd.DataFrame, pr.PyRanges],
+				   stats: Optional[List[str]]=['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
+				   label: Optional[str] = None,
+				   path_to_regions: Optional[str] = None,
+				   valid_bc: Optional[List[str]] = None,
+				   n_frag: Optional[int] = None,
+				   n_bc: Optional[int] = None,
+				   tss_flank_window: Optional[int] = 1000,
+				   tss_window: Optional[int] = 50,
+				   tss_minimum_signal_window: Optional[int] = 100,
+				   tss_rolling_window: Optional[int] = 10,
+				   check_for_duplicates: Optional[bool] = True,
+				   remove_duplicates: Optional[bool] = True):
+	""""
+	Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
+	
+	Parameters
+	---
+	fragments: str
+		Path to fragments file.
+	tss_annotation: pd.DataFrame or pr.PyRanges
+		A data frame or pyRanges containing transcription start sites for each gene, with 'Chromosome', 'Start' and 'Strand' as columns (additional columns will be ignored).
+	stats: list, optional
+		A list with the statistics that have to be computed. Default: All ('barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'FRIP).
+	label: str
+		Sample label. Default: None.
+	path_to_regions: str
+		Path to regions file to use for FRIP.
+	valid_bc: list, optional
+		A list containing selected barcodes. This parameter is ignored if n_frag or n_bc are specified. Default: None.
+	n_frag: int, optional
+		Minimal number of fragments assigned to a barcode to be kept. Either n_frag or n_bc can be specified. Default: None.
+	n_bc: int, optional
+		Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
+	tss_window: int, optional
+		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+	tss_flank_window: int, optional
+		Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
+	tss_minimum_signal_window: int, optional
+		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
+	tss_rolling_window: int, optional
+		Rolling window used to smooth signal. Default: 10.
+	check_for_duplicates: bool, optional
+		If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
+	remove_duplicates: bool, optional
+		Whether to remove duplicates. Default: True.
+		
+	Return
+	---
+	pd.DataFrame or list and list
+		A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
+	"""
+	
+	# Create logger
+	level	= logging.INFO
+	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+	handlers = [logging.StreamHandler(stream=sys.stdout)]
+	logging.basicConfig(level = level, format = format, handlers = handlers)
+	log = logging.getLogger('cisTopic')
+	# Compute stats
+	metrics={}
+	metadata_bc_dict={}
+	profile_data_dict={}
+	# Prepare fragments
+	if isinstance(fragments, str):
+		log.info('Reading ' + label)
+		fragments_df=pr.read_bed(fragments, as_df=True)
+	else:
+		fragments_df=fragments
+	# Check for duplicates
+	if 'Score' not in fragments_df or all(fragments_df['Score'] == '.'):
+		fragments_df = fragments_df[['Chromosome', 'Start', 'End']]
+		if check_for_duplicates == True:
+			log.info("Collapsing duplicates")
+			fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
+			dup_scores = fragments_df.groupby(["Read_id"]).size()
+			fragments_df = fragments_df.drop_duplicates()
+			fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()].tolist()
+		else:
+			fragments_df['Score'] = 1
+	else:
+		fragments_df = fragments_df[['Chromosome', 'Start', 'End', 'Score']]
+	# Prepare valid barcodes
+	if valid_bc is not None:
+		if n_bc is not None or n_frag is not None:
+			valid_bc=None			
+	# Rank plot
+	if 'barcode_rank_plot' in stats:
+		# Rank plot
+		log.info('Computing barcode rank plot for ' + label)
+		metrics['barcode_rank_plot'] = barcode_rank_plot(fragments = fragments_df,
+														 valid_bc = valid_bc,
+														 n_frag = n_frag,
+														 n_bc = n_bc,
+														 remove_duplicates = remove_duplicates,
+														 plot = False,
+														 return_bc = True,
+														 return_plot_data = True)
+		if valid_bc is None:
+			valid_bc=metrics['barcode_rank_plot']['valid_bc']
+				
+	# Duplicate rate		
+	if 'duplicate_rate' in stats:
+		# Duplicate rate
+		log.info('Computing duplicate rate plot for ' + label)
+		metrics['duplicate_rate'] = duplicate_rate(fragments=fragments_df,
+					valid_bc = valid_bc,
+					plot = False,
+					return_plot_data = True)
+		
+	# Fragment size
+	if 'insert_size_distribution' in stats:
+		# Fragment size
+		log.info('Computing insert size distribution for ' + label)
+		metrics['insert_size_distribution'] = insert_size_distribution(fragments=fragments_df,
+																	   valid_bc=valid_bc,
+																	   remove_duplicates=remove_duplicates,
+																	   plot=False,
+																	   return_plot_data=True)
+	# TSS
+	if 'profile_tss' in stats:
+		# TSS
+		log.info('Computing TSS profile for ' + label)
+		profile_tss_metrics = profile_tss(fragments=fragments_df,
+											   annotation=tss_annotation,
+											   valid_bc=valid_bc,
+											   plot=False,
+											   n_cpu=1,
+											   flank_window=tss_flank_window,
+											   tss_window=tss_window,
+											   minimum_signal_window = tss_minimum_signal_window,
+											   rolling_window = tss_rolling_window,
+											   return_TSS_enrichment_per_barcode=True,
+											   return_TSS_coverage_matrix_per_barcode=True,
+											   return_plot_data=True)
+		if profile_tss_metrics != None:
+			metrics['profile_tss'] = profile_tss_metrics
+	# FRIP
+	if 'frip' in stats:
+		# FRIP
+		log.info('Computing FRIP profile for ' + label)
+		metrics['frip'] = frip(fragments=fragments_df,
+								   path_to_regions=path_to_regions,
+								   valid_bc=valid_bc,
+								   remove_duplicates=remove_duplicates,
+								   n_cpu=1,
+								   plot=False,
+								   return_plot_data=True)
+	
+	metadata_bc, profile_data = metrics2data(metrics)
+	metadata_bc = metadata_bc.fillna(0)
+	metadata_bc_dict = {label : metadata_bc}
+	profile_data_dict = {label :  profile_data}
+	log.info('Sample ' + label + ' done!')
 
-    return metadata_bc_dict, profile_data_dict
+	return metadata_bc_dict, profile_data_dict
 
 def plot_sample_metrics(profile_data_dict: Dict[str, pd.DataFrame],
-                profile_list: Optional[Union['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip']] = ['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
-                remove_duplicates: Optional[bool] = True,
-                color: Optional[List[List[Union[str]]]] = None,
-                cmap: Optional[str] = None, 
-                ncol: Optional[int] = 1,
-                figsize: Optional[Tuple[int,int]] = None,
-                insert_size_distriubtion_xlim: Optional[List[int]] = None,
-                legend_outside: Optional[bool] = False,
-                duplicate_rate_as_hexbin: Optional[bool] = False,
-                plot: Optional[bool] = True,
-                save: Optional[str] = None):
-    
-    """
-    Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample).
-    
-    Parameters
-    ---------
-    profile_data_dict: list of dict
-        Dictionary of dictionaries with keys 'barcode_rank_plot', 'insert_size_distribution', 'profile_tss' and/or 'FRIP', containing the sample-level profiles for each metric. This dictionary is an output of `metrics2data`.
-    profile_list: list, optional
-        List of the sample-level profiles to plot. Default: All.
-    remove_duplicates: optional, bool
-        Whether duplicated should not be considered for the barcode rank plot. Default: True
-    color: list, optional
-        List containing the colors to each for sample. When using barcode_rank_plot, at least two colors must be provided per sample. Default: None.
-    cmap: list, optional
-        Color map to color the plot by density for the duplicate rate plot. Default: None
-    ncol: int, optional
-        Number of columns for grid plot. If 1 each plot will be drawn independently, while the number of rows is automatically adjusted. Default: 1.
-    figsize: tuple, optional
-        Figure size. If drawing each plot independently it corresponds to the size of each plot, if using grid plotting it will correspond to the total size of the figure.
-    insert_size_distriubtion_xlim: list, optional
-        A list with two numbers that indicate the x axis limits. Default: None
-    plot: bool, optional
-        Whether the plots should be returned to the console. Default: True
-    save: str, optional
-        Output file to save plot. Default: None.
-    """
-    
-    plot_sample_metrics_generator_obj=plot_sample_metrics_generator(profile_data_dict=profile_data_dict,
-                profile_list = profile_list,
-                remove_duplicates = remove_duplicates,
-                color = color,
-                cmap = cmap, 
-                insert_size_distriubtion_xlim = insert_size_distriubtion_xlim,
-                legend_outside = legend_outside,
-                duplicate_rate_as_hexbin = duplicate_rate_as_hexbin)
-    label_list = list(profile_data_dict.keys())
-    if ('duplicate_rate' in profile_list) & (not isinstance(profile_data_dict[label_list[0]], pd.DataFrame)):
-        n_plots= len(profile_list)-1+len(profile_data_dict)   
-    else:
-        n_plots = len(profile_list)
-    
-    multiplot_from_generator(g=plot_sample_metrics_generator_obj,
-                             num_columns=ncol,
-                             n_plots=n_plots,
-                             figsize=figsize,
-                             plot=plot,
-                             save=save)
-                             
+				profile_list: Optional[Union['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip']] = ['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
+				remove_duplicates: Optional[bool] = True,
+				color: Optional[List[List[Union[str]]]] = None,
+				cmap: Optional[str] = None, 
+				ncol: Optional[int] = 1,
+				figsize: Optional[Tuple[int,int]] = None,
+				insert_size_distriubtion_xlim: Optional[List[int]] = None,
+				legend_outside: Optional[bool] = False,
+				duplicate_rate_as_hexbin: Optional[bool] = False,
+				plot: Optional[bool] = True,
+				save: Optional[str] = None):
+	
+	"""
+	Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample).
+	
+	Parameters
+	---------
+	profile_data_dict: list of dict
+		Dictionary of dictionaries with keys 'barcode_rank_plot', 'insert_size_distribution', 'profile_tss' and/or 'FRIP', containing the sample-level profiles for each metric. This dictionary is an output of `metrics2data`.
+	profile_list: list, optional
+		List of the sample-level profiles to plot. Default: All.
+	remove_duplicates: optional, bool
+		Whether duplicated should not be considered for the barcode rank plot. Default: True
+	color: list, optional
+		List containing the colors to each for sample. When using barcode_rank_plot, at least two colors must be provided per sample. Default: None.
+	cmap: list, optional
+		Color map to color the plot by density for the duplicate rate plot. Default: None
+	ncol: int, optional
+		Number of columns for grid plot. If 1 each plot will be drawn independently, while the number of rows is automatically adjusted. Default: 1.
+	figsize: tuple, optional
+		Figure size. If drawing each plot independently it corresponds to the size of each plot, if using grid plotting it will correspond to the total size of the figure.
+	insert_size_distriubtion_xlim: list, optional
+		A list with two numbers that indicate the x axis limits. Default: None
+	plot: bool, optional
+		Whether the plots should be returned to the console. Default: True
+	save: str, optional
+		Output file to save plot. Default: None.
+	"""
+	
+	plot_sample_metrics_generator_obj=plot_sample_metrics_generator(profile_data_dict=profile_data_dict,
+				profile_list = profile_list,
+				remove_duplicates = remove_duplicates,
+				color = color,
+				cmap = cmap, 
+				insert_size_distriubtion_xlim = insert_size_distriubtion_xlim,
+				legend_outside = legend_outside,
+				duplicate_rate_as_hexbin = duplicate_rate_as_hexbin)
+	label_list = list(profile_data_dict.keys())
+	if ('duplicate_rate' in profile_list) & (not isinstance(profile_data_dict[label_list[0]], pd.DataFrame)):
+		n_plots= len(profile_list)-1+len(profile_data_dict)   
+	else:
+		n_plots = len(profile_list)
+	
+	multiplot_from_generator(g=plot_sample_metrics_generator_obj,
+							 num_columns=ncol,
+							 n_plots=n_plots,
+							 figsize=figsize,
+							 plot=plot,
+							 save=save)
+							 
 def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
-                profile_list: Optional[Union['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip']] = ['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
-                remove_duplicates: Optional[bool] = True,
-                color: Optional[List[List[Union[str]]]] = None,
-                cmap: Optional[str] = None, 
-                insert_size_distriubtion_xlim: Optional[List[int]] = None,
-                legend_outside: Optional[bool] = False,
-                duplicate_rate_as_hexbin: Optional[bool] = False):
-    """
-    Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample). This function creates the generator to pass to the multiplotting function.
-    
-    Parameters
-    ---------
-    profile_data_dict: list of dict
-        Dictionary of dictionaries with keys 'barcode_rank_plot', 'insert_size_distribution', 'profile_tss' and/or 'FRIP', containing the sample-level profiles for each metric. This dictionary is an output of `metrics2data`.
-    profile_list: list, optional
-        List of the sample-level profiles to plot. Default: All.
-    remove_duplicates: optional, bool
-        Whether duplicated should not be considered for the barcode rank plot. Default: True
-    color: list, optional
-        List containing the colors to each for sample. When using barcode_rank_plot, at least two colors must be provided per sample. Default: None.
-    cmap: list, optional
-        Color map to color the plot by density for the duplicate rate plot.
-    insert_size_distriubtion_xlim: list, optional
-        A list with two numbers that indicate the x axis limits. Default: None
-    duplicate_rate_as_hexbin: bool, optional
-        A boolean indicating if the duplicate rate should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
-        when dealing with a large number of points. Default: False.
-    """
-    # Create logger
-    level    = logging.INFO
-    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level = level, format = format, handlers = handlers)
-    log = logging.getLogger('cisTopic')
-    
+				profile_list: Optional[Union['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip']] = ['barcode_rank_plot', 'duplicate_rate', 'insert_size_distribution', 'profile_tss', 'frip'],
+				remove_duplicates: Optional[bool] = True,
+				color: Optional[List[List[Union[str]]]] = None,
+				cmap: Optional[str] = None, 
+				insert_size_distriubtion_xlim: Optional[List[int]] = None,
+				legend_outside: Optional[bool] = False,
+				duplicate_rate_as_hexbin: Optional[bool] = False):
+	"""
+	Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample). This function creates the generator to pass to the multiplotting function.
+	
+	Parameters
+	---------
+	profile_data_dict: list of dict
+		Dictionary of dictionaries with keys 'barcode_rank_plot', 'insert_size_distribution', 'profile_tss' and/or 'FRIP', containing the sample-level profiles for each metric. This dictionary is an output of `metrics2data`.
+	profile_list: list, optional
+		List of the sample-level profiles to plot. Default: All.
+	remove_duplicates: optional, bool
+		Whether duplicated should not be considered for the barcode rank plot. Default: True
+	color: list, optional
+		List containing the colors to each for sample. When using barcode_rank_plot, at least two colors must be provided per sample. Default: None.
+	cmap: list, optional
+		Color map to color the plot by density for the duplicate rate plot.
+	insert_size_distriubtion_xlim: list, optional
+		A list with two numbers that indicate the x axis limits. Default: None
+	duplicate_rate_as_hexbin: bool, optional
+		A boolean indicating if the duplicate rate should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
+		when dealing with a large number of points. Default: False.
+	"""
+	# Create logger
+	level	= logging.INFO
+	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+	handlers = [logging.StreamHandler(stream=sys.stdout)]
+	logging.basicConfig(level = level, format = format, handlers = handlers)
+	log = logging.getLogger('cisTopic')
+	
 
-    # Prepare labels
-    label_list = list(profile_data_dict.keys())
+	# Prepare labels
+	label_list = list(profile_data_dict.keys())
 
-    # Check if it is only one sample, without sample name as entry in dict
-    if isinstance(profile_data_dict[label_list[0]], pd.DataFrame):
-        profile_data_dict = {'Sample': profile_data_dict}
-        label_list = list(profile_data_dict.keys())
+	# Check if it is only one sample, without sample name as entry in dict
+	if isinstance(profile_data_dict[label_list[0]], pd.DataFrame):
+		profile_data_dict = {'Sample': profile_data_dict}
+		label_list = list(profile_data_dict.keys())
 
-    # Rank plot
-    if 'barcode_rank_plot' in profile_list:     
-        yield
+	# Rank plot
+	if 'barcode_rank_plot' in profile_list:	 
+		yield
 
-        legend_labels=[]
-        for i in range(len(profile_data_dict)):
-            if 'barcode_rank_plot' not in profile_data_dict[label_list[i]]:
-                log.error('barcode_rank_plot is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['barcode_rank_plot']
-            
-            sel=np.ma.masked_where(plot_data['Selected'] == True, plot_data['Barcode_rank'])
-            nosel=np.ma.masked_where(plot_data['Selected'] == False, plot_data['Barcode_rank'])
-            
-            if remove_duplicates == False:
-                NF=plot_data['Total_nr_frag']
-            else:
-                NF=plot_data['Unique_nr_frag']
-            
-            if color is None:
-                plt.plot(nosel, NF, sel, NF, 'grey')
-            else:
-                if len(color[i]) < 2:
-                    plt.plot(nosel, NF, sel, NF, 'grey')
-                else:
-                    plt.plot(nosel, NF, color[i][0], sel , NF, color[i][1])
-                        
-            plt.xscale("log")
-            plt.yscale("log")
-            plt.xlabel("Barcode Rank",fontsize=10)
-            plt.ylabel("Number of fragments in regions",fontsize=10)
-            
-            if (len(label_list) > 1) | (label_list[0] != ''):
-                legend_labels.append(f'{label_list[i]} ({sum(sel.mask)})')
-            else:
-                legend_labels.append(f'Selected BC: {sum(sel.mask)}')
-                legend_labels.append(f'Non-selected BC: {plot_data.shape[0]-sum(sel.mask)}')
-            
-            if legend_outside == True:
-                plt.legend(legend_labels, bbox_to_anchor=(1.04,1), loc="upper left")
-            else:    
-                plt.legend(legend_labels)
+		legend_labels=[]
+		for i in range(len(profile_data_dict)):
+			if 'barcode_rank_plot' not in profile_data_dict[label_list[i]]:
+				log.error('barcode_rank_plot is not included in the profiles dictionary')
+			plot_data = profile_data_dict[label_list[i]]['barcode_rank_plot']
+			
+			sel=np.ma.masked_where(plot_data['Selected'] == True, plot_data['Barcode_rank'])
+			nosel=np.ma.masked_where(plot_data['Selected'] == False, plot_data['Barcode_rank'])
+			
+			if remove_duplicates == False:
+				NF=plot_data['Total_nr_frag']
+			else:
+				NF=plot_data['Unique_nr_frag']
+			
+			if color is None:
+				plt.plot(nosel, NF, sel, NF, 'grey')
+			else:
+				if len(color[i]) < 2:
+					plt.plot(nosel, NF, sel, NF, 'grey')
+				else:
+					plt.plot(nosel, NF, color[i][0], sel , NF, color[i][1])
+						
+			plt.xscale("log")
+			plt.yscale("log")
+			plt.xlabel("Barcode Rank",fontsize=10)
+			plt.ylabel("Number of fragments in regions",fontsize=10)
+			
+			if (len(label_list) > 1) | (label_list[0] != ''):
+				legend_labels.append(f'{label_list[i]} ({sum(sel.mask)})')
+			else:
+				legend_labels.append(f'Selected BC: {sum(sel.mask)}')
+				legend_labels.append(f'Non-selected BC: {plot_data.shape[0]-sum(sel.mask)}')
+			
+			if legend_outside == True:
+				plt.legend(legend_labels, bbox_to_anchor=(1.04,1), loc="upper left")
+			else:	
+				plt.legend(legend_labels)
 
-    # Fragment size
-    if 'insert_size_distribution' in profile_list:
-        yield
-            
-        for i in range(len(profile_data_dict)):
-            if 'insert_size_distribution' not in profile_data_dict[label_list[i]]:
-                log.error('insert_size_distribution is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['insert_size_distribution']
-            if color is not None:
-                if len(color[i]) > 2:
-                    selected_color = color[i][0]
-                else:
-                    selected_color = None
-            else:
-                selected_color = None
+	# Fragment size
+	if 'insert_size_distribution' in profile_list:
+		yield
+			
+		for i in range(len(profile_data_dict)):
+			if 'insert_size_distribution' not in profile_data_dict[label_list[i]]:
+				log.error('insert_size_distribution is not included in the profiles dictionary')
+			plot_data = profile_data_dict[label_list[i]]['insert_size_distribution']
+			if color is not None:
+				if len(color[i]) > 2:
+					selected_color = color[i][0]
+				else:
+					selected_color = None
+			else:
+				selected_color = None
 
-            plt.plot(plot_data['Width'], plot_data['Ratio_frag'], color=selected_color)
-            plt.xlabel("Fragment size",fontsize=10)
-            plt.ylabel("Fragments ratio",fontsize=10)
-            if insert_size_distriubtion_xlim != None:
-                plt.xlim(insert_size_distriubtion_xlim[0], insert_size_distriubtion_xlim[1])
-        if (len(label_list) > 1) | (label_list[0] != ''):
-            if legend_outside == True:
-                plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
-            else:    
-                plt.legend(label_list)
-            
-    # TSS
-    if 'profile_tss' in profile_list:
-        yield
-        
-        for i in range(len(profile_data_dict)):
-            if 'profile_tss' not in profile_data_dict[label_list[i]]:
-                log.error('profile_tss is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['profile_tss']
-            if color is not None:
-                if len(color[i]) > 2:
-                    selected_color = color[i][0]
-                else:
-                    selected_color = None
-            else:
-                selected_color = None
-                
-            plt.plot(plot_data['Position'], plot_data['TSS_enrichment'], color=selected_color)
-                
-            plt.xlim(min(plot_data['Position']), max(plot_data['Position']))
-            plt.xlabel("Position from TSS",fontsize=10)
-            plt.ylabel("Normalized enrichment",fontsize=10)
-        if (len(label_list) > 1) | (label_list[0] != ''):
-            if legend_outside == True:
-                plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
-            else:    
-                plt.legend(label_list)
+			plt.plot(plot_data['Width'], plot_data['Ratio_frag'], color=selected_color)
+			plt.xlabel("Fragment size",fontsize=10)
+			plt.ylabel("Fragments ratio",fontsize=10)
+			if insert_size_distriubtion_xlim != None:
+				plt.xlim(insert_size_distriubtion_xlim[0], insert_size_distriubtion_xlim[1])
+		if (len(label_list) > 1) | (label_list[0] != ''):
+			if legend_outside == True:
+				plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
+			else:	
+				plt.legend(label_list)
+			
+	# TSS
+	if 'profile_tss' in profile_list:
+		yield
+		
+		for i in range(len(profile_data_dict)):
+			if 'profile_tss' not in profile_data_dict[label_list[i]]:
+				log.error('profile_tss is not included in the profiles dictionary')
+			plot_data = profile_data_dict[label_list[i]]['profile_tss']
+			if color is not None:
+				if len(color[i]) > 2:
+					selected_color = color[i][0]
+				else:
+					selected_color = None
+			else:
+				selected_color = None
+				
+			plt.plot(plot_data['Position'], plot_data['TSS_enrichment'], color=selected_color)
+				
+			plt.xlim(min(plot_data['Position']), max(plot_data['Position']))
+			plt.xlabel("Position from TSS",fontsize=10)
+			plt.ylabel("Normalized enrichment",fontsize=10)
+		if (len(label_list) > 1) | (label_list[0] != ''):
+			if legend_outside == True:
+				plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
+			else:	
+				plt.legend(label_list)
 
-    # FRIP
-    if 'frip' in profile_list:
-        yield
-        
-        for i in range(len(profile_data_dict)):
-            if 'frip' not in profile_data_dict[label_list[i]]:
-                log.error('frip is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['frip']
-            if color is not None:
-                if len(color[i]) > 2:
-                    selected_color = color[i][0]
-                else:
-                    selected_color = None
-            else:
-                selected_color = None
-            
-            sns.distplot(plot_data['FRIP'], hist = False, kde = True, color=selected_color, label=label_list[i])
+	# FRIP
+	if 'frip' in profile_list:
+		yield
+		
+		for i in range(len(profile_data_dict)):
+			if 'frip' not in profile_data_dict[label_list[i]]:
+				log.error('frip is not included in the profiles dictionary')
+			plot_data = profile_data_dict[label_list[i]]['frip']
+			if color is not None:
+				if len(color[i]) > 2:
+					selected_color = color[i][0]
+				else:
+					selected_color = None
+			else:
+				selected_color = None
+			
+			sns.distplot(plot_data['FRIP'], hist = False, kde = True, color=selected_color, label=label_list[i])
 
-        if (len(label_list) > 1) | (label_list[0] != ''):
-            if legend_outside == True:
-                plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
-            else:    
-                plt.legend(label_list)
-            
-    # Duplicate rate        
-    if 'duplicate_rate' in profile_list:
-        for i in range(len(profile_data_dict)):
-            yield
-            if 'duplicate_rate' not in profile_data_dict[label_list[i]]:
-                log.error('duplicate_rate is not included in the profiles dictionary')
-            
-            plot_data = profile_data_dict[label_list[i]]['duplicate_rate']
-            x = plot_data['Unique_nr_frag']
-            y = plot_data['Dupl_rate'] 
-            
-            if duplicate_rate_as_hexbin == False:
-                xy = np.vstack([np.log(x),y])
-                z = gaussian_kde(xy)(xy)
-                idx = z.argsort()
-                x, y, z = x[idx], y[idx], z[idx]
-                plt.scatter(x, y, c=z, s=10, edgecolor='', cmap=cmap)
-            else:
-                plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, xscale='log', bins='log', mincnt=1)
-            plt.title(label_list[i])
-            plt.ylim(0,1)
-            plt.xscale("log")
-            plt.xlabel("Number of (unique) fragments",fontsize=10)
-            plt.ylabel("Duplication rate",fontsize=10)
-            plt.colorbar().set_label('Density')
-            plt.xlim(min(x), max(x))
+		if (len(label_list) > 1) | (label_list[0] != ''):
+			if legend_outside == True:
+				plt.legend(label_list, bbox_to_anchor=(1.04,1), loc="upper left")
+			else:	
+				plt.legend(label_list)
+			
+	# Duplicate rate		
+	if 'duplicate_rate' in profile_list:
+		for i in range(len(profile_data_dict)):
+			yield
+			if 'duplicate_rate' not in profile_data_dict[label_list[i]]:
+				log.error('duplicate_rate is not included in the profiles dictionary')
+			
+			plot_data = profile_data_dict[label_list[i]]['duplicate_rate']
+			x = plot_data['Unique_nr_frag']
+			y = plot_data['Dupl_rate'] 
+			
+			if duplicate_rate_as_hexbin == False:
+				xy = np.vstack([np.log(x),y])
+				z = gaussian_kde(xy)(xy)
+				idx = z.argsort()
+				x, y, z = x[idx], y[idx], z[idx]
+				plt.scatter(x, y, c=z, s=10, edgecolor='', cmap=cmap)
+			else:
+				plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, xscale='log', bins='log', mincnt=1)
+			plt.title(label_list[i])
+			plt.ylim(0,1)
+			plt.xscale("log")
+			plt.xlabel("Number of (unique) fragments",fontsize=10)
+			plt.ylabel("Duplication rate",fontsize=10)
+			plt.colorbar().set_label('Density')
+			plt.xlim(min(x), max(x))
 
 def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
 					  barcode: Union[List[str],str],
@@ -1273,331 +1273,331 @@ def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
 		plt.close(fig)
 
 def plot_barcode_metrics_per_group(input_metrics: Dict,
-                                var_x: str,
-                                var_y: Optional[str] = None,
-                                min_x: Optional[int] = None,
-                                max_x: Optional[int] = None,
-                                min_y: Optional[int] = None,
-                                max_y: Optional[int] = None,
-                                color: Optional[str] = '#440154FF',
-                                cmap: Optional[str] = 'viridis',
-                                as_density: Optional[bool] = False,
-                                add_hist: Optional[bool] = True,
-                                n_bins: Optional[int] = 100,
-                                plot_as_hexbin: Optional[bool] = False,
-                                plot: Optional[bool]= True,
-                                save: Optional[str] = None):
-    
-    """"
-    Plot barcode metrics and filter based on used-provided thresholds.
-        
-    Parameters
-    ---
-    input_metrics: dictionary
-        A dictionary with group labels as keys and barcode metrics per sample as values.
-    var_x: str
-        Metric to plot.
-    var_group: str, optional
-        Variable to divide the plot by groups. Default: None.
-    var_y: str, optional
-        A second metric to plot in combination with `var_x`. When provided, the function returns a 2D plot with `var_x` and `var_y` as axes, if not provided the function returns and histogram or density plot for `var_x`. Default: None.
-    min_x: float, optional
-        Minimum value on `var_x` to keep the barcode/cell. Default: None.
-    max_x: float, optional
-        Maximum value on `var_x` to keep the barcode/cell. Default: None.
-    min_y: float, optional
-        Minimum value on `var_y` to keep the barcode/cell. Default: None.
-    max_y: float, optional
-        Maximum value on `var_y` to keep the barcode/cell. Default: None.
-    color: str, optional
-        Color to use on histograms and/or density plots. Default: None.
-    cmap: str, optional
-        Color map to color 2D dot plots by density. Default: None.
-    as_density: bool, optional
-        Whether to plot variables as density plots rather than histograms. Default: True.
-    add_hist: bool, optional
-        Whether to show the histogram together with the density plots when `as_density=True`. Default: True.
-    n_bins: int, optional
-        Number of bins to use when plotting the variable histogram. Default: 100.
-    plot_as_hexbin: bool, optional
-        A boolean indicating if the data should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
-        when dealing with a large number of points. Default: False.
-    plot: bool, optional
-        Whether the plots should be returned to the console. Default: True.
-    save: bool, optional
-        Path to save plots as a file. Default: None.
-    return_cells: bool, optional
-        Whether to return selected cells based on user-given thresholds. Default: True.
-        
-    Return
-    ---
-    dict or list
-        If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
-    """
-    # Create logger
-    level    = logging.INFO
-    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level = level, format = format, handlers = handlers)
-    log = logging.getLogger('cisTopic')
-    
-    selected_cells={}
-    fig_dict={}
-    if save is not None:
-        pdf = matplotlib.backends.backend_pdf.PdfPages(save)
-        if not os.path.exists(os.path.dirname(save)):
-            if os.path.dirname(save) != '':
-                os.makedirs(os.path.dirname(save))
-    for key in input_metrics.keys():
-        x=input_metrics[key][var_x]
-        if var_y in (set(input_metrics[key].columns)):
-            # Take cell data
-            y=input_metrics[key][var_y]
-            #Plot xy
-            plt.close()
-            fig = plt.figure(figsize=(5, 5))
-            fig.add_axes([0, 0, 0.8, 0.8])
-            if plot_as_hexbin == False:
-                # Color by density
-                xy = np.vstack([x,y])
-                z = gaussian_kde(xy)(xy)
-                idx = z.argsort()
-                x, y, z = x[idx], y[idx], z[idx]
-                plt.scatter(x, y, c=z, s=10,  edgecolor=None, cmap=cmap)
-            else:
-                plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, mincnt=0.1)
-            plt.xlabel(var_x, fontsize=10)
-            plt.ylabel(var_y, fontsize=10)
-            plt.xlim(min(x), max(x))
-            plt.ylim(min(y), max(y))
-            
-            if len(input_metrics) > 1:
-                plt.title(key, y=-0.2, fontsize=10, fontweight="bold")
-            # Add limits
-            if min_x != None:
-                plt.axvline(x=min_x, color='skyblue', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_x] > min_x,:]
-            if max_x != None:
-                plt.axvline(x=max_x, color='tomato', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_x] < max_x,:]
-            if min_y != None:
-                plt.axhline(y=min_y, color='skyblue', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_y] > min_y,:]
-            if max_y != None:
-                plt.axhline(y=max_y, color='tomato', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_y] < max_y,:]
-            
-            # first barplot on axis
-            fig.add_axes([0, 0.8, 0.8, 0.2])
-            if as_density == True:
-                sns.distplot(x, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, bins=n_bins)
-            else:
-                plt.hist(x, bins = n_bins, color=color)
-            plt.xlim(min(x), max(x))
-            plt.axis('off')
-            # second barplot on axis
-            fig.add_axes([0.8, 0, 0.2, 0.8])
-            if as_density == True:
-                sns.distplot(y, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, vertical=True, bins=n_bins)
-            else:
-                plt.hist(y, bins = n_bins, orientation='horizontal', color=color)
-            plt.ylim(min(y), max(y))
-            plt.axis('off')
-            
-            if save != None:
-                pdf.savefig(fig, bbox_inches='tight')
-            
-            if plot is not False:
-                plt.show()
-            else:
-                plt.close(fig)
+								var_x: str,
+								var_y: Optional[str] = None,
+								min_x: Optional[int] = None,
+								max_x: Optional[int] = None,
+								min_y: Optional[int] = None,
+								max_y: Optional[int] = None,
+								color: Optional[str] = '#440154FF',
+								cmap: Optional[str] = 'viridis',
+								as_density: Optional[bool] = False,
+								add_hist: Optional[bool] = True,
+								n_bins: Optional[int] = 100,
+								plot_as_hexbin: Optional[bool] = False,
+								plot: Optional[bool]= True,
+								save: Optional[str] = None):
+	
+	""""
+	Plot barcode metrics and filter based on used-provided thresholds.
+		
+	Parameters
+	---
+	input_metrics: dictionary
+		A dictionary with group labels as keys and barcode metrics per sample as values.
+	var_x: str
+		Metric to plot.
+	var_group: str, optional
+		Variable to divide the plot by groups. Default: None.
+	var_y: str, optional
+		A second metric to plot in combination with `var_x`. When provided, the function returns a 2D plot with `var_x` and `var_y` as axes, if not provided the function returns and histogram or density plot for `var_x`. Default: None.
+	min_x: float, optional
+		Minimum value on `var_x` to keep the barcode/cell. Default: None.
+	max_x: float, optional
+		Maximum value on `var_x` to keep the barcode/cell. Default: None.
+	min_y: float, optional
+		Minimum value on `var_y` to keep the barcode/cell. Default: None.
+	max_y: float, optional
+		Maximum value on `var_y` to keep the barcode/cell. Default: None.
+	color: str, optional
+		Color to use on histograms and/or density plots. Default: None.
+	cmap: str, optional
+		Color map to color 2D dot plots by density. Default: None.
+	as_density: bool, optional
+		Whether to plot variables as density plots rather than histograms. Default: True.
+	add_hist: bool, optional
+		Whether to show the histogram together with the density plots when `as_density=True`. Default: True.
+	n_bins: int, optional
+		Number of bins to use when plotting the variable histogram. Default: 100.
+	plot_as_hexbin: bool, optional
+		A boolean indicating if the data should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
+		when dealing with a large number of points. Default: False.
+	plot: bool, optional
+		Whether the plots should be returned to the console. Default: True.
+	save: bool, optional
+		Path to save plots as a file. Default: None.
+	return_cells: bool, optional
+		Whether to return selected cells based on user-given thresholds. Default: True.
+		
+	Return
+	---
+	dict or list
+		If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
+	"""
+	# Create logger
+	level	= logging.INFO
+	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+	handlers = [logging.StreamHandler(stream=sys.stdout)]
+	logging.basicConfig(level = level, format = format, handlers = handlers)
+	log = logging.getLogger('cisTopic')
+	
+	selected_cells={}
+	fig_dict={}
+	if save is not None:
+		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
+		if not os.path.exists(os.path.dirname(save)):
+			if os.path.dirname(save) != '':
+				os.makedirs(os.path.dirname(save))
+	for key in input_metrics.keys():
+		x=input_metrics[key][var_x]
+		if var_y in (set(input_metrics[key].columns)):
+			# Take cell data
+			y=input_metrics[key][var_y]
+			#Plot xy
+			plt.close()
+			fig = plt.figure(figsize=(5, 5))
+			fig.add_axes([0, 0, 0.8, 0.8])
+			if plot_as_hexbin == False:
+				# Color by density
+				xy = np.vstack([x,y])
+				z = gaussian_kde(xy)(xy)
+				idx = z.argsort()
+				x, y, z = x[idx], y[idx], z[idx]
+				plt.scatter(x, y, c=z, s=10,  edgecolor=None, cmap=cmap)
+			else:
+				plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, mincnt=0.1)
+			plt.xlabel(var_x, fontsize=10)
+			plt.ylabel(var_y, fontsize=10)
+			plt.xlim(min(x), max(x))
+			plt.ylim(min(y), max(y))
+			
+			if len(input_metrics) > 1:
+				plt.title(key, y=-0.2, fontsize=10, fontweight="bold")
+			# Add limits
+			if min_x != None:
+				plt.axvline(x=min_x, color='skyblue', linestyle='--')
+				input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_x] > min_x,:]
+			if max_x != None:
+				plt.axvline(x=max_x, color='tomato', linestyle='--')
+				input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_x] < max_x,:]
+			if min_y != None:
+				plt.axhline(y=min_y, color='skyblue', linestyle='--')
+				input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_y] > min_y,:]
+			if max_y != None:
+				plt.axhline(y=max_y, color='tomato', linestyle='--')
+				input_metrics[key] = input_metrics[key].loc[input_metrics[key][var_y] < max_y,:]
+			
+			# first barplot on axis
+			fig.add_axes([0, 0.8, 0.8, 0.2])
+			if as_density == True:
+				sns.distplot(x, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, bins=n_bins)
+			else:
+				plt.hist(x, bins = n_bins, color=color)
+			plt.xlim(min(x), max(x))
+			plt.axis('off')
+			# second barplot on axis
+			fig.add_axes([0.8, 0, 0.2, 0.8])
+			if as_density == True:
+				sns.distplot(y, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, vertical=True, bins=n_bins)
+			else:
+				plt.hist(y, bins = n_bins, orientation='horizontal', color=color)
+			plt.ylim(min(y), max(y))
+			plt.axis('off')
+			
+			if save != None:
+				pdf.savefig(fig, bbox_inches='tight')
+			
+			if plot is not False:
+				plt.show()
+			else:
+				plt.close(fig)
 
-        else:
-            plt.close()
-            fig = plt.figure()
-            if isinstance(var_y, str):
-                log.info('The given var_y is not a column in cistopic_obj.cell_data')
-                    
-            # first barplot on axis
-            if as_density == True:
-                sns.distplot(x, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, bins=n_bins)
-            else:
-                plt.hist(x, bins = n_bins, color=color)
-                plt.xlim(min(x), max(x))
-                    
-            if len(input_metrics) > 1:
-                plt.legend([key])
-                
-            # Add limits
-            if min_x != None:
-                plt.axvline(x=min_x, color='skyblue', linestyle='--')
-                input_metrics[key]=input_metrics[key].loc[input_metrics[key][var_x] > min_x,:]
-                if max_x != None:
-                    plt.axvline(x=max_x, color='tomato', linestyle='--')
-                    input_metrics[key]=input_metrics[key].loc[input_metrics[key][var_x] < max_x,:]
-            
-            if save != None:
-                pdf.savefig(fig, bbox_inches='tight')
-                
-            if plot is not False:
-                plt.show()
-            else:
-                plt.close(fig)
+		else:
+			plt.close()
+			fig = plt.figure()
+			if isinstance(var_y, str):
+				log.info('The given var_y is not a column in cistopic_obj.cell_data')
+					
+			# first barplot on axis
+			if as_density == True:
+				sns.distplot(x, hist = add_hist, kde = True, color=color, kde_kws={'shade': True}, bins=n_bins)
+			else:
+				plt.hist(x, bins = n_bins, color=color)
+				plt.xlim(min(x), max(x))
+					
+			if len(input_metrics) > 1:
+				plt.legend([key])
+				
+			# Add limits
+			if min_x != None:
+				plt.axvline(x=min_x, color='skyblue', linestyle='--')
+				input_metrics[key]=input_metrics[key].loc[input_metrics[key][var_x] > min_x,:]
+				if max_x != None:
+					plt.axvline(x=max_x, color='tomato', linestyle='--')
+					input_metrics[key]=input_metrics[key].loc[input_metrics[key][var_x] < max_x,:]
+			
+			if save != None:
+				pdf.savefig(fig, bbox_inches='tight')
+				
+			if plot is not False:
+				plt.show()
+			else:
+				plt.close(fig)
 
-        selected_cells[key] = input_metrics[key].index.to_list()
-        fig_dict[key] = fig
+		selected_cells[key] = input_metrics[key].index.to_list()
+		fig_dict[key] = fig
 
-    if save != None:
-        pdf.close()
-        
-    return fig_dict, selected_cells
+	if save != None:
+		pdf.close()
+		
+	return fig_dict, selected_cells
 
 
 def plot_barcode_metrics(input_metrics: Union[Dict, pd.DataFrame, 'CistopicObject'],
-                       var_x: str,
-                       var_group: Optional[str] = None,
-                       var_y: Optional[str] = None,
-                       min_x: Optional[float] = None,
-                       max_x: Optional[float] = None,
-                       min_y: Optional[float] = None,
-                       max_y: Optional[float] = None,
-                       color: Optional[str] = '#440154FF',
-                       cmap: Optional[str] = 'viridis',
-                       as_density: Optional[bool] = True,
-                       add_hist: Optional[bool] = True,
-                       n_bins: Optional[int] = 100,
-                       plot_as_hexbin: Optional[bool] = False,
-                       combine_samples_ridgeline: Optional[bool] = True,
-                       overlap_ridgeline: Optional[float] =.85,
-                       plot: Optional[bool] = True,
-                       save: Optional[str] = None,
-                       return_cells: Optional[bool] = True,
-                       return_fig: Optional[bool] = False):
-    """"
-    Plot barcode metrics and filter based on used-provided thresholds.
-        
-    Parameters
-    ---
-    input_metrics: dictionary, pd.DataFrame or CistopicObject
-    A dictionary with group labels as keys and barcode metrics per sample as values, a dataframe with barcode metrics (for one or more samples) or a cisTopicObjbect with metrics in `class::CistopicObject.cell_data`.
-    var_x: str
-        Metric to plot.
-    var_group: str, optional
-        Variable to divide the plot by groups. Default: None.
-    var_y: str, optional
-        A second metric to plot in combination with `var_x`. When provided, the function returns a 2D plot with `var_x` and `var_y` as axes, if not provided the function returns and histogram or density plot for `var_x`. Default: None.
-    min_x: float, optional
-        Minimum value on `var_x` to keep the barcode/cell. Default: None.
-    max_x: float, optional
-        Maximum value on `var_x` to keep the barcode/cell. Default: None.
-    min_y: float, optional
-        Minimum value on `var_y` to keep the barcode/cell. Default: None.
-    max_y: float, optional
-        Maximum value on `var_y` to keep the barcode/cell. Default: None.
-    color: str, optional
-        Color to use on histograms and/or density plots. Default: None.
-    cmap: str, optional
-        Color map to color 2D dot plots by density. Default: None.
-    as_density: bool, optional
-        Whether to plot variables as density plots rather than histograms. Default: True.
-    add_hist: bool, optional
-        Whether to show the histogram together with the density plots when `as_density=True`. Default: True.
-    n_bins: int, optional
-        Number of bins to use when plotting the variable histogram. Default: 100.
-    plot_as_hexbin: bool, optional
-        A boolean indicating if the data should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
-        when dealing with a large number of points. Default: False.
-    combine_samples_ridgeline: bool, optional
-        When a group variable is provided and only one metric is given, the distribution of the metric can be plotted in all groups using a ridgeline plot. If False, an histogram per sample will be returned. Default: True.
-    overlap_ridgeline: float, optional
-        Overlap between the ridgeline plot tracks. Default=.85
-    plot: bool, optional
-        Whether the plots should be returned to the console. Default: True.
-    save: bool, optional
-        Path to save plots as a file. Default: None.
-    return_cells: bool, optional
-        Whether to return selected cells based on user-given thresholds. Default: True.
-    return_fig: bool, optional
-        Whether to return the plot figure; if several samples it will return a dictionary with the figures per sample. Default: False.
+					   var_x: str,
+					   var_group: Optional[str] = None,
+					   var_y: Optional[str] = None,
+					   min_x: Optional[float] = None,
+					   max_x: Optional[float] = None,
+					   min_y: Optional[float] = None,
+					   max_y: Optional[float] = None,
+					   color: Optional[str] = '#440154FF',
+					   cmap: Optional[str] = 'viridis',
+					   as_density: Optional[bool] = True,
+					   add_hist: Optional[bool] = True,
+					   n_bins: Optional[int] = 100,
+					   plot_as_hexbin: Optional[bool] = False,
+					   combine_samples_ridgeline: Optional[bool] = True,
+					   overlap_ridgeline: Optional[float] =.85,
+					   plot: Optional[bool] = True,
+					   save: Optional[str] = None,
+					   return_cells: Optional[bool] = True,
+					   return_fig: Optional[bool] = False):
+	""""
+	Plot barcode metrics and filter based on used-provided thresholds.
+		
+	Parameters
+	---
+	input_metrics: dictionary, pd.DataFrame or CistopicObject
+	A dictionary with group labels as keys and barcode metrics per sample as values, a dataframe with barcode metrics (for one or more samples) or a cisTopicObjbect with metrics in `class::CistopicObject.cell_data`.
+	var_x: str
+		Metric to plot.
+	var_group: str, optional
+		Variable to divide the plot by groups. Default: None.
+	var_y: str, optional
+		A second metric to plot in combination with `var_x`. When provided, the function returns a 2D plot with `var_x` and `var_y` as axes, if not provided the function returns and histogram or density plot for `var_x`. Default: None.
+	min_x: float, optional
+		Minimum value on `var_x` to keep the barcode/cell. Default: None.
+	max_x: float, optional
+		Maximum value on `var_x` to keep the barcode/cell. Default: None.
+	min_y: float, optional
+		Minimum value on `var_y` to keep the barcode/cell. Default: None.
+	max_y: float, optional
+		Maximum value on `var_y` to keep the barcode/cell. Default: None.
+	color: str, optional
+		Color to use on histograms and/or density plots. Default: None.
+	cmap: str, optional
+		Color map to color 2D dot plots by density. Default: None.
+	as_density: bool, optional
+		Whether to plot variables as density plots rather than histograms. Default: True.
+	add_hist: bool, optional
+		Whether to show the histogram together with the density plots when `as_density=True`. Default: True.
+	n_bins: int, optional
+		Number of bins to use when plotting the variable histogram. Default: 100.
+	plot_as_hexbin: bool, optional
+		A boolean indicating if the data should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
+		when dealing with a large number of points. Default: False.
+	combine_samples_ridgeline: bool, optional
+		When a group variable is provided and only one metric is given, the distribution of the metric can be plotted in all groups using a ridgeline plot. If False, an histogram per sample will be returned. Default: True.
+	overlap_ridgeline: float, optional
+		Overlap between the ridgeline plot tracks. Default=.85
+	plot: bool, optional
+		Whether the plots should be returned to the console. Default: True.
+	save: bool, optional
+		Path to save plots as a file. Default: None.
+	return_cells: bool, optional
+		Whether to return selected cells based on user-given thresholds. Default: True.
+	return_fig: bool, optional
+		Whether to return the plot figure; if several samples it will return a dictionary with the figures per sample. Default: False.
 
-    Return
-    ---
-    dict or list
-        If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
-    """
-    # Create logger
-    level    = logging.INFO
-    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level = level, format = format, handlers = handlers)
-    log = logging.getLogger('cisTopic')
-    
-    # Take cell data
-    if isinstance(input_metrics, CistopicObject):
-        input_metrics = input_metrics.cell_data
-    if isinstance(input_metrics, dict):
-        input_metrics = merge_metadata(input_metrics)
-        var_group = 'Sample'
+	Return
+	---
+	dict or list
+		If var_group is provided or the input is a dictionary, the function returns a dictionary with the selected cells per group based on user provided thresholds; otherwise a list with the selected cells.
+	"""
+	# Create logger
+	level	= logging.INFO
+	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+	handlers = [logging.StreamHandler(stream=sys.stdout)]
+	logging.basicConfig(level = level, format = format, handlers = handlers)
+	log = logging.getLogger('cisTopic')
+	
+	# Take cell data
+	if isinstance(input_metrics, CistopicObject):
+		input_metrics = input_metrics.cell_data
+	if isinstance(input_metrics, dict):
+		input_metrics = merge_metadata(input_metrics)
+		var_group = 'Sample'
 
-    # If there is only one sample
-    if var_group is None:
-        input_metrics={'Sample':input_metrics}
-        fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot, save)
-    else:
-        input_metrics_dict={x:input_metrics[input_metrics.loc[:,var_group] == x] for x in list(set(input_metrics.loc[:,var_group]))}
-        if combine_samples_ridgeline is True and var_y is None:
-            selected_cells=plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot=False, save=None)
-            if save is not None:
-                if not os.path.exists(os.path.dirname(save)):
-                    os.makedirs(os.path.dirname(save))
-                pdf = matplotlib.backends.backend_pdf.PdfPages(save)
-            plt.close()
-            fig = plt.figure()
-            grouped = [(v, d.loc[:,var_x].dropna().values) for v, d in input_metrics.groupby(var_group)]
-            sample, data = zip(*grouped)
-            if color is None:
-                color='skyblue'
-            ridgeline(data, labels=sample, overlap=overlap_ridgeline, fill=color)
-            plt.xlabel(var_x)
-            plt.grid(zorder=0)
-            # Add limits
-            if min_x != None:
-                plt.axvline(x=min_x, color='skyblue', linestyle='--')
-            if max_x != None:
-                plt.axvline(x=max_x, color='tomato', linestyle='--')
-            if min_y != None:
-                plt.axhline(y=min_y, color='skyblue', linestyle='--')
-            if max_y != None:
-                plt.axhline(y=max_y, color='tomato', linestyle='--')
-                
-            if save != None:
-                pdf.savefig(fig, bbox_inches='tight')
-                pdf.close()
+	# If there is only one sample
+	if var_group is None:
+		input_metrics={'Sample':input_metrics}
+		fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot, save)
+	else:
+		input_metrics_dict={x:input_metrics[input_metrics.loc[:,var_group] == x] for x in list(set(input_metrics.loc[:,var_group]))}
+		if combine_samples_ridgeline is True and var_y is None:
+			selected_cells=plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot=False, save=None)
+			if save is not None:
+				if not os.path.exists(os.path.dirname(save)):
+					os.makedirs(os.path.dirname(save))
+				pdf = matplotlib.backends.backend_pdf.PdfPages(save)
+			plt.close()
+			fig = plt.figure()
+			grouped = [(v, d.loc[:,var_x].dropna().values) for v, d in input_metrics.groupby(var_group)]
+			sample, data = zip(*grouped)
+			if color is None:
+				color='skyblue'
+			ridgeline(data, labels=sample, overlap=overlap_ridgeline, fill=color)
+			plt.xlabel(var_x)
+			plt.grid(zorder=0)
+			# Add limits
+			if min_x != None:
+				plt.axvline(x=min_x, color='skyblue', linestyle='--')
+			if max_x != None:
+				plt.axvline(x=max_x, color='tomato', linestyle='--')
+			if min_y != None:
+				plt.axhline(y=min_y, color='skyblue', linestyle='--')
+			if max_y != None:
+				plt.axhline(y=max_y, color='tomato', linestyle='--')
+				
+			if save != None:
+				pdf.savefig(fig, bbox_inches='tight')
+				pdf.close()
 
-            if plot is not False:
-                plt.show()
-            else:
-                plt.close(fig)
-            fig_dict = fig
+			if plot is not False:
+				plt.show()
+			else:
+				plt.close(fig)
+			fig_dict = fig
 
-        else:
-            fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot, save)
-    
-    if return_cells == True:
-        if len(selected_cells) == 1:
-            selected_cells = selected_cells[list(selected_cells.keys())[0]]
-        if return_fig == True:
-            if len(fig_dict) == 1:
-                fig_dict = fig_dict[list(fig_dict.keys())[0]]
-            return fig_dict, selected_cells
-        else:
-            return selected_cells    
-    else:
-        if return_fig == True:
-            if len(fig_dict) == 1:
-                fig_dict = fig_dict[list(fig_dict.keys())[0]]
-            return fig_dict
-            
+		else:
+			fig_dict, selected_cells = plot_barcode_metrics_per_group(input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot, save)
+	
+	if return_cells == True:
+		if len(selected_cells) == 1:
+			selected_cells = selected_cells[list(selected_cells.keys())[0]]
+		if return_fig == True:
+			if len(fig_dict) == 1:
+				fig_dict = fig_dict[list(fig_dict.keys())[0]]
+			return fig_dict, selected_cells
+		else:
+			return selected_cells	
+	else:
+		if return_fig == True:
+			if len(fig_dict) == 1:
+				fig_dict = fig_dict[list(fig_dict.keys())[0]]
+			return fig_dict
+			
 def merge_metadata(metadata_bc_dict: Dict):
 	"""
 	Merge barcode-level statistics from different samples.
