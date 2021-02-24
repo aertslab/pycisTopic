@@ -727,7 +727,7 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
     cao_juan_2009=tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(topic_word)
     mimno_2011=tmtoolkit.topicmod.evaluate.metric_coherence_mimno_2011(topic_word, dtm=binary_matrix.transpose(), top_n=20, eps=1e-12, normalize=True, return_mean=False)
     topic_word_assig=model.word_topics
-    doc_topic_assig=(doc_topic.T * (cell_cov+n_topics*alpha)).T-alpha
+    doc_topic_assig=(doc_topic.T * (cell_cov)).T
     ll=loglikelihood(topic_word_assig, doc_topic_assig, alpha, eta)
 
     # Organinze data
