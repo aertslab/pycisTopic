@@ -870,6 +870,7 @@ def compute_qc_stats_ray(fragments,
         fragments_df=fragments
     # Check for duplicates
     if 'Score' not in fragments_df or all(fragments_df['Score'] == '.'):
+    	fragments_df = fragments_df[['Chromosome', 'Start', 'End']]
         if check_for_duplicates == True:
             log.info("Collapsing duplicates")
             fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
@@ -878,6 +879,8 @@ def compute_qc_stats_ray(fragments,
             fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()].tolist()
         else:
             fragments_df['Score'] = 1
+    else:
+    	fragments_df = fragments_df[['Chromosome', 'Start', 'End', 'Score']]
     # Prepare valid barcodes
     if valid_bc is not None:
         if n_bc is not None or n_frag is not None:
