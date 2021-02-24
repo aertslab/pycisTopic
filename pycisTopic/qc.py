@@ -229,7 +229,7 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
 	idx = z.argsort()
 	x, y, z = x[idx], y[idx], z[idx]
 
-	plt.scatter(x, y, c=z, s=10,  edgecolor='', cmap=cmap)
+	plt.scatter(x, y, c=z, s=10,  edgecolors=None, cmap=cmap)
 	plt.ylim(0,1)
 	plt.xscale("log")
 	plt.xlabel("Number of (unique) fragments",fontsize=10)
@@ -1195,9 +1195,9 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
                 z = gaussian_kde(xy)(xy)
                 idx = z.argsort()
                 x, y, z = x[idx], y[idx], z[idx]
-                plt.scatter(x, y, c=z, s=10, edgecolor='', cmap=cmap)
+                plt.scatter(x, y, c=z, s=10, edgecolors=None, cmap=cmap)
             else:
-                plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, xscale='log', bins='log', mincnt=1)
+                plt.hexbin(x, y, edgecolors=None, cmap=cmap, gridsize=100, xscale='log', bins='log', mincnt=1)
             plt.title(label_list[i])
             plt.ylim(0,1)
             plt.xscale("log")
@@ -1360,9 +1360,9 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
                 z = gaussian_kde(xy)(xy)
                 idx = z.argsort()
                 x, y, z = x[idx], y[idx], z[idx]
-                plt.scatter(x, y, c=z, s=10,  edgecolor=None, cmap=cmap)
+                plt.scatter(x, y, c=z, s=10,  edgecolors=None, cmap=cmap)
             else:
-                plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, mincnt=0.1)
+                plt.hexbin(x, y, edgecolors=None, cmap=cmap, gridsize=100, mincnt=0.1)
             plt.xlabel(var_x, fontsize=10)
             plt.ylabel(var_y, fontsize=10)
             plt.xlim(min(x), max(x))
