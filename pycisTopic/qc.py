@@ -1197,7 +1197,7 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
                 x, y, z = x[idx], y[idx], z[idx]
                 plt.scatter(x, y, c=z, s=10, edgecolors=None, cmap=cmap)
             else:
-                plt.hexbin(x, y, edgecolors=None, cmap=cmap, gridsize=100, xscale='log', bins='log', mincnt=1)
+                plt.hexbin(x, y, linewidths=0.5, cmap=cmap, gridsize=100, xscale='log', mincnt=1)
             plt.title(label_list[i])
             plt.ylim(0,1)
             plt.xscale("log")
@@ -1362,7 +1362,7 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
                 x, y, z = x[idx], y[idx], z[idx]
                 plt.scatter(x, y, c=z, s=10,  edgecolors=None, cmap=cmap)
             else:
-                plt.hexbin(x, y, edgecolors=None, cmap=cmap, gridsize=100, mincnt=0.1)
+                plt.hexbin(x, y, linewidth=0.5, cmap=cmap, gridsize=100, mincnt=1)
             plt.xlabel(var_x, fontsize=10)
             plt.ylabel(var_y, fontsize=10)
             plt.xlim(min(x), max(x))
