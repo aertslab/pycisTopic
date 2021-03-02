@@ -735,8 +735,8 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
         metrics = pd.DataFrame([arun_2010, cao_juan_2009, np.mean(mimno_2011), ll], index=['Arun_2010', 'Cao_Juan_2009', 'Mimno_2011', 'loglikelihood'], columns=['Metric']).transpose()
     else:
         metrics = pd.DataFrame([arun_2010, cao_juan_2009, np.mean(mimno_2011[np.argpartition(mimno_2011, -top_topics_coh)[-top_topics_coh:]]), ll], index=['Arun_2010', 'Cao_Juan_2009', 'Mimno_2011', 'loglikelihood'], columns=['Metric']).transpose()
-    coherence = pd.DataFrame([range(n_topics), mimno_2011], index=['Topic', 'Mimno_2011']).transpose()
-    marg_topic = pd.DataFrame([range(n_topics), tmtoolkit.topicmod.model_stats.marginal_topic_distrib(doc_topic, cell_cov)], index=['Topic', 'Marg_Topic']).transpose()
+    coherence = pd.DataFrame([range(1, n_topics+1), mimno_2011], index=['Topic', 'Mimno_2011']).transpose()
+    marg_topic = pd.DataFrame([range(1, n_topics+1), tmtoolkit.topicmod.model_stats.marginal_topic_distrib(doc_topic, cell_cov)], index=['Topic', 'Marg_Topic']).transpose()
     topic_ass = pd.DataFrame.from_records([range(1, n_topics+1),  list(chain.from_iterable(model.word_topics.sum(axis=1)[:,None]))], index=['Topic', 'Assignments']).transpose()
     cell_topic = pd.DataFrame.from_records(doc_topic, index = cell_names, columns=['Topic'+ str(i) for i in range(1, n_topics+1)]).transpose()
     topic_region = pd.DataFrame.from_records(topic_word, columns = region_names, index=['Topic'+ str(i) for i in range(1, n_topics+1)]).transpose()

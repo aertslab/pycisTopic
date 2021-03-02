@@ -223,13 +223,16 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
 	x = FPB['Unique_nr_frag']
 	y = FPB['Dupl_rate']
 	
-	fig = plt.figure()
-	xy = np.vstack([np.log(x),y])
-	z = gaussian_kde(xy)(xy)
-	idx = z.argsort()
-	x, y, z = x[idx], y[idx], z[idx]
-
-	plt.scatter(x, y, c=z, s=10,  edgecolor='', cmap=cmap)
+	try:
+		fig = plt.figure()
+		xy = np.vstack([np.log(x),y])
+		z = gaussian_kde(xy)(xy)
+		idx = z.argsort()
+		x, y, z = x[idx], y[idx], z[idx]
+		plt.scatter(x, y, c=z, s=10,  edgecolor='', cmap=cmap)
+	except:
+		log.info('All fragments are unique')
+		plt.scatter(x, y, s=10, edgecolor='', cmap=cmap)
 	plt.ylim(0,1)
 	plt.xscale("log")
 	plt.xlabel("Number of (unique) fragments",fontsize=10)
@@ -242,7 +245,7 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
 		plt.show()
 	else:
 		plt.close(fig)
-
+		
 	output = {}
 	if return_plot_data == True:
 		output.update({'duplicate_rate_plot_data' : FPB})
@@ -1188,17 +1191,20 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str, pd.DataFrame],
 			yield
 			if 'duplicate_rate' not in profile_data_dict[label_list[i]]:
 				log.error('duplicate_rate is not included in the profiles dictionary')
-			
 			plot_data = profile_data_dict[label_list[i]]['duplicate_rate']
 			x = plot_data['Unique_nr_frag']
 			y = plot_data['Dupl_rate'] 
 			
 			if duplicate_rate_as_hexbin == False:
-				xy = np.vstack([np.log(x),y])
-				z = gaussian_kde(xy)(xy)
-				idx = z.argsort()
-				x, y, z = x[idx], y[idx], z[idx]
-				plt.scatter(x, y, c=z, s=10, edgecolor='', cmap=cmap)
+				try:
+					xy = np.vstack([np.log(x),y])
+					z = gaussian_kde(xy)(xy)
+					idx = z.argsort()
+					x, y, z = x[idx], y[idx], z[idx]
+					plt.scatter(x, y, c=z, s=10, edgecolor='', cmap=cmap)
+				except:
+					log.info('All fragments are unique')
+					plt.scatter(x, y, s=10, edgecolor='', cmap=cmap)
 			else:
 				plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, xscale='log', bins='log', mincnt=1)
 			plt.title(label_list[i])
@@ -1359,11 +1365,14 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
 			fig.add_axes([0, 0, 0.8, 0.8])
 			if plot_as_hexbin == False:
 				# Color by density
-				xy = np.vstack([x,y])
-				z = gaussian_kde(xy)(xy)
-				idx = z.argsort()
-				x, y, z = x[idx], y[idx], z[idx]
-				plt.scatter(x, y, c=z, s=10,  edgecolor=None, cmap=cmap)
+				try:
+					xy = np.vstack([x,y])
+					z = gaussian_kde(xy)(xy)
+					idx = z.argsort()
+					x, y, z = x[idx], y[idx], z[idx]
+					plt.scatter(x, y, c=z, s=10,  edgecolor=None, cmap=cmap)
+				except:
+					plt.scatter(x, y, s=10, edgecolor=None, cmap=cmap)	
 			else:
 				plt.hexbin(x, y, edgecolor='', cmap=cmap, gridsize=100, mincnt=0.1)
 			plt.xlabel(var_x, fontsize=10)
