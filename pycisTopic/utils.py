@@ -155,12 +155,12 @@ def multiplot_from_generator(g, num_columns, n_plots, figsize=None, plot=True, s
         if num_columns == 1:
             figsize = (5, 5)
         else:
-            num_rows = np.ceil(n_plots/num_columns)
+            num_rows = int(np.ceil(n_plots/num_columns))
             figsize = (6.4*num_columns, 4.8*num_rows)
               
     if num_columns > 1:
         fig=plt.figure(figsize=figsize) 
-        num_rows = np.ceil(n_plots/num_columns)
+        num_rows = int(np.ceil(n_plots/num_columns))
     plot = 0    
     try:
         while True:
