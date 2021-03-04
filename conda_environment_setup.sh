@@ -68,6 +68,8 @@ conda install -c conda-forge python-igraph
 conda install -c conda-forge leidenalg
 conda install pandas==1.2.0  # important
 
+conda install -c bioconda pyfaidx
+
 #########
 # After installing any new package, check pandas version. It keeps getting downgraded:
 conda list | grep pandas
@@ -87,6 +89,8 @@ pip install pyscenic
 conda list | grep pandas
 conda list | grep pyscenic
 conda list | grep arboreto
+
+
 
 
 
