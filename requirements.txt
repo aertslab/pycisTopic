@@ -4,7 +4,6 @@ bbknn
 Cython
 ipython
 ipykernel
-igraph
 fitsne
 gensim
 harmonypy
