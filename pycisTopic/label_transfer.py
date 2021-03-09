@@ -94,8 +94,8 @@ def label_transfer(rna_anndata,
         transfer_dict['bbknn'] = pd.concat(bbknn_transfer_list, axis=1, sort=False)
     if 'scanorama' in methods:
         log.info('Running integration with scanorama')
-        integrated, corrected = scanorama.correct_scanpy([rna_anndata, atac_anndata], return_dimred=True)
-        embedding = np.concatenate(integrated, axis=0)
+        integrated = scanorama.correct_scanpy([rna_anndata, atac_anndata], return_dimred=True)
+        embedding = np.concatenate([x.obsm['X_scanorama'] for x in integrated], axis=0) 
         adata_concat.obsm["scanorama_embedding"] = embedding
         distances = 1 - cosine_distances(adata_concat[adata_concat.obs.batch == "RNA"].obsm["scanorama_embedding"], 
                                          adata_concat[adata_concat.obs.batch == "ATAC"].obsm["scanorama_embedding"])
