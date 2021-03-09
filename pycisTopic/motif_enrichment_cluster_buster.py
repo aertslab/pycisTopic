@@ -120,7 +120,7 @@ def cluster_buster(cbust_path, input_data, outdir, path_to_fasta, path_to_motifs
     logging.basicConfig(level = level, format = format, handlers = handlers)
     log = logging.getLogger('cisTopic')
     # Format input data
-    pr_regions_dict = formatInputRegions(input_data)
+    pr_regions_dict = format_input_regions(input_data)
     # Generate fasta file
     if not os.path.exists(outdir):
         os.mkdir(outdir)  

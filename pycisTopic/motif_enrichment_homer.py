@@ -25,7 +25,7 @@ def homer_find_motifs_genome(homer_path, input_data, outdir, genome, size='given
     logging.basicConfig(level = level, format = format, handlers = handlers)
     log = logging.getLogger('cisTopic')
     # Format input data
-    pr_regions_dict = formatInputRegions(input_data)
+    pr_regions_dict = format_input_regions(input_data)
     # Save regions in dict to the output dir
     bed_paths={}
     bed_dir = outdir+'regions_bed/'
