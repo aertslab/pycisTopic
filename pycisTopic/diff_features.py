@@ -132,7 +132,7 @@ def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=Non
     if isinstance(scale_factor, int):
         log.info('Scaling')
         # Set all values smaller or equal than (1 / scale_factor) to zero.
-        imputed_acc[imputed_acc < (1 / scale_factor)] = 0
+        np.place(imputed_acc, imputed_acc < (1 / scale_factor), [0])
         imputed_acc = imputed_acc * scale_factor
         imputed_acc = sparse.csr_matrix(imputed_acc, dtype=np.float64)
         if scale_factor != 1:
