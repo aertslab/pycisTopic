@@ -124,8 +124,8 @@ def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=Non
 		topic_region=topic_region.loc[selected_regions,:]
 		region_names=selected_regions
 		
-	cell_topic = cell_topic.to_numpy()
-	topic_region = topic_region.to_numpy()
+	cell_topic = cell_topic.to_numpy().astype('float16')
+	topic_region = topic_region.to_numpy().astype('float16')
 	
 	log.info('Imputing drop-outs')
 	imputed_acc = topic_region @ cell_topic
