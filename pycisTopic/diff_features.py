@@ -140,6 +140,7 @@ def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=Non
             region_names = subset_list(region_names, keep_regions_index)
     imputed_acc_obj = CistopicImputedFeatures(imputed_acc, region_names, cell_names, project)
     log.info('Done!')
+    return(imputed_acc_obj)
 
 def normalize_scores(input_mat, scale_factor=10**4):
 	# Create cisTopic logger
