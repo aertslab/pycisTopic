@@ -102,47 +102,44 @@ class CistopicImputedFeatures:
 			self.project = project
 			
 
-def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=None, scale_factor=10**6, project='cisTopic_Impute'):
+def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=None, scale_factor=10 ** 6, project='cisTopic_Impute'):
     # Create cisTopic logger
-    level    = logging.INFO
-    format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    level = logging.INFO
+    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level = level, format = format, handlers = handlers)
+    logging.basicConfig(level=level, format=format, handlers=handlers)
     log = logging.getLogger('cisTopic')
-    
     model = cistopic_obj.selected_model
     cell_names = cistopic_obj.cell_names
-    cell_topic = model.cell_topic.loc[:,cell_names]
+    cell_topic = model.cell_topic.loc[:, cell_names]
     region_names = cistopic_obj.region_names
-    topic_region = model.topic_region.loc[region_names,:]
-    
+    topic_region = model.topic_region.loc[region_names, :]
     if selected_cells is not None:
-        cell_topic = cell_topic.loc[:,selected_cells]
+        cell_topic = cell_topic.loc[:, selected_cells]
         cell_names = selected_cells
     if selected_regions is not None:
-        topic_region = topic_region.loc[selected_regions,:]
+        topic_region = topic_region.loc[selected_regions, :]
         region_names = selected_regions
-        
-    cell_topic = cell_topic.to_numpy().astype('float16')
-    topic_region = topic_region.to_numpy().astype('float16')
-    
+    # Convert cell_topic and topic_region 2d arrays to np.float16 so multiplying them uses 8 times less memory than with np.float64
+    cell_topic = cell_topic.to_numpy().astype(np.float16)
+    topic_region = topic_region.to_numpy().astype(np.float16)
     log.info('Imputing drop-outs')
     imputed_acc = topic_region @ cell_topic
-
     if isinstance(scale_factor, int):
         log.info('Scaling')
-        # Set all values smaller or equal than (1 / scale_factor) to zero.
+        # Set all values smaller or equal than (1 / scale_factor) to zero (to make sparse matrix more efficient).
         np.place(imputed_acc, imputed_acc < (1 / scale_factor), [0])
+        # Convert imputed_acc np.float16 matrix to sparse matrix with np.flaot32 values before multiplying
+        # (so no out of range values are generated).
+        imputed_acc = sparse.csr_matrix(imputed_acc, dtype=np.float32)
         imputed_acc = imputed_acc * scale_factor
-        imputed_acc = sparse.csr_matrix(imputed_acc, dtype=np.float64)
         if scale_factor != 1:
             log.info('Converting to sparse matrix')
             keep_regions_index = non_zero_rows(imputed_acc)
             imputed_acc = imputed_acc[keep_regions_index,]
             region_names = subset_list(region_names, keep_regions_index)
     imputed_acc_obj = CistopicImputedFeatures(imputed_acc, region_names, cell_names, project)
-    log.info('Done!')  
-    return(imputed_acc_obj)
+    log.info('Done!')
 
 def normalize_scores(input_mat, scale_factor=10**4):
 	# Create cisTopic logger
