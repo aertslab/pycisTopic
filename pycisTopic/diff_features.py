@@ -132,7 +132,7 @@ def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=Non
         # Convert imputed_acc np.float16 matrix to sparse matrix with np.flaot32 values before multiplying
         # (so no out of range values are generated).
         imputed_acc = sparse.csr_matrix(imputed_acc, dtype=np.float32)
-        imputed_acc = imputed_acc * scale_factor
+        imputed_acc = imputed_acc * np.float32(scale_factor)
         if scale_factor != 1:
             log.info('Converting to sparse matrix')
             keep_regions_index = non_zero_rows(imputed_acc)
@@ -141,7 +141,8 @@ def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=Non
     imputed_acc_obj = CistopicImputedFeatures(imputed_acc, region_names, cell_names, project)
     log.info('Done!')
     return(imputed_acc_obj)
-
+    
+    
 def normalize_scores(input_mat, scale_factor=10**4):
 	# Create cisTopic logger
 	level	= logging.INFO
