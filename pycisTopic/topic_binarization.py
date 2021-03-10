@@ -69,11 +69,17 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
 		topic_region = smooth_topics(topic_region)
 	
 	binarized_topics = {}
-	if save != None:
+	pdf=None
+	if (save != None) & (num_columns == 1):
 		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 		
+	if num_columns > 1:
+		num_rows = np.ceil(topic_region.shape[1]/num_columns)
+		if figsize == (6.4, 4.8):
+			figsize = (6.4*num_columns, 4.8*num_rows)
+		
 	fig = plt.figure(figsize=figsize)
-	i = 1
+	j = 1
 	for i in range(topic_region.shape[1]):
 		l = np.asarray(topic_region.iloc[:,i])
 		l_norm = (l - np.min(l))/np.ptp(l)
@@ -93,8 +99,8 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
 		
 		if plot == True:
 			if num_columns > 1:
-				plt.subplot(num_rows, num_columns, i)
-				i = i + 1
+				plt.subplot(num_rows, num_columns, j)
+				j = j + 1
 			plt.hist(l_norm, bins=100)
 			plt.axvline(thr, color='tomato', linestyle='--')
 			plt.xlabel('Probability Topic ' + str(i+1) + '\n' + 'Selected regions:' + str(sum(l_norm>thr)), fontsize=10)
@@ -104,17 +110,19 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
 				if plot == True:
 					plt.show()
 		binarized_topics['Topic' + str(i+1)] =  pd.DataFrame(topic_region.iloc[l_norm>thr,i]).sort_values('Topic'+str(i+1), ascending=False)
+    
+	cistopic_obj.selected_model.topic_ass['Features_in_binarized_topic'] = [binarized_topics[x].shape[0] for x in binarized_topics.keys()]
    
 	if num_columns > 1:
 		plt.tight_layout()
 		if save != None:
-				pdf.savefig(fig, bbox_inches='tight')
+			fig.savefig(save, bbox_inches='tight')
 		if plot == True:
 			plt.show()
 		else:
-			plt.close()
+			fig.close()
 
-	if save != None:
+	if (save != None) & (num_columns == 1):
 		pdf.close() 
 	
 	return binarized_topics

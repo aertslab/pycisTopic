@@ -218,7 +218,8 @@ def region_weights(imputed_acc_object,
 	# Calculate variability weight
 	if gini_weight == True:
 		log.info('Calculating gini weights')
-		subset_imputed_acc_object = subset_imputed_matrix(imputed_acc_object, features=list(set(regions_per_gene.Name)))
+		imputed_features_obj.subset(cells=None, features=list(set(regions_per_gene.Name)), copy=True)
+		subset_imputed_acc_object = imputed_features_obj.subset(cells=None, features=list(set(regions_per_gene.Name)), copy=True)
 		x = subset_imputed_acc_object.mtx
 		if sparse.issparse(x):
 			gini_weight = [gini(x[i,:].toarray()) for i in range(x.shape[0])]

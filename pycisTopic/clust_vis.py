@@ -339,7 +339,7 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
 		embedding = embedding.loc[selected_features]
 		
 	data_mat=data_mat.loc[embedding.index.to_list()]	
-	
+	pdf = None
 	if (save != None) & (num_columns == 1):
 		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 		
@@ -431,7 +431,7 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
 		if save != None:
 			fig.savefig(save, bbox_inches='tight')
 		plt.show()
-	if save != None:
+	if (save != None) & (num_columns == 1):
 		pdf = pdf.close()
 
 
@@ -557,7 +557,7 @@ def plot_topic(cistopic_obj: 'CistopicObject',
 			fig.savefig(save, bbox_inches='tight')
 		plt.show()
 
-	if save != None:
+	if (save != None) & (num_columns == 1):
 		pdf.close()
 
 def plot_imputed_features(cistopic_obj: 'CistopicObject',
@@ -603,7 +603,7 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
 	save: str, optional
 		Path to save plot. Default: None.
 	"""
-	
+	pdf = None
 	if (save != None) & (num_columns == 1):
 		pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 		
@@ -654,7 +654,7 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
 			fig.savefig(save, bbox_inches='tight')
 		plt.show()
 
-	if save != None:
+	if (save != None) & (num_columns == 1):
 		pdf = pdf.close()
 
 def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
