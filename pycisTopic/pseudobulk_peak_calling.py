@@ -180,6 +180,7 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
 	log = logging.getLogger('cisTopic')
 	
 	log.info('Creating pseudobulk for '+ str(group))
+	group_fragments_list=[]
 	group_fragments_dict={}
 	for sample_id in fragments_df_dict:
 		sample_data = cell_data[cell_data.loc[:,sample_id_col].isin([sample_id])]

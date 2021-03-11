@@ -754,7 +754,6 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
 				color = [mcolors.to_rgb(x) for x in color]
 				color_dict[var] = dict(zip(categories, color))
 			col_colors[var] = var_data.map(color_dict[var])
-			seed=seed+1
 		col_colors = pd.concat([col_colors[var] for var in variables], axis=1, sort=False)
 
 		g=sns.clustermap(cell_topic,
