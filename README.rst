@@ -8,16 +8,15 @@ Under development.
 Installation
 **********************
 
-::
+.. code-block:: python
 	git clone https://github.com/aertslab/pycisTopic.git
 	cd pycisTopic
 	pip install . 
-::
+
 
 Check version
 **********************
 
-::
+.. code-block:: python
 	import pycisTopic
 	pycisTopic.__version__
-::
