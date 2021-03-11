@@ -1,25 +1,50 @@
-# Take cell data
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+from adjustText import adjust_text
 from itertools import compress
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+import matplotlib.patheffects as PathEffects
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from statsmodels.stats import proportion
 
-from typing import Optional, Union
-from typing import Dict, List, Tuple
+from typing import Optional
+from typing import Dict, Tuple
 
+from .cistopic_class import *
+    
 def compute_topic_metrics(cistopic_obj: 'CistopicObject',
                      return_metrics: Optional[bool] = True):
+    """
+    Compute topic quality control metrics. 
+    
+    Parameters
+    ---------
+    cistopic_obj: `class::CistopicObject`
+        A cisTopic object with a model in `class::CistopicObject.selected_model`.
+    return_metrics: Optional, bool
+    	Whether to return metrics as `class::pd.DataFrame`. The metrics will be also appended to
+    	class::CistopicObject.selected_model.topic_qc_metrics` despite the value of this parameter. Default: True.
+ 
+    Return
+    ---------
+    pd.DataFrame
+        Data frame containing a column with topic metrics: the number of assignments, the topic coherence (Mimno et al., 2011), the 
+        marginal topic distribution (which indicates how much each topic contributes to the model), and the gini index (which indicates
+        the specificity of topics. If topics have been binarized, the number of regions/cells per topic will be added.
+
+    References
+    ----------
+    Mimno, D., Wallach, H., Talley, E., Leenders, M., & McCallum, A. (2011). Optimizing semantic coherence in topic models. In Proceedings of the 2011 Conference on Empirical Methods in Natural Language Processing (pp. 262-272).
+    
+    """
     model = cistopic_obj.selected_model
     topic_coh = model.coherence['Mimno_2011']
-    try:
-        topic_ass = model.topic_ass[['Assignments', 'Features_in_binarized_topic']]
-    except:
-        topic_ass = model.topic_ass['Assignments']
+    topic_ass = model.topic_ass.drop('Topic', axis=1)
     marginal_dist = model.marg_topic['Marg_Topic']
     gini_values = pd.DataFrame([gini_coefficient(model.cell_topic.iloc[i,:].to_numpy()) for i in range(model.cell_topic.shape[0])])
     topic_qc_metrics = pd.concat([np.log10(topic_ass['Assignments']), topic_ass, topic_coh, marginal_dist, gini_values], axis=1)
-    topic_qc_metrics.columns = ['Log10_Assignments', 'Assignments', 'Features_in_binarized_topic', 'Coherence', 'Marginal_topic_dist', 'Gini_index']
+    topic_qc_metrics.columns = ['Log10_Assignments'] + topic_ass.columns.tolist() + ['Coherence', 'Marginal_topic_dist', 'Gini_index']
     topic_qc_metrics.index = ['Topic'+str(i) for i in range(1, model.cell_topic.shape[0]+1)]
     cistopic_obj.selected_model.topic_qc_metrics = topic_qc_metrics
     if return_metrics == True:
@@ -125,3 +150,62 @@ def gini_coefficient(x):
     for i, xi in enumerate(x[:-1], 1):
         diffsum += np.sum(np.abs(xi - x[i:]))
     return diffsum / (len(x)**2 * np.mean(x))
+    
+def topic_annotation(cistopic_obj: 'CistopicObject',
+                    annot_var: str,
+                    binarized_cell_topic: Optional[Dict[pd.DataFrame]] = None,
+                    general_topic_thr: Optional[float] = 0.2,
+                    **kwargs):
+    """
+    Automatic annotation of topics.
+    
+    Parameters
+    ---------
+    cistopic_obj: `class::CistopicObject`
+        A cisTopic object with a model in `class::CistopicObject.selected_model`.
+    annot_var: str
+    	Name of the variable (contained in 'class::CistopicObject.cell_data') to use for annotation
+    binarized_cell_topic: Optional, dict
+    	A dictionary containing binarized cell topic distributions (from `binarize_topics()`). If not provided, `binarized_topics()`
+    	will be run. Default: None.
+    general_topic_thr: Optional, float
+    	Threshold for considering a topic as general. After assigning topics to annotations, the ratio of cells in the binarized topic
+    	in the whole population is compared with the ratio of the total number of cells in the assigned groups versus the whole population.
+    	If the difference is above this threshold, the topic is considered general. Default: 0.2.
+    **kwargs
+    	Arguments to pass to `binarize_topics()`
+       
+    Return
+    ---------
+    pd.DataFrame
+        Data frame containing a column with the annotations (separated by ,), the ratio of cells in the binarized topic and the ratio of
+        cells assigned to a topic based on the annotated groups.
+    """
+    model = cistopic_obj.selected_model
+    cell_topic = model.cell_topic
+    annot = cistopic_obj.cell_data[annot_var]
+    if binarized_cell_topic is None:
+        binarized_cell_topic = binarize_topics(cistopic_obj, target='cell', **kwargs)
+        
+    topic_annot_dict = {topic:[] for topic in cell_topic.index.tolist()}
+    group_size_dict = {topic:[] for topic in cell_topic.index.tolist()}
+    for group in set(filter(lambda x: x == x , set(annot))):
+        cells_in_group = annot[annot == group].index.tolist()
+        nobs = len(cells_in_group)
+        for topic in cell_topic.index.tolist():
+            count =  len(list(set(cells_in_group) & set(binarized_cell_topic[topic].index.tolist())))
+            value = binarized_cell_topic[topic].shape[0]/cell_topic.shape[1]
+            stat, pval = proportion.proportions_ztest(count, nobs, value=value, alternative='larger')
+            if pval < 0.05:
+                topic_annot_dict[topic].append(group)
+                group_size_dict[topic].append(nobs)
+                   
+    topic_annot_dict = {x:', '.join(topic_annot_dict[x]) for x in topic_annot_dict.keys()}
+    topic_annot = pd.DataFrame([list(topic_annot_dict.values()),
+                               [binarized_cell_topic[topic].shape[0]/cell_topic.shape[1] for topic in cell_topic.index.tolist()],
+                               [sum(group_size_dict[topic])/cell_topic.shape[1] for topic in cell_topic.index.tolist()]],
+                               index=[annot_var, 'Ratio_cells_in_topic', 'Ratio_group_in_population']).T
+    topic_annot.index = list(topic_annot_dict.keys())
+    topic_annot['is_general'] = (topic_annot['Ratio_cells_in_topic'] - topic_annot['Ratio_group_in_population']) > general_topic_thr
+            
+    return topic_annot     

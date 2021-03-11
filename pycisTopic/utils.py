@@ -22,11 +22,16 @@ def get_position_index(query_list, target_list):
     d = {k:v for v,k in enumerate(target_list)}
     index=(d[k] for k in query_list)
     return list(index)
-
+    
 def non_zero_rows(X):
-    nonzero_row_indice, _ = X.nonzero()
-    unique_nonzero_indice = np.unique(nonzero_row_indice)
-    return unique_nonzero_indice
+     if is_instance(X, scipy.sparse.csr.csr_matrix):       
+         # Remove all explicit zeros in sparse matrix.                                                                                                                                                              
+         X.eliminate_zeros()
+         # Get number of non zeros per row and get indices for each row which is not completely zero.                                                                                                                                                                                           
+         return np.nonzero(X.getnnz(axis=1))[0]
+    else:
+         # For non sparse matrices.
+         return np.nonzero(np.count_nonzero(x, axis=1))[0]
 
 def subset_list(target_list, index_list):
     X = list(map(target_list.__getitem__, index_list))
@@ -193,7 +198,7 @@ def fig2img(fig):
     """Convert a Matplotlib figure to a PIL Image and return it"""
     import io
     buf = io.BytesIO()
-    fig.savefig(buf, bbox_inches='tight', dpi=500)
+    fig.savefig(buf, bbox_inches='tight', format='png', dpi=500, transparent=True)
     buf.seek(0)
     img = Image.open(buf)
     return img
