@@ -198,6 +198,11 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
 		group_fragments_list = [group_fragments_dict[list(group_fragments_dict.keys())[x]] for x in range(len(fragments_df_dict))]
 		group_fragments = group_fragments_list[0].append(group_fragments_list[1:])
 		
+	del group_fragments_dict	
+	del group_fragments_list	
+	del fragments_df
+	gc.collect()
+	
 	group_pr=pr.PyRanges(group_fragments)
 	bigwig_path_group = os.path.join(bigwig_path, str(group) + '.bw')
 	bed_path_group = os.path.join(bed_path, str(group) + '.bed.gz')
@@ -208,7 +213,7 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
 			group_pr.to_bigwig(path=bigwig_path_group, chromsizes=chromsizes, rpm=normalize_bigwig, value_col='Score')
 	if isinstance(bed_path, str):
 		group_pr.to_bed(path=bed_path_group, keep=True, compression='infer', chain=False)
-	gc.collect()
+	
 	log.info(str(group)+' done!')
 
 
