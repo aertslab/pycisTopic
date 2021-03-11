@@ -5,6 +5,9 @@ import matplotlib.cm as cm
 from itertools import compress
 import numpy as np
 
+from typing import Optional, Union
+from typing import Dict, List, Tuple
+
 def compute_topic_metrics(cistopic_obj: 'CistopicObject',
                      return_metrics: Optional[bool] = True):
     model = cistopic_obj.selected_model

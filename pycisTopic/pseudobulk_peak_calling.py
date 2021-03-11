@@ -1,3 +1,4 @@
+import gc
 import logging
 import os
 import pandas as pd
@@ -207,6 +208,7 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
 			group_pr.to_bigwig(path=bigwig_path_group, chromsizes=chromsizes, rpm=normalize_bigwig, value_col='Score')
 	if isinstance(bed_path, str):
 		group_pr.to_bed(path=bed_path_group, keep=True, compression='infer', chain=False)
+	gc.collect()
 	log.info(str(group)+' done!')
 
 
