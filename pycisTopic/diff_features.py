@@ -126,18 +126,21 @@ def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=Non
     log.info('Imputing drop-outs')
     imputed_acc = topic_region @ cell_topic
     if isinstance(scale_factor, int):
-        log.info('Scaling')
+        log.info('Removing small values')
         # Set all values smaller or equal than (1 / scale_factor) to zero (to make sparse matrix more efficient).
         np.place(imputed_acc, imputed_acc < (1 / scale_factor), [0])
-        # Convert imputed_acc np.float16 matrix to sparse matrix with np.flaot32 values before multiplying
-        # (so no out of range values are generated).
+        log.info('Converting to sparse matrix')
         imputed_acc = sparse.csr_matrix(imputed_acc, dtype=np.float32)
-        imputed_acc = imputed_acc * np.float32(scale_factor)
         if scale_factor != 1:
-            log.info('Converting to sparse matrix')
+            log.info('Scaling')
+            # Only multiply non-zero data of sparse matrix.
+            imputed_acc.data = imputed_acc.data * np.float32(scale_factor)
+            log.info('Keep non zero rows')
             keep_regions_index = non_zero_rows(imputed_acc)
+            log.info('Filter rows with only zeros')
             imputed_acc = imputed_acc[keep_regions_index,]
             region_names = subset_list(region_names, keep_regions_index)
+    log.info('Create CistopicImputedFeatures object')
     imputed_acc_obj = CistopicImputedFeatures(imputed_acc, region_names, cell_names, project)
     log.info('Done!')
     return(imputed_acc_obj)
