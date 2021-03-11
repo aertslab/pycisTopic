@@ -181,7 +181,7 @@ def plot_topic_qc(topic_qc_metrics: Union[pd.DataFrame, 'CistopicObject'],
         
 def topic_annotation(cistopic_obj: 'CistopicObject',
                     annot_var: str,
-                    binarized_cell_topic: Optional[Dict[pd.DataFrame]] = None,
+                    binarized_cell_topic: Optional[Dict[str,pd.DataFrame]] = None,
                     general_topic_thr: Optional[float] = 0.2,
                     **kwargs):
     """
