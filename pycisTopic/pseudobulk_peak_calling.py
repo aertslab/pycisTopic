@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import pyBigWig
 import pyranges as pr
+import numpy as np
 import ray
 import re
 import subprocess
@@ -98,6 +99,10 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 			else:	
 				log.info('Reading fragments from ' + path_to_fragments[sample_id])
 				fragments_df=pr.read_bed(path_to_fragments[sample_id], as_df=True)
+				# Convert to int32 for memory efficiency
+				fragments_df.Start = np.int32(fragments_df.Start)
+				fragments_df.End = np.int32(fragments_df.End)
+				fragments_df.Score = np.int32(fragments_df.Score)
 				if 'barcode' in cell_data:
 					fragments_df = fragments_df.loc[fragments_df['Name'].isin(cell_data['barcode'].tolist())]	
 				else:
