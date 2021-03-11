@@ -871,6 +871,10 @@ def compute_qc_stats_ray(fragments,
 		fragments_df=pr.read_bed(fragments, as_df=True)
 	else:
 		fragments_df=fragments
+	# Convert to int32 for memory efficiency
+	fragments_df.Start = np.int32(fragments_df.Start)
+	fragments_df.End = np.int32(fragments_df.End)
+	fragments_df.Score = np.int32(fragments_df.Score)
 	# Check for duplicates
 	if 'Score' not in fragments_df or all(fragments_df['Score'] == '.'):
 		fragments_df = fragments_df[['Chromosome', 'Start', 'End', 'Name']]
@@ -1332,8 +1336,6 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
 		Whether the plots should be returned to the console. Default: True.
 	save: bool, optional
 		Path to save plots as a file. Default: None.
-	return_cells: bool, optional
-		Whether to return selected cells based on user-given thresholds. Default: True.
 		
 	Return
 	---

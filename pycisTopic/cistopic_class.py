@@ -293,7 +293,7 @@ class CistopicObject:
 				fragment_matrix=sparse.vstack([fragment_matrix, diff_fragment_matrix])
 				region_names=common_regions+diff_regions
 			
-			fragment_matrix = sparse.csr_matrix(fragment_matrix).astype(int)
+			fragment_matrix = sparse.csr_matrix(fragment_matrix, dtype=np.int32)
 			log.info(f"cisTopic object {i} merged")
 		
 		
@@ -388,7 +388,7 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
 		log.info('Converting fragment matrix to sparse matrix')
 		region_names = list(fragment_matrix.index)
 		cell_names = list(fragment_matrix.columns.values)
-		fragment_matrix = sparse.csr_matrix(fragment_matrix.to_numpy())
+		fragment_matrix = sparse.csr_matrix(fragment_matrix.to_numpy(), dtype=np.int32)
 	
 	if tag_cells == True: 
 		cell_names=[cell_names[x] + '-' + project for x in range(len(cell_names))]
@@ -423,7 +423,7 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
 		cell_names = cell_data.index.to_list()
 
 	region_data=region_names_to_coordinates(region_names)
-	region_data['Width'] = abs(region_data.End-region_data.Start).astype(dtype)
+	region_data['Width'] = abs(region_data.End-region_data.Start).astype(np.int32)
 	region_data['cisTopic_nr_frag'] = np.array(fragment_matrix.sum(axis=1)).flatten()
 	region_data['cisTopic_log_nr_frag'] = np.log10(region_data['cisTopic_nr_frag'])
 	region_data['cisTopic_nr_acc'] = np.array(binary_matrix.sum(axis=1)).flatten()
@@ -622,18 +622,18 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
 	log.info('Counting fragments in regions')
 	fragments_in_regions=regions.join(fragments, nb_cpu=n_cpu)
 	# Convert to pandas
-	counts_df = pd.concat([fragments_in_regions.regionID, fragments_in_regions.Name, fragments_in_regions.Score.astype(dtype)], axis=1, sort=False)
+	counts_df = pd.concat([fragments_in_regions.regionID, fragments_in_regions.Name, fragments_in_regions.Score.astype(np.int32)], axis=1, sort=False)
 
 	log.info('Creating fragment matrix')
 	try:
-		fragment_matrix = counts_df.groupby(["Name", "regionID"]).size().unstack(level="Name").fillna(0).astype(dtype)
+		fragment_matrix = counts_df.groupby(["Name", "regionID"]).size().unstack(level="Name").fillna(0).astype(np.int32)
 		fragment_matrix.columns.names = [None]
 	except ValueError:
 		log.info('Data is too big, making partitions. This is a reported error in Pandas versions > 0.21 (https://github.com/pandas-dev/pandas/issues/26314)')
 		barcode_list = np.array_split(list(set(counts_df.Name.to_list())), partition)
 		dfList = [counts_df[counts_df.Name.isin(set(barcode_list[x]))] for x in range(0,partition)]
-		dfList = [x.groupby(["Name", "regionID"]).size().unstack(level="Name").fillna(0).astype(dtype) for x in dfList]
-		fragment_matrix  = pd.concat(dfList, axis=1, sort=False).fillna(0).astype(dtype)
+		dfList = [x.groupby(["Name", "regionID"]).size().unstack(level="Name").fillna(0).astype(np.int32) for x in dfList]
+		fragment_matrix  = pd.concat(dfList, axis=1, sort=False).fillna(0).astype(np.int32)
 		fragment_matrix.columns.names = [None]
 
 	# Create CistopicObject
