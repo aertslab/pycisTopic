@@ -120,9 +120,9 @@ def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=Non
     if selected_regions is not None:
         topic_region = topic_region.loc[selected_regions, :]
         region_names = selected_regions
-    # Convert cell_topic and topic_region 2d arrays to np.float16 so multiplying them uses 8 times less memory than with np.float64
-    cell_topic = cell_topic.to_numpy().astype(np.float16)
-    topic_region = topic_region.to_numpy().astype(np.float16)
+    # Convert cell_topic and topic_region 2d arrays to np.float32 so multiplying them uses 4 times less memory than with np.float64
+    cell_topic = cell_topic.to_numpy().astype(np.float32)
+    topic_region = topic_region.to_numpy().astype(np.float32)
     log.info('Imputing drop-outs')
     imputed_acc = topic_region @ cell_topic
     if isinstance(scale_factor, int):
