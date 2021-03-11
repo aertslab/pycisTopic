@@ -7,15 +7,15 @@ Under development.
 
 ### Installation
 
-```
+``
 git clone https://github.com/aertslab/pycisTopic.git
 cd pycisTopic
 pip install . 
-```
+``
 
 ### Check version
 
-```
+``
 import pycisTopic
 pycisTopic.__version__
-```
+``
