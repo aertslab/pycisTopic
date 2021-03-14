@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import pyranges as pr
 import re
-import scipy
+from scipy import sparse
 
 
 def region_names_to_coordinates(region_names):
@@ -25,7 +25,7 @@ def get_position_index(query_list, target_list):
     return list(index)
     
 def non_zero_rows(X):
-    if isinstance(X, scipy.sparse.csr.csr_matrix):       
+    if isinstance(X, sparse.csr_matrix):       
          # Remove all explicit zeros in sparse matrix.                                                                                                                                                              
          X.eliminate_zeros()
          # Get number of non zeros per row and get indices for each row which is not completely zero.                                                                                                                                                                                           
