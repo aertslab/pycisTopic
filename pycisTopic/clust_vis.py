@@ -792,7 +792,8 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
 def harmony(cistopic_obj: 'CistopicObject',
 			vars_use: List[str],
 			scale: Optional[bool] = True,
-			random_state: Optional[int] = 555):
+			random_state: Optional[int] = 555,
+			**kwargs):
 	"""
 	Apply harmony batch effect correction (Korsunsky et al, 2019) over cell-topic distribution
 	
@@ -819,7 +820,7 @@ def harmony(cistopic_obj: 'CistopicObject',
 	if scale == True:
 		cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
 	cell_topic=cell_topic.transpose().to_numpy()
-	ho = hm.run_harmony(cell_topic, cell_data, vars_use, random_state=random_state)
+	ho = hm.run_harmony(cell_topic, cell_data, vars_use, random_state=random_state, **kwargs)
 	cell_topic_harmony = pd.DataFrame(ho.Z_corr, index=model.cell_topic.index.to_list(), columns=model.cell_topic.columns)
 	cistopic_obj.selected_model.cell_topic_harmony = cell_topic_harmony
 
