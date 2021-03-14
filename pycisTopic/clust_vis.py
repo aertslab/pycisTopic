@@ -74,7 +74,6 @@ def find_clusters(cistopic_obj: 'CistopicObject',
 	if target == 'cell':
 		if (harmony == True):
 			data_mat=model.cell_topic_harmony
-			prefix='harmony_'+prefix
 		else:
 			data_mat=model.cell_topic
 

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import pyranges as pr
 import re
+import scipy
 
 
 def region_names_to_coordinates(region_names):
