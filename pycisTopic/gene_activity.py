@@ -8,27 +8,83 @@ import sys
 from .utils import *
 from .diff_features import *
 
+from typing import Optional, Union
+from typing import List
+
 pd.options.mode.chained_assignment = None
 
-def get_gene_activity(imputed_acc_object,
-				pr_annot,
-				chromsizes,
-				use_gene_boundaries=True,
-				upstream=[1000,100000],
-				downstream=[1000,100000],
-				distance_weight=True,
-				decay_rate=2.5,
-				extend_gene_body_upstream=1000,
-				extend_gene_body_downstream=0,
-				gene_size_weight=True,
-				gene_size_scale_factor='median',
-				remove_promoters=True,
-				scale_factor=1,
-				average_scores=False,
-				extend_tss=[10,10],
-				return_weights=True,
-				gini_weight = True,
-				project='Gene_activity'):
+def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
+				pr_annot: pr.PyRanges,
+				chromsizes: pr.PyRanges,
+				use_gene_boundaries: Optional[bool]=True,
+				upstream: Optional[List[int]]=[1000,100000],
+				downstream: Optional[List[int]]=[1000,100000],
+				distance_weight: Optional[bool]=True,
+				decay_rate: Optional[float]=1,
+				extend_gene_body_upstream: Optional[int]=5000,
+				extend_gene_body_downstream: Optional[int]=0,
+				gene_size_weight: Optional[bool=False,
+				gene_size_scale_factor: Optional[Union[str, int]]='median',
+				remove_promoters: Optional[bool]=False,
+				scale_factor: Optional[float]=1,
+				average_scores: Optional[bool]=True,
+				extend_tss: Optional[List[int]]=[10,10],
+				return_weights: Optional[bool]=True,
+				gini_weight: Optional[bool]=True,
+				project: Optional[str]='Gene_activity'):
+	"""
+    Infer gene activity.
+        
+    Parameters
+    ---------
+    imputed_features_obj: :class:`CistopicImputedFeatures`
+        A cisTopic imputation data object.
+    pr_annot: pr.PyRanges
+		A :class:`pr.PyRanges` containing gene annotation, including Chromosome, Start, End, Strand (as '+' and '-'), Gene name
+		and Transcription Start Site.
+	chromsizes: pr.PyRanges
+		A :class:`pr.PyRanges` containing size of each chromosome, containing 'Chromosome', 'Start' and 'End' columns.
+	use_gene_boundaries: bool, optional
+		Whether to use the whole search space or stop when encountering another gene. Default: True
+	upstream: List, optional
+		Search space upstream. The minimum (first position) means that even if there is a gene right next to it these
+		bp will be taken. The second position indicates the maximum distance. Default: [1000,100000]
+	downstream: List, optional
+		Search space downstream. The minimum (first position) means that even if there is a gene right next to it these
+		bp will be taken. The second position indicates the maximum distance. Default: [1000,100000]
+	distance_weight: bool, optional
+		Whether to add a distance weight (an exponential function, the weight will decrease with distance). Default: True
+	decay_rate: float, optional
+		Exponent for the distance exponential funciton (the higher the faster will be the decrease). Default: 1
+	extend_gene_body_upstream: int, optional
+		Number of bp upstream immune to the distance weight (their value will be maximum for this weight). Default: 5000
+	extend_gene_body_downstream: int, optional
+		Number of bp downstream immune to the distance weight (their value will be maximum for this weight). Default: 0
+	gene_size_weight: bool, optional
+		Whether to add a weights based on th length of the gene. Default: False
+	gene_size_scale_factor: str or int, optional
+		Dividend to calculate the gene size weigth. Default is the median value of all genes in the genome.
+	remove_promoters: bool, optional
+		Whether to ignore promoters when computing gene activity. Default: False
+	average_scores: bool, optional
+		Whether to divide by the total number of region assigned to a gene when calculating the gene activity 
+		score. Default: True
+	scale_factor: int, optional
+		Value to multiply for the final gene activity matrix. Default: 1
+	extend_tss: list, optional
+		Space around the TSS consider as promoter. Default: [10,10]
+	gini_weight: bool, optional
+		Whether to add a gini index weigth. The more unique the region is, the higher this weight will be.
+		Default: True
+	return_weigths: bool, optional
+		Whether to return the final weight values. Default: True
+	project: str, optiona;
+		Project name for the :class:`CistopicImputedFeatures` with the gene activity
+	
+    Return
+    ------
+    CistopicImputedFeatures
+    """
 	# Create cisTopic logger
 	level	= logging.INFO
 	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -73,7 +129,21 @@ def get_gene_activity(imputed_acc_object,
 	else:
 		return gene_act
 
-def weighted_aggregation(imputed_acc_obj_mtx, region_weights_df_per_gene, average_scores):
+def weighted_aggregation(imputed_acc_obj_mtx: sparse.crs_matrix, 
+						region_weights_df_per_gene: pd.DataFrame,
+						average_scores: bool):
+	"""
+	Weighted aggregation of region probabilities into gene activity
+	
+	Parameters
+    ---------
+    imputed_acc_obj_mtx: sparse.crs_matrix
+        A sparse matrix with regions as rows and cells as columns.
+    region_weights_df_per_gene: pd.DataFrame
+    	A data frame with region index (from the sparse matrix) for the gene
+    average_score: bool
+    	Whether final values should be divided by the total number of regions aggregated
+	"""
 	if average_scores == True:
 		gene_act = imputed_acc_obj_mtx[region_weights_df_per_gene.Index,:].T.dot((region_weights_df_per_gene.Weight.values))/region_weights_df_per_gene.shape[0]
 	else:
@@ -95,6 +165,54 @@ def region_weights(imputed_acc_object,
 				  remove_promoters=True,
 				  extend_tss=[10,10],
 				  gini_weight = True):
+				  
+	"""
+    Calculate region weights.
+        
+    Parameters
+    ---------
+    imputed_features_obj: :class:`CistopicImputedFeatures`
+        A cisTopic imputation data object.
+    pr_annot: pr.PyRanges
+		A :class:`pr.PyRanges` containing gene annotation, including Chromosome, Start, End, Strand (as '+' and '-'), Gene name
+		and Transcription Start Site.
+	chromsizes: pr.PyRanges
+		A :class:`pr.PyRanges` containing size of each chromosome, containing 'Chromosome', 'Start' and 'End' columns.
+	use_gene_boundaries: bool, optional
+		Whether to use the whole search space or stop when encountering another gene. Default: True
+	upstream: List, optional
+		Search space upstream. The minimum (first position) means that even if there is a gene right next to it these
+		bp will be taken. The second position indicates the maximum distance. Default: [1000,100000]
+	downstream: List, optional
+		Search space downstream. The minimum (first position) means that even if there is a gene right next to it these
+		bp will be taken. The second position indicates the maximum distance. Default: [1000,100000]
+	distance_weight: bool, optional
+		Whether to add a distance weight (an exponential function, the weight will decrease with distance). Default: True
+	decay_rate: float, optional
+		Exponent for the distance exponential funciton (the higher the faster will be the decrease). Default: 1
+	extend_gene_body_upstream: int, optional
+		Number of bp upstream immune to the distance weight (their value will be maximum for this weight). Default: 5000
+	extend_gene_body_downstream: int, optional
+		Number of bp downstream immune to the distance weight (their value will be maximum for this weight). Default: 0
+	gene_size_weight: bool, optional
+		Whether to add a weights based on th length of the gene. Default: False
+	gene_size_scale_factor: str or int, optional
+		Dividend to calculate the gene size weigth. Default is the median value of all genes in the genome.
+	remove_promoters: bool, optional
+		Whether to ignore promoters when computing gene activity. Default: False
+	extend_tss: list, optional
+		Space around the TSS consider as promoter. Default: [10,10]
+	gini_weight: bool, optional
+		Whether to add a gini index weigth. The more unique the region is, the higher this weight will be.
+		Default: True
+	return_weigths: bool, optional
+
+	
+    Return
+    ------
+    pd.DataFrame
+    	A data frame for with weights for each region and the gene they are linked to.
+    """
 	# Create cisTopic logger
 	level	= logging.INFO
 	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -237,7 +355,11 @@ def region_weights(imputed_acc_object,
 		weights_df = regions_per_gene.df.loc[:, ['Name', 'Gene', 'Distance', 'Gene_size_weight', 'Distance_weight', 'Gini_weight']]
 	return weights_df
 
-def extend_pyranges_with_limits(pr_obj):
+def extend_pyranges_with_limits(pr_obj: pr.PyRanges):
+	"""
+	A helper function to extend coordinates downstream/upstream in a pyRanges with Distance_upstream and
+	Distance_dorwnstream columns.
+	"""
 	# Split per strand
 	positive_pr = pr_obj[pr_obj.Strand == '+']
 	negative_pr = pr_obj[pr_obj.Strand == '-']
@@ -251,7 +373,11 @@ def extend_pyranges_with_limits(pr_obj):
 	extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
 	return extended_pr
 
-def reduce_pyranges_with_limits_b(pr_obj):
+def reduce_pyranges_with_limits_b(pr_obj: pr.PyRanges):
+	"""
+	A helper function to reduce coordinates downstream/upstream in a pyRanges with Distance_upstream and
+	Distance_dorwnstream columns.
+	"""
 	# Split per strand
 	positive_pr = pr_obj[pr_obj.Strand == '+']
 	negative_pr = pr_obj[pr_obj.Strand == '-']
@@ -265,7 +391,13 @@ def reduce_pyranges_with_limits_b(pr_obj):
 	extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
 	return extended_pr
 
-def extend_pyranges(pr_obj, upstream, downstream):
+def extend_pyranges(pr_obj: pr.PyRanges,
+					upstream: int,
+					downstream: int):
+	"""
+	A helper function to extend coordinates downstream/upstream in a pyRanges given upstream and downstream
+	distances.
+	"""
 	# Split per strand
 	positive_pr = pr_obj[pr_obj.Strand == '+']
 	negative_pr = pr_obj[pr_obj.Strand == '-']
@@ -279,7 +411,13 @@ def extend_pyranges(pr_obj, upstream, downstream):
 	extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
 	return extended_pr
 
-def reduce_pyranges_b(pr_obj, upstream, downstream):
+def reduce_pyranges_b(pr_obj: pr.PyRanges,
+					 upstream: int,
+					 downstream: int):
+	"""
+	A helper function to reduce coordinates downstream/upstream in a pyRanges given upstream and downstream
+	distances.
+	"""
 	# Split per strand
 	positive_pr = pr_obj[pr_obj.Strand == '+']
 	negative_pr = pr_obj[pr_obj.Strand == '-']
@@ -293,7 +431,10 @@ def reduce_pyranges_b(pr_obj, upstream, downstream):
 	extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
 	return extended_pr
 
-def calculate_distance_join(pr_obj):
+def calculate_distance_join(pr_obj: pr.PyRanges):
+	"""
+	A helper function to calculate distances between regions and genes.
+	"""
 	# Split per strand
 	pr_obj_df = pr_obj.df
 	distance_df = pd.DataFrame([pr_obj_df.Start_b-pr_obj_df.Start, pr_obj_df.End_b-pr_obj_df.Start, pr_obj_df.Strand], index=['start_dist', 'end_dist', 'strand'])
@@ -309,7 +450,11 @@ def calculate_distance_join(pr_obj):
 	pr_obj =  pr_obj[['Chromosome', 'Start', 'End', 'Strand', 'Name', 'Gene', 'Gene_width', 'Gene_size_weight', 'Distance']]
 	return pr_obj
 
-def calculate_distance_with_limits_join(pr_obj):
+def calculate_distance_with_limits_join(pr_obj: pr.PyRanges):
+	"""
+	A helper function to calculate distances between regions and genes, returning information on what is the relative
+	distance to the TSS and end of the gene.
+	"""
 	# Split per strand
 	pr_obj_df = pr_obj.df
 	distance_df = pd.DataFrame([pr_obj_df.Start_b-pr_obj_df.Start, pr_obj_df.End_b-pr_obj_df.Start, pr_obj_df.Strand], index=['start_dist', 'end_dist', 'strand'])
