@@ -881,7 +881,6 @@ def compute_qc_stats_ray(fragments,
 	# Convert to int32 for memory efficiency
 	fragments_df.Start = np.int32(fragments_df.Start)
 	fragments_df.End = np.int32(fragments_df.End)
-	fragments_df.Score = np.int32(fragments_df.Score)
 	# Check for duplicates
 	if 'Score' not in fragments_df or all(fragments_df['Score'] == '.'):
 		fragments_df = fragments_df[['Chromosome', 'Start', 'End', 'Name']]
@@ -895,6 +894,7 @@ def compute_qc_stats_ray(fragments,
 			fragments_df['Score'] = 1
 	else:
 		fragments_df = fragments_df[['Chromosome', 'Start', 'End', 'Name', 'Score']]
+	fragments_df.Score = np.int32(fragments_df.Score)
 	# Prepare valid barcodes
 	if valid_bc is not None:
 		if n_bc is not None or n_frag is not None:
