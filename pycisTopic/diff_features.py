@@ -12,7 +12,28 @@ import matplotlib
 from .utils import *
 
 class CistopicImputedFeatures:
-	def __init__(self, imputed_acc, feature_names, cell_names, project):
+	"""
+	cisTopic imputation data class.
+	
+	:class:`CistopicImputedFeatures` contains the cell by features matrices (stored at :attr:`mtx`, with features being eithere regions or genes ),
+	cell names :attr:`cell_names` and feature names :attr:`feature_names`.
+	
+	Attributes
+	---------
+	mtx: sparse.csr_matrix
+		A matrix containing imputed values.
+	cell_names: list
+		A list containing cell names.
+	feature_names: list
+		A list containing feature names.
+	project: str
+		Name of the cisTopic imputation project.
+	"""
+	def __init__(self,
+				 imputed_acc: sparse.csr_matrix,
+				 feature_names: List[str],
+				 cell_names: List[str],
+				 project: str):
 		self.mtx=imputed_acc
 		self.feature_names=feature_names
 		self.cell_names=cell_names
@@ -22,7 +43,27 @@ class CistopicImputedFeatures:
 		descr = f"CistopicImputedFeatures from project {self.project} with nCells × nFeatures = {len(self.cell_names)} × {len(self.feature_names)}"
 		return(descr)
 		
-	def subset(self, cells=None, features=None, copy=False):
+	def subset(self,
+			   cells: Optional[List[str]]=None,
+			   features: Optional[List[str]]=None,
+			   copy: Optional[bool]=False):
+		"""
+		Subset cells and/or regions from :class:`CistopicImputedFeatures`. 
+		
+		Parameters
+		---------
+		cells: list, optional
+			A list containing the names of the cells to keep.
+		features: list, optional
+			A list containing the names of the features to keep.
+		copy: bool, optional
+			Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
+		
+		Return
+		------
+		CistopicImputedFeatures
+			A :class:`CistopicImputedFeatures` containing the selected cells and/or features.
+		"""
 		mtx = self.mtx
 		cell_names = self.cell_names
 		feature_names = self.feature_names
@@ -54,7 +95,26 @@ class CistopicImputedFeatures:
 			self.cell_names = cell_names
 			self.feature_names = feature_names
 	
-	def merge(self, cistopic_imputed_features_list, project='cisTopic_impute_merge', copy=False):
+	def merge(self,
+			  cistopic_imputed_features_list: List['CistopicImputedFeatures'],
+			  project: Optional[str]='cisTopic_impute_merge',
+			  copy: Optional[bool]=False):
+		"""
+		Merge a list of :class:`CistopicImputedFeatures` to the input :class:`CistopicImputedFeatures`. Reference coordinates (for regions) must be the same between the objects. 
+		
+		Parameters
+		---------
+		cistopic_imputed_features_list: list
+			A list containing one or more :class:`CistopicImputedFeatures` to merge.
+		project: str, optional
+			Name of the cisTopic imputation project.
+		copy: bool, optional
+			Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
+		Return
+		------
+		CistopicImputedFeatures
+			A combined :class:`CistopicImputedFeatures`.
+		"""
 		# Create cisTopic logger
 		level	= logging.INFO
 		format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -102,7 +162,31 @@ class CistopicImputedFeatures:
 			self.project = project
 			
 
-def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=None, scale_factor=10 ** 6, project='cisTopic_Impute'):
+def impute_accessibility(cistopic_obj: 'CistopicObject',
+						 selected_cells: Optional[List[str]]=None,
+					     selected_regions: Optional[List[str]]=None,
+					     scale_factor: Optional[int]=10**6,
+					     project: Optional[str]='cisTopic_Impute'):
+	"""
+	Impute region accessibility.
+		
+	Parameters
+	---------
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object with a model in `class::CistopicObject.selected_model`.
+	selected_cells: list, optional
+		A list with selected cells to impute accessibility for. Default: None
+	selected_regions: list, optional
+		A list with selected regions to impute accessibility for. Default: None
+	scale_factor: int, optional
+		A number to multiply the imputed values for. This is useful to convert low probabilities to 0, making the matrix more sparse. Default: 10**6.
+	project: str, optional
+			Name of the cisTopic imputation project. Default: 'cisTopic_impute.'
+		
+	Return
+	------
+	CistopicImputedFeatures
+	"""
     # Create cisTopic logger
     level = logging.INFO
     format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -146,7 +230,23 @@ def impute_accessibility(cistopic_obj, selected_cells=None, selected_regions=Non
     return(imputed_acc_obj)
     
     
-def normalize_scores(input_mat, scale_factor=10**4):
+def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
+					 scale_factor: Optional[int]=10**4):
+	"""
+	Log-normalize imputation data. Feature counts for each cell are divided by the total counts for that cell and multiplied by the scale_factor. 
+		
+	Parameters
+	---------
+	cistopic_obj: pd.DataFrame or :class:`CistopicImputedFeatures`
+		A dataframe with values to be normalize or cisTopic imputation data.
+	scale_factor: int, optional
+		Scale factor for cell-level normalization. Default: 10**4
+		
+	Return
+	------
+	pd.DataFrame or CistopicImputedFeatures
+		The output class will be the same as the used as input.
+	"""
 	# Create cisTopic logger
 	level	= logging.INFO
 	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -164,7 +264,44 @@ def normalize_scores(input_mat, scale_factor=10**4):
 	log.info('Done!')
 	return(output)
 
-def find_high_variable_features(input_mat, min_disp = 0.05, min_mean = 0.0125, max_mean = 3, max_disp = np.inf, n_bins=20, n_top_features=None, plot=True, save=None):
+def find_highly_variable_features(input_mat: Unioin[pd.DataFrame, 'CistopicImputedFeatures'],
+								min_disp: Optional[float] = 0.05,
+								min_mean: Optional[float] = 0.0125,
+								max_disp: Optional[float] = np.inf,
+								max_mean: Optional[float] = 3,
+								n_bins: Optional[int] = 20, 
+								n_top_features: Optional[int] = None,
+								plot: Optional[bool] = True,
+								save: Optional[str] = None):
+	"""
+	Find highly variable features. 
+		
+	Parameters
+	---------
+	cistopic_obj: pd.DataFrame or :class:`CistopicImputedFeatures`
+		A dataframe with values to be normalize or cisTopic imputation data.
+	min_disp: float, optional
+		Minimum dispersion value for a feature to be selected. Default: 0.05
+	min_mean: float, optional
+		Minimum mean value for a feature to be selected. Default: 0.0125
+	max_disp: float, optional
+		Maximum dispersion value for a feature to be selected. Default: np.inf
+	max_mean: float, optional
+		Maximum mean value for a feature to be selected. Default: 3
+	n_bins: int, optional
+		Number of bins for binning the mean gene expression. Normalization is done with respect to each bin. Default: 20
+	n_top_features: int, optional
+		Number of highly-variable features to keep. If specifed, dispersion and mean thresholds will be ignored. Default: None
+	plot: bool, optional
+		Whether to plot dispersion versus mean values. Default: True.
+	save: str, optional
+		Path to save feature selection plot. Default: None
+		
+	Return
+	------
+	List
+		List with selected features.
+	"""
 	# Create cisTopic logger
 	level	= logging.INFO
 	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -198,9 +335,9 @@ def find_high_variable_features(input_mat, min_disp = 0.05, min_mean = 0.0125, m
 	disp_grouped = df.groupby('mean_bin')['dispersions']
 	disp_mean_bin = disp_grouped.mean()
 	disp_std_bin = disp_grouped.std(ddof=1)
-	# retrieve those regions that have nan std, these are the ones where
+	# Retrieve those regions that have nan std, these are the ones where
 	# only a single gene fell in the bin and implicitly set them to have
-	# a normalized disperion of 1
+	# a normalized dispersion of 1
 	one_feature_per_bin = disp_std_bin.isnull()
 	feature_indices = np.where(one_feature_per_bin[df['mean_bin'].values])[0].tolist()
 	
@@ -256,7 +393,15 @@ def find_high_variable_features(input_mat, min_disp = 0.05, min_mean = 0.0125, m
 	log.info('Done!')
 	return var_features
 	
-def find_diff_features(cistopic_obj, imputed_features_obj, variable, var_features=None, contrasts=None, contrast_name='contrast', adjpval_thr=0.05, log2fc_thr=1, n_cpu=1):
+def find_diff_features(cistopic_obj: 'CistopicObject',
+					   imputed_features_obj: 'CistopicImputedFeatures',
+					   variable: str,
+					   var_features: Optional[List[str]] = None,
+					   contrasts: Optional[List[List]] = None,
+					   contrast_name: Optional[str] = 'contrast',
+					   adjpval_thr: Optional[float] = 0.05,
+					   log2fc_thr: Optional[float] = 1,
+					   n_cpu: Optional[int] = 1):
 	# Create cisTopic logger
 	level	= logging.INFO
 	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'

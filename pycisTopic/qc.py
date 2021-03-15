@@ -723,6 +723,7 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 				   tss_window: Optional[int] = 50,
 				   tss_minimum_signal_window: Optional[int] = 100,
 				   tss_rolling_window: Optional[int] = 10,
+				   min_norm: Optional[int] = 0.2,
 				   check_for_duplicates: Optional[bool] = True,
 				   remove_duplicates: Optional[bool] = True,
 				   **kwargs):
@@ -758,6 +759,8 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
 	tss_rolling_window: int, optional
 		Rolling window used to smooth signal. Default: 10.
+	min_norm: int, optional
+		Minimum normalization score. If the average minimum signal value is below this value, this number is used to normalize the TSS signal. This approach penalizes cells with fewer reads.
 	check_for_duplicates: bool, optional
 		If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
 	remove_duplicates: bool, optional
@@ -792,6 +795,7 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 							  n_bc=n_bc,
 							  tss_flank_window=tss_flank_window,
 							  tss_rolling_window=tss_rolling_window,
+							  min_norm=min_norm,
 							  check_for_duplicates=check_for_duplicates,
 							  remove_duplicates=remove_duplicates) for i in list(range(len(fragments_list)))])
 	ray.shutdown()
@@ -813,6 +817,7 @@ def compute_qc_stats_ray(fragments,
 				   tss_window: Optional[int] = 50,
 				   tss_minimum_signal_window: Optional[int] = 100,
 				   tss_rolling_window: Optional[int] = 10,
+				   min_norm: Optional[int] = 0.2,
 				   check_for_duplicates: Optional[bool] = True,
 				   remove_duplicates: Optional[bool] = True):
 	""""
@@ -844,6 +849,8 @@ def compute_qc_stats_ray(fragments,
 		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
 	tss_rolling_window: int, optional
 		Rolling window used to smooth signal. Default: 10.
+	min_norm: int, optional
+		Minimum normalization score. If the average minimum signal value is below this value, this number is used to normalize the TSS signal. This approach penalizes cells with fewer reads.
 	check_for_duplicates: bool, optional
 		If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
 	remove_duplicates: bool, optional
@@ -938,6 +945,7 @@ def compute_qc_stats_ray(fragments,
 											   tss_window=tss_window,
 											   minimum_signal_window = tss_minimum_signal_window,
 											   rolling_window = tss_rolling_window,
+											   min_norm = min_norm
 											   return_TSS_enrichment_per_barcode=True,
 											   return_TSS_coverage_matrix_per_barcode=True,
 											   return_plot_data=True)
