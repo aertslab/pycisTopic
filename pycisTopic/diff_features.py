@@ -237,7 +237,7 @@ def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
 		
 	Parameters
 	---------
-	cistopic_obj: pd.DataFrame or :class:`CistopicImputedFeatures`
+	input_mat: pd.DataFrame or :class:`CistopicImputedFeatures`
 		A dataframe with values to be normalize or cisTopic imputation data.
 	scale_factor: int, optional
 		Scale factor for cell-level normalization. Default: 10**4
@@ -278,7 +278,7 @@ def find_highly_variable_features(input_mat: Unioin[pd.DataFrame, 'CistopicImput
 		
 	Parameters
 	---------
-	cistopic_obj: pd.DataFrame or :class:`CistopicImputedFeatures`
+	input_mat: pd.DataFrame or :class:`CistopicImputedFeatures`
 		A dataframe with values to be normalize or cisTopic imputation data.
 	min_disp: float, optional
 		Minimum dispersion value for a feature to be selected. Default: 0.05
@@ -397,11 +397,42 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
 					   imputed_features_obj: 'CistopicImputedFeatures',
 					   variable: str,
 					   var_features: Optional[List[str]] = None,
-					   contrasts: Optional[List[List]] = None,
-					   contrast_name: Optional[str] = 'contrast',
+					   contrasts: Optional[List[List[str]]] = None,
 					   adjpval_thr: Optional[float] = 0.05,
-					   log2fc_thr: Optional[float] = 1,
-					   n_cpu: Optional[int] = 1):
+					   log2fc_thr: Optional[float] = np.log2(1.5),
+					   n_cpu: Optional[int] = 1,
+					   **kwargs):
+	"""
+	Find differential imputed features. 
+		
+	Parameters
+	---------
+	cistopic_obj: `class::CistopicObject`
+		A cisTopic object including the cells in imputed_features_obj.
+	imputed_features_obj: :class:`CistopicImputedFeatures`
+		A cisTopic imputation data object.
+	variable: str
+		Name of the group variable to do comparison. It must be included in `class::CistopicObject.cell_data`
+	var_features: list, optional
+		A list of features to use (e.g. variable features from `find_highly_variable_features()`)
+	contrast: List, optional
+		A list including contrasts to make in the form of lists with foreground and background, e.g.
+		[['Group_1'], ['Group_2, 'Group_3']], ['Group_2'], ['Group_1, 'Group_3']], ['Group_1'], ['Group_2, 'Group_3']].
+		Default: None.
+	adjpval_thr: float, optional
+		Adjusted p-values threshold. Default: 0.05
+	log2fc_thr: float, optional
+		Log2FC threshold. Default: np.log2(1.5)
+	n_cpu: int, optional
+		Number of cores to use. Default: 1
+	**kwargs
+		Parameters to pass to ray.init()
+		
+	Return
+	------
+	List
+		List of `class::pd.DataFrame` per contrast with the selected features and logFC and adjusted p-values.
+	"""
 	# Create cisTopic logger
 	level	= logging.INFO
 	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -409,8 +440,9 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
 	logging.basicConfig(level = level, format = format, handlers = handlers)
 	log = logging.getLogger('cisTopic')
 	
-	group_var=cistopic_obj.cell_data.loc[:,variable]
-	if contrasts == None:
+	selected_cells = list(set(cistopic_obj.cell_data.tolist()) & set(imputed_features_obj.cell_names))
+	group_var = cistopic_obj.cell_data.loc[selected_cells, variable]
+	if contrasts is None:
 		levels=sorted(list(set(group_var.tolist())))
 		contrasts=[[[x], levels[:levels.index(x)] + levels[levels.index(x)+1:]] for x in levels]
 		contrasts_names=levels
@@ -427,17 +459,33 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
 	markers_dict={contrasts_names[i]: markers_list[i] for i in range(len(markers_list))} 
 	return markers_dict
 
-def p_adjust_bh(p):
-	"""Benjamini-Hochberg p-value correction for multiple hypothesis testing."""
-	p = np.asfarray(p)
-	by_descend = p.argsort()[::-1]
-	by_orig = by_descend.argsort()
-	steps = float(len(p)) / np.arange(len(p), 0, -1)
-	q = np.minimum(1, np.minimum.accumulate(steps * p[by_descend]))
-	return q[by_orig]
-
 @ray.remote
-def markers_ray(input_mat, barcode_group, contrast_name, adjpval_thr=0.05, log2fc_thr=1):
+def markers_ray(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
+			 barcode_group: List[List[str]],
+			 contrast_name: str,
+			 adjpval_thr: Optional[float] = 0.05,
+			 log2fc_thr: Optional[float] = 1):
+	"""
+	Find differential imputed features. 
+		
+	Parameters
+	---------
+	input_mat: :class:`pd.DataFrame` or :class:`CistopicImputedFeatures`
+		A data frame or a cisTopic imputation data object.
+	barcode_group: List
+		List of length 2, including foreground cells on the first slot and background on the second.
+	contrast_name: str
+		Name of the contrast
+	adjpval_thr: float, optional
+		Adjusted p-values threshold. Default: 0.05
+	log2fc_thr: float, optional
+		Log2FC threshold. Default: np.log2(1.5)
+		
+	Return
+	------
+	List
+		`class::pd.DataFrame` with the selected features and logFC and adjusted p-values.
+	"""
 	# Create cisTopic logger
 	level	= logging.INFO
 	format   = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -478,3 +526,12 @@ def markers_ray(input_mat, barcode_group, contrast_name, adjpval_thr=0.05, log2f
 	markers_dataframe = markers_dataframe.sort_values(['Log2FC', 'Adjusted_pval'], ascending=[False, True])
 	log.info(contrast_name + ' done!')
 	return markers_dataframe
+
+def p_adjust_bh(p: float):
+	"""Benjamini-Hochberg p-value correction for multiple hypothesis testing."""
+	p = np.asfarray(p)
+	by_descend = p.argsort()[::-1]
+	by_orig = by_descend.argsort()
+	steps = float(len(p)) / np.arange(len(p), 0, -1)
+	q = np.minimum(1, np.minimum.accumulate(steps * p[by_descend]))
+	return q[by_orig]
