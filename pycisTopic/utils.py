@@ -32,7 +32,7 @@ def non_zero_rows(X):
          return np.nonzero(X.getnnz(axis=1))[0]
     else:
          # For non sparse matrices.
-         return np.nonzero(np.count_nonzero(x, axis=1))[0]
+         return np.nonzero(np.count_nonzero(X, axis=1))[0]
 
 def subset_list(target_list, index_list):
     X = list(map(target_list.__getitem__, index_list))
