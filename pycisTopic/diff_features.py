@@ -387,7 +387,7 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImpute
     df['highly_variable'] = feature_subset
     var_features = [features[i] for i in df[df.highly_variable == True].index.to_list()]
     
-
+    fig = plt.figure()
     if plot == True:
         matplotlib.rcParams['agg.path.chunksize'] = 10000
         plt.scatter(df['means'], df['dispersions_norm'], c=feature_subset, s=10, alpha=0.1)
@@ -424,7 +424,7 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
         A list of features to use (e.g. variable features from `find_highly_variable_features()`)
     contrast: List, optional
         A list including contrasts to make in the form of lists with foreground and background, e.g.
-        [['Group_1'], ['Group_2, 'Group_3']], ['Group_2'], ['Group_1, 'Group_3']], ['Group_1'], ['Group_2, 'Group_3']].
+        [[['Group_1'], ['Group_2, 'Group_3']], []['Group_2'], ['Group_1, 'Group_3']], []['Group_1'], ['Group_2, 'Group_3']]].
         Default: None.
     adjpval_thr: float, optional
         Adjusted p-values threshold. Default: 0.05
@@ -447,8 +447,8 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
     logging.basicConfig(level = level, format = format, handlers = handlers)
     log = logging.getLogger('cisTopic')
     
-    selected_cells = list(set(cistopic_obj.cell_data.tolist()) & set(imputed_features_obj.cell_names))
-    group_var = cistopic_obj.cell_data.loc[selected_cells, variable]
+    selected_cells = list(set(cistopic_obj.cell_data.index.tolist()) & set(imputed_features_obj.cell_names))
+    group_var = cistopic_obj.cell_data.loc[selected_cells, variable].dropna()
     if contrasts is None:
         levels=sorted(list(set(group_var.tolist())))
         contrasts=[[[x], levels[:levels.index(x)] + levels[levels.index(x)+1:]] for x in levels]
