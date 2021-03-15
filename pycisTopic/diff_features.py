@@ -11,6 +11,9 @@ import matplotlib
 
 from .utils import *
 
+from typing import Optional, Union
+from typing import List
+
 class CistopicImputedFeatures:
     """
     cisTopic imputation data class.
