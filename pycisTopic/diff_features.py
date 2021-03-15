@@ -269,7 +269,7 @@ def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
     log.info('Done!')
     return(output)
 
-def find_highly_variable_features(input_mat: Unioin[pd.DataFrame, 'CistopicImputedFeatures'],
+def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
                                 min_disp: Optional[float] = 0.05,
                                 min_mean: Optional[float] = 0.0125,
                                 max_disp: Optional[float] = np.inf,
