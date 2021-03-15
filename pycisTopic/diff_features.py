@@ -2,6 +2,7 @@ import sklearn
 import scipy
 from scipy.stats import ranksums
 import numpy as np
+import pandas as pd
 import ray
 import logging
 import sys
@@ -9,6 +10,7 @@ import scipy.sparse as sparse
 import matplotlib.pyplot as plt
 import matplotlib
 
+from .cistopic_class import *
 from .utils import *
 
 from typing import Optional, Union
