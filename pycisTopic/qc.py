@@ -945,7 +945,7 @@ def compute_qc_stats_ray(fragments,
 											   tss_window=tss_window,
 											   minimum_signal_window = tss_minimum_signal_window,
 											   rolling_window = tss_rolling_window,
-											   min_norm = min_norm
+											   min_norm = min_norm,
 											   return_TSS_enrichment_per_barcode=True,
 											   return_TSS_coverage_matrix_per_barcode=True,
 											   return_plot_data=True)
