@@ -129,7 +129,7 @@ def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
 	else:
 		return gene_act
 
-def weighted_aggregation(imputed_acc_obj_mtx: sparse.crs_matrix, 
+def weighted_aggregation(imputed_acc_obj_mtx: sparse.csr_matrix, 
 						region_weights_df_per_gene: pd.DataFrame,
 						average_scores: bool):
 	"""
@@ -137,7 +137,7 @@ def weighted_aggregation(imputed_acc_obj_mtx: sparse.crs_matrix,
 	
 	Parameters
     ---------
-    imputed_acc_obj_mtx: sparse.crs_matrix
+    imputed_acc_obj_mtx: sparse.csr_matrix
         A sparse matrix with regions as rows and cells as columns.
     region_weights_df_per_gene: pd.DataFrame
     	A data frame with region index (from the sparse matrix) for the gene
