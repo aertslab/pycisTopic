@@ -621,7 +621,10 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
 		feature_index = get_position_index([feature], imputed_data.feature_names)
 		feature_data = imputed_data.mtx[feature_index,:]
 		if scale == True:
-			feature_data=sklearn.preprocessing.scale(feature_data.todense(), axis=1)
+			try:
+				feature_data=sklearn.preprocessing.scale(feature_data.todense(), axis=1)
+			except:
+				feature_data=sklearn.preprocessing.scale(feature_data, axis=1)
 		if isinstance(feature_data, sparse.csr_matrix):
 			color_data = pd.DataFrame(feature_data.transpose().todense(), index=embedding.index.tolist())
 		else:
