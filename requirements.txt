@@ -36,6 +36,6 @@ statsmodels
 tables
 tmtoolkit
 typing
-umap
+umap-learn
 xlrd
 
