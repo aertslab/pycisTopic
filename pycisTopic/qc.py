@@ -399,7 +399,7 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
 	flank_window: int, optional
 		Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
 	tss_window: int, optional
-		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 50 (+/- 50 bp).
 	minimum_signal_window: int, optional
 		Tail window use to normalize the TSS enrichment. Default: 100 (average signal in the 100bp in the extremes of the TSS window).
 	rolling_window: int, optional

@@ -155,7 +155,7 @@ class CistopicImputedFeatures:
                 mtx=sparse.vstack([mtx, diff_mtx])
                 feature_names=common_features+diff_features
             
-            mtx = sparse.csr_matrix(mtx).astype(int)
+            mtx = sparse.csr_matrix(mtx, dtype=np.float32)
             log.info(f"cisTopic imputed features object {i} merged")
             
         if copy is True:
