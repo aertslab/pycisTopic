@@ -9,6 +9,9 @@ import scanorama
 import logging
 import sys
 
+from typing import Optional
+from typing import List
+
 def label_transfer(ref_anndata: AnnData,
                   query_anndata: AnnData,
                   labels_to_transfer: List[str],
