@@ -158,6 +158,10 @@ class CistopicImputedFeatures:
             mtx = sparse.csr_matrix(mtx, dtype=np.float32)
             log.info(f"cisTopic imputed features object {i} merged")
             
+        features_index = non_zero_rows(mtx)
+        mtx = mtx[features_index,:]
+        feature_names = subset_list(feature_names, features_index) 
+           
         if copy is True:
             return CistopicImputedFeatures(mtx, feature_names, cell_names, project)
         else:

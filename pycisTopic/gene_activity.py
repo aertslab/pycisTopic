@@ -219,6 +219,10 @@ def region_weights(imputed_acc_object,
 	handlers = [logging.StreamHandler(stream=sys.stdout)]
 	logging.basicConfig(level = level, format = format, handlers = handlers)
 	log = logging.getLogger('cisTopic')
+	# Check up on imputed_acc_object
+	features_index = non_zero_rows(imputed_acc_object.mtx)
+    imputed_acc_object.mtx = imputed_acc_object.mtx[features_index,:]
+    imputed_acc_object.feature_names = subset_list(imputed_acc_object.feature_names, features_index) 
 	# Load regions
 	pr_regions = region_names_to_coordinates(imputed_acc_object.feature_names)
 	pr_regions.loc[:,'Name'] = imputed_acc_object.feature_names
