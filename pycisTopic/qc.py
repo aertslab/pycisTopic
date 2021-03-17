@@ -752,7 +752,7 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 	n_bc: int, optional
 		Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
 	tss_window: int, optional
-		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 50 (+/- 50 bp).
 	tss_flank_window: int, optional
 		Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
 	tss_minimum_signal_window: int, optional
@@ -794,6 +794,8 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 							  n_frag=n_frag,
 							  n_bc=n_bc,
 							  tss_flank_window=tss_flank_window,
+							  tss_window=tss_window,
+							  tss_minimum_signal_window=tss_minimum_signal_window
 							  tss_rolling_window=tss_rolling_window,
 							  min_norm=min_norm,
 							  check_for_duplicates=check_for_duplicates,
@@ -842,7 +844,7 @@ def compute_qc_stats_ray(fragments,
 	n_bc: int, optional
 		Number of barcodes to select. Either n_frag or n_bc can be specified. Default: None.
 	tss_window: int, optional
-		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 1000 (+/- 1000 bp).
+		Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per barcode. Default: 50 (+/- 50 bp).
 	tss_flank_window: int, optional
 		Flanking window around the TSS. Default: 1000 (+/- 1000 bp).
 	tss_minimum_signal_window: int, optional
