@@ -285,17 +285,25 @@ class CistopicObject:
 			
 			common_index_fm = get_position_index(common_regions, region_names)
 			common_index_fm_to_add = get_position_index(common_regions, region_names_to_add)
-			fragment_matrix=sparse.hstack([fragment_matrix[common_index_fm,], fragment_matrix_to_add[common_index_fm_to_add,]])
-			region_names=common_regions
+			fragment_matrix_common=sparse.hstack([fragment_matrix[common_index_fm,], fragment_matrix_to_add[common_index_fm_to_add,]])
 			
 			if len(diff_regions) > 0:
-				diff_fragment_matrix=np.zeros((len(diff_regions), fragment_matrix.shape[1]))
-				fragment_matrix=sparse.vstack([fragment_matrix, diff_fragment_matrix])
-				region_names=common_regions+diff_regions
+				diff_regions_1 = list(np.setdiff1d(region_names, region_names_to_add))
+                diff_index_fm_1 = get_position_index(diff_regions_1, region_names)
+                fragment_matrix_diff_1 = sparse.hstack([fragment_matrix[diff_index_fm_1,], np.zeros((len(diff_regions_1), fragment_matrix_to_add.shape[1]))])
+                
+                diff_regions_2 = list(np.setdiff1d(region_names_to_add, region_names))
+                diff_index_fm_2 = get_position_index(diff_features_2, region_names_to_add)
+                fragment_matrix_diff_2 = sparse.hstack([np.zeros((len(diff_regions_2), fragment_matrix.shape[1])), fragment_matrix_to_add[diff_index_fm_2,]])
 			
+				fragment_matrix = sparse.vstack([fragment_matrix_common, fragment_matrix_diff_1, fragment_matrix_diff_2])
+				region_names = common_regions + diff_regions_1 + diff_regions_2
+			else:
+				fragment_matrix = common_matrix
+				region_names = common_regions
+				
 			fragment_matrix = sparse.csr_matrix(fragment_matrix, dtype=np.int32)
 			log.info(f"cisTopic object {i} merged")
-		
 		
 		binary_matrix = sp.binarize(fragment_matrix, threshold=is_acc-1)
 		cell_data = pd.concat(cell_data_list, axis=0, sort=False)

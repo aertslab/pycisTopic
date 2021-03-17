@@ -142,26 +142,28 @@ class CistopicImputedFeatures:
             cell_names_to_add = cell_names_list[i]
             cell_names=cell_names+cell_names_to_add
             
-            common_features=list(set(feature_names) & set(feature_names_to_add))
-            diff_features=list(set(feature_names) ^ set(feature_names_to_add))
+            common_features = list(set(feature_names) & set(feature_names_to_add))
+            diff_features = list(set(feature_names) ^ set(feature_names_to_add))
             
             common_index_fm = get_position_index(common_features, feature_names)
             common_index_fm_to_add = get_position_index(common_features, feature_names_to_add)
-            mtx=sparse.hstack([mtx[common_index_fm,], mtx_to_add[common_index_fm_to_add,]])
-            feature_names=common_features
+            mtx_common = sparse.hstack([mtx[common_index_fm,], mtx_to_add[common_index_fm_to_add,]])
             
             if len(diff_features) > 0:
-                diff_mtx=np.zeros((len(diff_features), mtx.shape[1]))
-                mtx=sparse.vstack([mtx, diff_mtx])
-                feature_names=common_features+diff_features
+                diff_features_1 = list(np.setdiff1d(feature_names, feature_names_to_add))
+                diff_index_fm_1 = get_position_index(diff_features_1, feature_names)
+                mtx_diff_1 = sparse.hstack([mtx[diff_index_fm_1,], np.zeros((len(diff_features_1), mtx_to_add.shape[1]))])
+                
+                diff_features_2 = list(np.setdiff1d(feature_names_to_add, feature_names))
+                diff_index_fm_2 = get_position_index(diff_features_2, feature_names_to_add)
+                mtx_diff_2 = sparse.hstack([np.zeros((len(diff_features_2), mtx.shape[1])), mtx_to_add[diff_index_fm_2,]])
+                
+            	mtx = sparse.vstack([mtx_common, mtx_diff_1, mtx_diff_2])
+            	feature_names = common_features+diff_features_1+diff_features_2
+            else:
+            	mtx = mtx_common
+            	feature_names = common_features
             
-            mtx = sparse.csr_matrix(mtx, dtype=np.float32)
-            log.info(f"cisTopic imputed features object {i} merged")
-            
-        features_index = non_zero_rows(mtx)
-        mtx = mtx[features_index,:]
-        feature_names = subset_list(feature_names, features_index) 
-           
         if copy is True:
             return CistopicImputedFeatures(mtx, feature_names, cell_names, project)
         else:
