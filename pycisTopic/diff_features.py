@@ -158,11 +158,11 @@ class CistopicImputedFeatures:
                 diff_index_fm_2 = get_position_index(diff_features_2, feature_names_to_add)
                 mtx_diff_2 = sparse.hstack([np.zeros((len(diff_features_2), mtx.shape[1])), mtx_to_add[diff_index_fm_2,]])
                 
-            	mtx = sparse.vstack([mtx_common, mtx_diff_1, mtx_diff_2])
-            	feature_names = common_features+diff_features_1+diff_features_2
+                mtx = sparse.vstack([mtx_common, mtx_diff_1, mtx_diff_2])
+                feature_names = common_features+diff_features_1+diff_features_2
             else:
-            	mtx = mtx_common
-            	feature_names = common_features
+                mtx = mtx_common
+                feature_names = common_features
             
         if copy is True:
             return CistopicImputedFeatures(mtx, feature_names, cell_names, project)
