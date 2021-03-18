@@ -167,7 +167,7 @@ def run_umap(cistopic_obj: 'CistopicObject',
 		data_mat=data_mat.loc[['Topic' + str(x) for x in selected_topics],:]
 	if selected_features != None:
 		data_mat=data_mat[selected_features]
-		data_names=selected_cells
+		data_names=selected_features
 	
 	if scale == True:
 		data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
