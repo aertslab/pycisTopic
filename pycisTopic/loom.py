@@ -201,7 +201,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     ---------
     accessibility_matrix: class::CistopicImputedFeatures or class::pd.DataFrame
         A cisTopic imputed features object containing imputed accessibility as values. Alternatively, a pandas data frame with regions as 
-        rows, cells as columns and accessibility per regions as values.
+        columns, cells as rows and accessibility per regions as values.
     cistopic_obj: class::CisTopicObject
         The cisTopic object from which accessibility values have been derived. It must include cell meta data (including specified cluster
         annotation columns) and the topic model from which accessibility has been imputed.
@@ -358,6 +358,9 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     loom.export(out_fname)
 
 def get_metadata(loom):
+    """
+    A helper function to get metadata
+    """
     annot_metadata = loom.get_meta_data()['annotations']
     annot_mt_column_names = [annot_metadata[x]['name'] for x in range(len(annot_metadata))]
     annot_mt = pd.concat([pd.DataFrame(loom.col_attrs[annot_mt_column_names[x]]) for x in range(len(annot_mt_column_names))], axis=1)
