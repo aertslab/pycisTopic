@@ -299,7 +299,7 @@ class CistopicObject:
                 fragment_matrix = sparse.vstack([fragment_matrix_common, fragment_matrix_diff_1, fragment_matrix_diff_2])
                 region_names = common_regions + diff_regions_1 + diff_regions_2
             else:
-                fragment_matrix = common_matrix
+                fragment_matrix = fragment_matrix_common
                 region_names = common_regions
                 
             fragment_matrix = sparse.csr_matrix(fragment_matrix, dtype=np.int32)

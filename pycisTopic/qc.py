@@ -795,7 +795,7 @@ def compute_qc_stats(fragments_dict: Dict[str, Union[str, pd.DataFrame]],
 							  n_bc=n_bc,
 							  tss_flank_window=tss_flank_window,
 							  tss_window=tss_window,
-							  tss_minimum_signal_window=tss_minimum_signal_window
+							  tss_minimum_signal_window=tss_minimum_signal_window,
 							  tss_rolling_window=tss_rolling_window,
 							  min_norm=min_norm,
 							  check_for_duplicates=check_for_duplicates,
