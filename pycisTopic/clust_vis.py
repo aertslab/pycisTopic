@@ -113,7 +113,8 @@ def run_umap(cistopic_obj: 'CistopicObject',
 			random_state: Optional[int] = 555,
 			selected_topics: Optional[List[int]] = None,
 			selected_features: Optional[List[str]] = None,
-			harmony: Optional[bool] = False):
+			harmony: Optional[bool] = False,
+			**kwargs):
 	
 	"""
 	Run UMAP and add it to the dimensionality reduction dictionary. 
@@ -137,6 +138,8 @@ def run_umap(cistopic_obj: 'CistopicObject',
 		regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
 	harmony: bool, optional
 		If target is 'cell', whether to use harmony processed topic contributions. Default: False.
+	**kwargs
+		Parameters to pass to umap.UMAP.
 	"""
 			
 	# Create cisTopic logger
@@ -172,7 +175,7 @@ def run_umap(cistopic_obj: 'CistopicObject',
 	data_mat = data_mat.T
 
 	log.info(f"Running UMAP")
-	reducer=umap.UMAP(random_state=random_state)
+	reducer=umap.UMAP(random_state=random_state, **kwargs)
 	embedding = reducer.fit_transform(data_mat)
 	dr = pd.DataFrame(embedding, index=data_names, columns=['UMAP_1', 'UMAP_2'])
 	if target == 'cell':
