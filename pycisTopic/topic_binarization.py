@@ -145,7 +145,7 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
         if plot == True:
             plt.show()
         else:
-            fig.close()
+            plt.close()
 
     if (save != None) & (num_columns == 1):
         pdf.close() 
