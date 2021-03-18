@@ -22,3 +22,8 @@ To check your pycisTopic version::
 
 	import pycisTopic
 	pycisTopic.__version__
+
+Tutorials
+**********************
+
+ - [Single sample - Complete workflow](https://github.com/aertslab/pycisTopic/blob/master/notebooks/Single_sample_workflow.html)
