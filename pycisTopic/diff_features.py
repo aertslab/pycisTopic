@@ -163,8 +163,6 @@ class CistopicImputedFeatures:
             else:
                 mtx = mtx_common
                 feature_names = common_features
-                
-        mtx  = sparse.csr_matrix(mtx, dtype=np.float32)
             
         if copy is True:
             return CistopicImputedFeatures(mtx, feature_names, cell_names, project)
