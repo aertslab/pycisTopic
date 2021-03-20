@@ -396,15 +396,14 @@ def add_clusterings(loom: SCopeLoom,
     A helper function to add clusters
     """
     col_attrs = loom.col_attrs
-    clusterings = pd.DataFrame(
-        index=cluster_data.index.tolist()
-    )
     
     attrs_metadata = {}
     attrs_metadata["clusterings"] = []
     j = 0
 
     for cluster_name in cluster_data.columns:
+    
+        clusterings = pd.DataFrame(index=cluster_data.index.tolist())
 
         clustering_id = j
         clustering_algorithm = cluster_name
