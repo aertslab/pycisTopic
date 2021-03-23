@@ -76,10 +76,10 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 	
 	# Get fragments file
 	if isinstance(input_data, CistopicObject):
-		path_to_fragments = cistopic_obj.path_to_fragments
+		path_to_fragments = input_data.path_to_fragments
 		if path_to_fragments == None:
 			log.error('No path_to_fragments in this cisTopic object.')
-		cell_data = cistopic_obj.cell_data
+		cell_data= input_data.cell_data
 	elif isinstance(input_data, pd.DataFrame):
 		if path_to_fragments == None:
 			log.error('Please, provide path_to_fragments.')
@@ -93,21 +93,20 @@ def export_pseudobulk(input_data: Union['CistopicObject', pd.DataFrame, Dict[str
 	# Get fragments
 	fragments_df_dict={}
 	for sample_id in path_to_fragments.keys():
-		if isinstance(input_data, pd.DataFrame):
-			if sample_id not in sample_ids:
-				log.info('The following path_to_fragments entry is not found in the cell metadata sample_id_col: ', sample_id, '. It will be ignored.')
-			else:	
-				log.info('Reading fragments from ' + path_to_fragments[sample_id])
-				fragments_df=pr.read_bed(path_to_fragments[sample_id], as_df=True)
-				# Convert to int32 for memory efficiency
-				fragments_df.Start = np.int32(fragments_df.Start)
-				fragments_df.End = np.int32(fragments_df.End)
-				fragments_df.Score = np.int32(fragments_df.Score)
-				if 'barcode' in cell_data:
-					fragments_df = fragments_df.loc[fragments_df['Name'].isin(cell_data['barcode'].tolist())]	
-				else:
-					fragments_df = fragments_df.loc[fragments_df['Name'].isin(prepare_tag_cells(cell_data.index.tolist()))]	
-				fragments_df_dict[sample_id] = fragments_df
+		if sample_id not in sample_ids:
+			log.info('The following path_to_fragments entry is not found in the cell metadata sample_id_col: ', sample_id, '. It will be ignored.')
+		else:	
+			log.info('Reading fragments from ' + path_to_fragments[sample_id])
+			fragments_df=pr.read_bed(path_to_fragments[sample_id], as_df=True)
+			# Convert to int32 for memory efficiency
+			fragments_df.Start = np.int32(fragments_df.Start)
+			fragments_df.End = np.int32(fragments_df.End)
+			fragments_df.Score = np.int32(fragments_df.Score)
+			if 'barcode' in cell_data:
+				fragments_df = fragments_df.loc[fragments_df['Name'].isin(cell_data['barcode'].tolist())]	
+			else:
+				fragments_df = fragments_df.loc[fragments_df['Name'].isin(prepare_tag_cells(cell_data.index.tolist()))]	
+			fragments_df_dict[sample_id] = fragments_df
 
 	# Set groups
 	if 'barcode' in cell_data:
