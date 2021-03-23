@@ -889,7 +889,7 @@ def compute_qc_stats_ray(fragments,
 		if check_for_duplicates == True:
 			log.info("Collapsing duplicates")
 			fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
-			dup_scores = fragments_df.groupby(["Read_id"]).size()
+			dup_scores = fragments_df.groupby(["Read_id"], sort=False).size()
 			fragments_df = fragments_df.drop_duplicates()
 			fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()].tolist()
 		else:
