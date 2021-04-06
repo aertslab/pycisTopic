@@ -4,4 +4,3 @@ try:
     __version__ = get_distribution("pycisTopic").version
 except DistributionNotFound:
     pass
-
