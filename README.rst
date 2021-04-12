@@ -26,4 +26,4 @@ To check your pycisTopic version::
 Tutorials
 **********************
 
--  `Single sample - Complete workflow <https://github.com/aertslab/pycisTopic/blob/master/notebooks/Single_sample_workflow.html>`__
+-  `Single sample - Complete workflow <https://htmlpreview.github.io/?https://github.com/aertslab/pycisTopic/blob/master/notebooks/Single_sample_workflow.html>`__
