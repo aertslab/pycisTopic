@@ -207,7 +207,7 @@ def run_tsne(cistopic_obj: 'CistopicObject',
              target: Optional[str] = 'cell',
              scale: Optional[bool] = False,
              reduction_name: Optional[str] = 'tSNE',
-             seed: Optional[int] = 555,
+             random_state: Optional[int] = 555,
              perplexity: Optional[int] = 30,
              selected_topics: Optional[List[int]] = None,
              selected_features: Optional[List[str]] = None,
@@ -226,7 +226,7 @@ def run_tsne(cistopic_obj: 'CistopicObject',
     reduction_name: str, optional
             Reduction name to use as key in the dimensionality reduction dictionary. Default: 'tSNE'
     random_state: int, optional
-            Seed parameter for running UMAP. Default: 555
+            Seed parameter for running tSNE. Default: 555
     perplexity: int, optional
             Perplexity parameter for FitSNE. Default: 30
     selected_topics: list, optional
@@ -280,12 +280,12 @@ def run_tsne(cistopic_obj: 'CistopicObject',
         embedding = fitsne.FItSNE(
             np.ascontiguousarray(
                 data_mat.to_numpy()),
-            rand_seed=seed,
+            rand_seed=random_state,
             perplexity=perplexity)
     except BaseException:
         log.info(f"Running TSNE")
         embedding = sklearn.manifold.TSNE(
-            n_components=2).fit_transform(
+            n_components=2, random_state=random_state).fit_transform(
             data_mat.to_numpy())
     dr = pd.DataFrame(
         embedding,
