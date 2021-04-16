@@ -6,6 +6,7 @@ ipython
 ipykernel
 gensim
 harmonypy
+ipympl
 leidenalg
 lda
 loompy
@@ -21,7 +22,8 @@ pyfasta
 pyranges
 pybiomart
 pyBigWig
-pyscenic>=0.11.0
+python-Levenshtein
+pyscenic>=0.11.1
 python-igraph
 ray
 scipy
@@ -30,7 +32,6 @@ scanpy
 scanorama
 scrublet
 seaborn
-sklearn
 statsmodels
 tables
 tmtoolkit
