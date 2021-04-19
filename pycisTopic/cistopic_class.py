@@ -722,6 +722,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
             fragments_df = fragments_df.drop_duplicates()
             fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()
                                                ].tolist()
+            fragments_df.drop('Read_id', axis=1, inplace=True)
         else:
             fragments_df['Score'] = 1
         fragments = pr.PyRanges(fragments_df)

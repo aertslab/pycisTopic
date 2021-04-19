@@ -479,19 +479,17 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
         tss_space_annotation = pr.PyRanges(tss_space_annotation)
         log.info('Overlapping fragments with TSS')
         overlap_with_TSS = fragments.join(tss_space_annotation, nb_cpu=n_cpu)
-        overlap_with_TSS_save = overlap_with_TSS
-        overlap_with_TSS = overlap_with_TSS_save
         if len(overlap_with_TSS) == 0:
             log.error(
                 'There is no overlap with any TSS! Please, check your fragments file.')
             return
         log.info('Getting cut sites')
         overlap_with_TSS = overlap_with_TSS.df
-        overlap_with_TSS['Strand'] = overlap_with_TSS['Strand'].astype(int)
-        overlap_with_TSS['start_pos'] = -(overlap_with_TSS['Start_b'].values + flank_window -
-                                          overlap_with_TSS['Start'].values) * overlap_with_TSS['Strand'].values
-        overlap_with_TSS['end_pos'] = -(overlap_with_TSS['Start_b'].values + flank_window -
-                                        overlap_with_TSS['End'].values) * overlap_with_TSS['Strand'].values
+        overlap_with_TSS['Strand'] = overlap_with_TSS['Strand'].astype(np.int32)
+        overlap_with_TSS['start_pos'] = -(np.int32(overlap_with_TSS['Start_b'].values) + np.int32(flank_window) -
+                                           np.int32(overlap_with_TSS['Start'].values)) *  np.int32(overlap_with_TSS['Strand'].values)
+        overlap_with_TSS['end_pos'] = -(np.int32(overlap_with_TSS['Start_b'].values) + np.int32(flank_window) -
+                                        np.int32(overlap_with_TSS['End'].values)) * np.int32(overlap_with_TSS['Strand'].values)
         # We split them to also keep the start position of reads whose start is
         # in the space and their end not and viceversa
         overlap_with_TSS_start = overlap_with_TSS[(overlap_with_TSS['start_pos'].values <= flank_window) & (
@@ -862,6 +860,9 @@ def compute_qc_stats(fragments_dict: Dict[str,
     fragments_list = [fragments_dict[key] for key in fragments_dict.keys()]
     path_to_regions = [path_to_regions[key] for key in fragments_dict.keys()]
 
+	if n_cpu > len(fragments_list):
+		log.info('n_cpu is larger than the number of samples. Setting n_cpu to the number of samples')
+		n_cpu = len(fragments_list)
     ray.init(num_cpus=n_cpu, **kwargs)
     qc_stats = ray.get(
         [
@@ -880,9 +881,8 @@ def compute_qc_stats(fragments_dict: Dict[str,
                 tss_rolling_window=tss_rolling_window,
                 min_norm=min_norm,
                 check_for_duplicates=check_for_duplicates,
-                remove_duplicates=remove_duplicates) for i in list(
-                range(
-                    len(fragments_list)))])
+                remove_duplicates=remove_duplicates) for i in range(
+                    len(fragments_list))])
     ray.shutdown()
     metadata_dict = {key: x[key] for x in list(
         list(zip(*qc_stats))[0]) for key in x.keys()}
