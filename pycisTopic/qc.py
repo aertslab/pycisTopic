@@ -13,7 +13,7 @@ import sys
 from typing import Optional, Union
 from typing import List, Dict, Tuple
 from .cistopic_class import *
-from .utils import multiplot_from_generator
+from .utils import multiplot_from_generator, collapse_duplicates
 
 pd.options.mode.chained_assignment = None
 dtype = pd.SparseDtype(int, fill_value=0)
@@ -979,13 +979,8 @@ def compute_qc_stats_ray(fragments,
         fragments_df = fragments_df[['Chromosome', 'Start', 'End', 'Name']]
         if check_for_duplicates:
             log.info("Collapsing duplicates")
-            fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(
-                str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
-            dup_scores = fragments_df.groupby(["Read_id"], sort=False).size()
-            fragments_df = fragments_df.drop_duplicates()
-            fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()
-                                               ].tolist()
-            fragments_df.drop('Read_id', axis=1, inplace=True)
+            fragments_df = pd.concat([collapse_duplicates(fragments_df[fragments_df.Chromosome == x])
+             for x in fragments_df.Chromosome.cat.categories.values])
         else:
             fragments_df['Score'] = 1
     else:

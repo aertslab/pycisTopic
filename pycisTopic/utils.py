@@ -278,3 +278,11 @@ def fig2img(fig):
     buf.seek(0)
     img = Image.open(buf)
     return img
+    
+def collapse_duplicates(df):    
+    a = df.values
+    sidx = np.lexsort(a[:,:4].T)
+    b = a[sidx,:4]
+    m = np.concatenate(([True],(b[1:] != b[:-1]).any(1),[True]))
+    out_ar = np.column_stack((b[m[:-1],:4], np.diff(np.flatnonzero(m)+1)))
+    return pd.DataFrame(out_ar, columns=['Chromosome', 'Start', 'End', 'Name', 'Score'])

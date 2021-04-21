@@ -716,13 +716,8 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         fragments_df = fragments.df
         if check_for_duplicates:
             log.info("Collapsing duplicates")
-            fragments_df['Read_id'] = fragments_df['Chromosome'].astype(str) + ':' + fragments_df['Start'].astype(
-                str) + '-' + fragments_df['End'].astype(str) + '_' + fragments_df['Name'].astype(str)
-            dup_scores = fragments_df.groupby(["Read_id"]).size()
-            fragments_df = fragments_df.drop_duplicates()
-            fragments_df['Score'] = dup_scores[fragments_df['Read_id'].tolist()
-                                               ].tolist()
-            fragments_df.drop('Read_id', axis=1, inplace=True)
+            fragments_df = pd.concat([collapse_duplicates(fragments_df[fragments_df.Chromosome == x])
+             for x in fragments_df.Chromosome.cat.categories.values])
         else:
             fragments_df['Score'] = 1
         fragments = pr.PyRanges(fragments_df)
