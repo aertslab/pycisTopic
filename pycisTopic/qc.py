@@ -860,9 +860,10 @@ def compute_qc_stats(fragments_dict: Dict[str,
     fragments_list = [fragments_dict[key] for key in fragments_dict.keys()]
     path_to_regions = [path_to_regions[key] for key in fragments_dict.keys()]
 
-       if n_cpu > len(fragments_list):
-              log.info('n_cpu is larger than the number of samples. Setting n_cpu to the number of samples')
-              n_cpu = len(fragments_list)
+    if n_cpu > len(fragments_list):
+        log.info('n_cpu is larger than the number of samples. Setting n_cpu to the number of samples')
+        n_cpu = len(fragments_list)
+        
     ray.init(num_cpus=n_cpu, **kwargs)
     qc_stats = ray.get(
         [
