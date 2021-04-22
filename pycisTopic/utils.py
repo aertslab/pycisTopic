@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+import logging
+import sys
+import gc 
 import math
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
@@ -280,9 +283,47 @@ def fig2img(fig):
     return img
     
 def collapse_duplicates(df):    
+    """
+    Collapse duplicates from fragments df
+    """
     a = df.values
     sidx = np.lexsort(a[:,:4].T)
     b = a[sidx,:4]
     m = np.concatenate(([True],(b[1:] != b[:-1]).any(1),[True]))
     out_ar = np.column_stack((b[m[:-1],:4], np.diff(np.flatnonzero(m)+1)))
     return pd.DataFrame(out_ar, columns=['Chromosome', 'Start', 'End', 'Name', 'Score'])
+    
+def get_tss_matrix(fragments, flank_window, tss_space_annotation):
+    overlap_with_TSS = fragments.join(tss_space_annotation, nb_cpu=1).df
+    if len(overlap_with_TSS) == 0:
+        return
+            
+    overlap_with_TSS['Strand'] = overlap_with_TSS['Strand'].astype(np.int32)
+    overlap_with_TSS['start_pos'] = -(np.int32(overlap_with_TSS['Start_b'].values) + np.int32(flank_window) -
+                                           np.int32(overlap_with_TSS['Start'].values)) *  np.int32(overlap_with_TSS['Strand'].values)
+    overlap_with_TSS['end_pos'] = -(np.int32(overlap_with_TSS['Start_b'].values) + np.int32(flank_window) -
+                                        np.int32(overlap_with_TSS['End'].values)) * np.int32(overlap_with_TSS['Strand'].values)
+    # We split them to also keep the start position of reads whose start is
+    # in the space and their end not and viceversa
+    overlap_with_TSS_start = overlap_with_TSS[(overlap_with_TSS['start_pos'].values <= flank_window) & (
+            overlap_with_TSS['start_pos'].values >= -flank_window)]
+    overlap_with_TSS_end = overlap_with_TSS[(overlap_with_TSS['end_pos'].values <= flank_window) & (
+            overlap_with_TSS['end_pos'].values >= -flank_window)]
+    overlap_with_TSS_start['rel_start_pos'] = overlap_with_TSS_start['start_pos'].values + flank_window
+    overlap_with_TSS_end['rel_end_pos'] = overlap_with_TSS_end['end_pos'].values + flank_window
+    cut_sites_TSS = pd.concat([overlap_with_TSS_start[['Name',
+                                                           'rel_start_pos']].rename(columns={'Name': 'Barcode',
+                                                                                             'rel_start_pos': 'Position'}),
+                                   overlap_with_TSS_end[['Name',
+                                                         'rel_end_pos']].rename(columns={'Name': 'Barcode',
+                                                                                         'rel_end_pos': 'Position'})],
+                                  axis=0)
+    
+    cut_sites_TSS['Barcode'] = cut_sites_TSS["Barcode"].astype("category")
+    cut_sites_TSS['Position'] = cut_sites_TSS["Position"].astype("category")
+    TSS_matrix = cut_sites_TSS.groupby(
+            ["Position", "Barcode"], observed=True, sort=False).size().unstack(level="Position", fill_value=0).astype(np.int32)
+    del cut_sites_TSS
+    gc.collect()
+
+    return TSS_matrix

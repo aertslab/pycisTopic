@@ -764,16 +764,16 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
     log.info('Counting fragments in regions')
     fragments_in_regions = regions.join(fragments, nb_cpu=n_cpu)
     # Convert to pandas
-    counts_df = pd.concat([fragments_in_regions.regionID,
-                           fragments_in_regions.Name,
+    counts_df = pd.concat([fragments_in_regions.regionID.astype("category"),
+                           fragments_in_regions.Name.astype("category"),
                            fragments_in_regions.Score.astype(np.int32)],
                           axis=1,
                           sort=False)
 
     log.info('Creating fragment matrix')
     try:
-        fragment_matrix = counts_df.groupby(["Name", "regionID"]).size().unstack(
-            level="Name").fillna(0).astype(np.int32)
+        fragment_matrix = counts_df.groupby(["Name", "regionID"], sort=False, observed=True).size().unstack(
+            level="Name", fill_value=0).astype(np.int32)
         fragment_matrix.columns.names = [None]
     except ValueError:
         log.info('Data is too big, making partitions. This is a reported error in Pandas versions > 0.21 (https://github.com/pandas-dev/pandas/issues/26314)')
@@ -781,8 +781,8 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
             list(set(counts_df.Name.to_list())), partition)
         dfList = [counts_df[counts_df.Name.isin(
             set(barcode_list[x]))] for x in range(0, partition)]
-        dfList = [x.groupby(["Name", "regionID"]).size().unstack(
-            level="Name").fillna(0).astype(np.int32) for x in dfList]
+        dfList = [x.groupby(["Name", "regionID"], sort=False, observed=True).size().unstack(
+            level="Name", fill_value=0).astype(np.int32) for x in dfList]
         fragment_matrix = pd.concat(
             dfList,
             axis=1,
