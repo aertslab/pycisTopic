@@ -17,7 +17,7 @@ from typing import List
 def label_transfer(ref_anndata: AnnData,
                    query_anndata: AnnData,
                    labels_to_transfer: List[str],
-                   sample_id_col: str,
+                   sample_id_col: Optional[str] = 'sample_id',
                    n_cpu: Optional[int] = 1,
                    variable_genes: Optional[bool] = True,
                    methods: Optional[List[str]] = ['ingest',
@@ -47,7 +47,7 @@ def label_transfer(ref_anndata: AnnData,
     labels_to_transfer: List
         Labels to transfer. They must be included in `ref_anndata.obs`.
     sample_id_col: str
-        Name of the column containing the sample ids in the query data set. It must be included in `query_anndata.obs`.
+        Name of the column containing the sample ids in the query data set. It must be included in `query_anndata.obs`. Default: sample_id
     n_cpu: int, optional
             Number of cores to use. Default: 1.
     variable_genes: bool, optional
@@ -62,7 +62,7 @@ def label_transfer(ref_anndata: AnnData,
         Number of principal components to use for reference and query, respectively. Default: [50,50]
     n_neighbours: List, optional
         Number of neighbours to use for reference and query, respectively. Default: [10,10]
-    bbknn_components: int, optiional
+    bbknn_components: int, optional
         Number of components to use for the umap for bbknn integration. Default: 30
     cca_components: int, optional
         Number of components to use for cca. Default: 30
@@ -120,8 +120,8 @@ def label_transfer(ref_anndata: AnnData,
                     ref_anndata,
                     query_anndata,
                     labels_to_transfer,
-                    sample_id_col,
                     i,
+                    sample_id_col=sample_id_col,
                     variable_genes=variable_genes,
                     methods=methods,
                     pca_ncomps=pca_ncomps,
@@ -139,8 +139,8 @@ def label_transfer(ref_anndata: AnnData,
 def label_transfer_ray(ref_anndata: AnnData,
                    query_anndata: AnnData,
                    labels_to_transfer: List[str],
-                   sample_id_col: str,
                    sample_id: str,
+                   sample_id_col: Optional[str] = 'sample_id',
                    variable_genes: Optional[bool] = True,
                    methods: Optional[List[str]] = ['ingest',
                                                    'harmony',
@@ -166,10 +166,10 @@ def label_transfer_ray(ref_anndata: AnnData,
         (typically, gene activities derived from scATAC-seq)
     labels_to_transfer: List
         Labels to transfer. They must be included in `ref_anndata.obs`.
-    sample_id_col: str
-        Name of the column containing the sample ids in the query data set. It must be included in `query_anndata.obs`.
     sample_id: str
         Name of the sample to process.
+    sample_id_col: str
+        Name of the column containing the sample ids in the query data set. It must be included in `query_anndata.obs`. Default: sample_id
     variable_genes: bool, optional
         Whether variable genes matching between the two data set should be used (True) or otherwise, all matching
         genes (False). Default: True
