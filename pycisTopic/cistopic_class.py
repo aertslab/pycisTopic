@@ -782,13 +782,12 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         dfList = [counts_df[counts_df.Name.isin(
             set(barcode_list[x]))] for x in range(0, partition)]
         dfList = [x.groupby(["Name", "regionID"], sort=False, observed=True).size().unstack(
-            level="Name", fill_value=0).astype(np.int32) for x in dfList]
+            level="Name", fill_value=0).astype(np.int32).rename_axis(None) for x in dfList]
         fragment_matrix = pd.concat(
             dfList,
             axis=1,
             sort=False).fillna(0).astype(
             np.int32)
-        fragment_matrix.columns.names = [None]
 
     # Create CistopicObject
     cistopic_obj = create_cistopic_object(
