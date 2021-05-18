@@ -747,7 +747,7 @@ def metrics2data(metrics: Optional[Dict]):
         metadata_bc = metrics_list[0]
     elif len(metrics_list) < 1:
         log.info('No barcode statistics have been computed')
-        metadara_bc = []
+        metadata_bc = []
 
     # Plot dict
     profile_dict = {}
