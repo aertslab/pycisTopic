@@ -1059,7 +1059,10 @@ def compute_qc_stats_ray(fragments,
     del fragments_df
     gc.collect()
     metadata_bc, profile_data = metrics2data(metrics)
-    metadata_bc = metadata_bc.fillna(0)
+    
+    if isinstance(metadata_bc, pd.DataFrame):
+        metadata_bc = metadata_bc.fillna(0)
+
     metadata_bc_dict = {label: metadata_bc}
     profile_data_dict = {label: profile_data}
     log.info('Sample ' + label + ' done!')
