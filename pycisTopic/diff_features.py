@@ -523,7 +523,7 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
     subset_imputed_features_obj = imputed_features_obj.subset(
         cells=None, features=var_features, copy=True)
     # Compute p-val and log2FC
-    ray.init(num_cpus=n_cpu)
+    ray.init(num_cpus=n_cpu, **kwargs)
     markers_list = ray.get(
         [
             markers_ray.remote(
