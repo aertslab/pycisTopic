@@ -14,7 +14,7 @@ import sys
 from typing import Optional, Union
 from typing import List, Dict, Tuple
 from .cistopic_class import *
-from .utils import multiplot_from_generator, collapse_duplicates
+from .utils import multiplot_from_generator, collapse_duplicates, read_fragments_from_file
 
 pd.options.mode.chained_assignment = None
 dtype = pd.SparseDtype(int, fill_value=0)
@@ -84,7 +84,7 @@ def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
         FPB_DF = plot_data
     else:
         if isinstance(fragments, str):
-            fragments = pr.read_bed(fragments).df
+            fragments = read_fragments_from_file(fragments).df
 
         log.info('Counting fragments')
         fragments_per_barcode_dup = fragments.groupby(
@@ -215,7 +215,7 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
     else:
         if isinstance(fragments, str):
             log.info('Reading fragments file')
-            fragments = pr.read_bed(fragments).df
+            fragments = read_fragments_from_file(fragments).df
 
         if valid_bc is not None:
             log.info('Using provided valid barcodes')
@@ -321,7 +321,7 @@ def insert_size_distribution(fragments: Union[str, pd.DataFrame],
     else:
         if isinstance(fragments, str):
             log.info('Reading fragments file')
-            fragments = pr.read_bed(fragments, as_df=True)
+            fragments = read_fragments_from_file(fragments).df
 
         if valid_bc is not None:
             log.info('Using provided valid barcodes')
@@ -466,7 +466,7 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
     else:
         if isinstance(fragments, str):
             log.info('Reading fragments file')
-            fragments = pr.read_bed(fragments)
+            fragments = read_fragments_from_file(fragments)
         else:
             if isinstance(fragments, pd.DataFrame):
                 fragments = pr.PyRanges(fragments)
@@ -619,7 +619,7 @@ def frip(fragments: Union[str, pd.DataFrame],
     else:
         if isinstance(fragments, str):
             log.info('Reading fragments file')
-            fragments = pr.read_bed(fragments)
+            fragments = read_fragments_from_file(fragments)
         else:
             if isinstance(fragments, pd.DataFrame):
                 fragments = pr.PyRanges(fragments)
@@ -628,12 +628,12 @@ def frip(fragments: Union[str, pd.DataFrame],
             log.info('Using provided valid barcodes')
             fragments = fragments[fragments.Name.isin(set(valid_bc))]
 
-        regions = pr.read_bed(path_to_regions)
+        regions = read_fragments_from_file(path_to_regions)
         regions = regions[['Chromosome', 'Start', 'End']
                           ].drop_duplicate_positions()
 
         if isinstance(path_to_blacklist, str):
-            blacklist = pr.read_bed(path_to_blacklist)
+            blacklist = read_fragments_from_file(path_to_blacklist)
             regions = regions.overlap(blacklist, invert=True)
 
         log.info('Counting fragments')
@@ -962,7 +962,7 @@ def compute_qc_stats_ray(fragments,
     # Prepare fragments
     if isinstance(fragments, str):
         log.info('Reading ' + label)
-        fragments_df = pr.read_bed(fragments).df
+        fragments_df = read_fragments_from_file(fragments).df
     else:
         fragments_df = fragments
     # Convert to category for memory efficiency

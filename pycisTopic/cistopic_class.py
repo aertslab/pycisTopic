@@ -485,7 +485,7 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
     if isinstance(path_to_blacklist, str):
         log.info('Removing blacklisted regions')
         regions = pr.PyRanges(region_names_to_coordinates(region_names))
-        blacklist = pr.read_bed(path_to_blacklist)
+        blacklist = read_fragments_from_file(path_to_blacklist)
         regions = regions.overlap(blacklist, invert=True)
         selected_regions = [
             str(chrom) +
@@ -710,7 +710,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         if path_to_fragments is not None:
             log.info('Using fragments of provided pandas data frame')
     else:
-        fragments = pr.read_bed(path_to_fragments)
+        fragments = read_fragments_from_file(path_to_fragments)
 
     if 'Score' not in fragments.df:
         fragments_df = fragments.df
@@ -722,7 +722,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
             fragments_df['Score'] = 1
         fragments = pr.PyRanges(fragments_df)
 
-    regions = pr.read_bed(path_to_regions)
+    regions = read_fragments_from_file(path_to_regions)
     regions = regions[['Chromosome', 'Start', 'End']]
     regions.regionID = [
         str(chrom) +

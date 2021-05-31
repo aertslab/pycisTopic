@@ -294,6 +294,9 @@ def collapse_duplicates(df):
     return pd.DataFrame(out_ar, columns=['Chromosome', 'Start', 'End', 'Name', 'Score'])
     
 def get_tss_matrix(fragments, flank_window, tss_space_annotation):
+    """
+    Get TSS matrix
+    """
     overlap_with_TSS = fragments.join(tss_space_annotation, nb_cpu=1).df
     if len(overlap_with_TSS) == 0:
         return
@@ -327,3 +330,13 @@ def get_tss_matrix(fragments, flank_window, tss_space_annotation):
     gc.collect()
 
     return TSS_matrix
+
+def read_fragments_from_file(f):
+    """
+    Read fragments file as pyranges, compatible with CellRange 2.0.0
+    """
+    columns = "Chromosome Start End Name Score Strand ThickStart ThickEnd ItemRGB BlockCount BlockSizes BlockStarts".split(
+    )
+    df = pd.read_table(f, comment="#", header=None)
+    df.columns = columns[:df.shape[1]]
+    return pr.PyRanges(df)

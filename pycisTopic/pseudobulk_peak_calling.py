@@ -105,8 +105,8 @@ def export_pseudobulk(input_data: Union['CistopicObject',
                 '. It will be ignored.')
         else:
             log.info('Reading fragments from ' + path_to_fragments[sample_id])
-            fragments_df = pr.read_bed(
-                path_to_fragments[sample_id], as_df=True)
+            fragments_df = read_fragments_from_file(
+                path_to_fragments[sample_id]).df
             # Convert to int32 for memory efficiency
             fragments_df.Start = np.int32(fragments_df.Start)
             fragments_df.End = np.int32(fragments_df.End)
