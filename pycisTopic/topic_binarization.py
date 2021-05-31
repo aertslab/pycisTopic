@@ -78,9 +78,9 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
     logging.basicConfig(level=level, format=format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
-    if target is 'region':
+    if target == 'region':
         topic_dist = cistopic_obj.selected_model.topic_region
-    elif target is 'cell':
+    elif target == 'cell':
         topic_dist = cistopic_obj.selected_model.cell_topic.T
 
     if smooth_topics:
