@@ -20,7 +20,7 @@ conda install -c conda-forge loompy igraph python-igraph leidenalg lda IPython g
 conda install -c bioconda pyBigWig pyranges pybedtools pyfasta umap harmonypy scanorama pybiomart 
 
 conda install ipykernel  # for Jupyter
-pip install ray # https://docs.ray.io/en/master/installation.html
+pip install ray # https://docs.ray.io/en/master/installation.html Required: >=1.3 (1.1  gives errors)
 pip install -U "tmtoolkit[recommended]"
 conda install -c conda-forge cython fftw # for fitsne
 pip install fitsne
