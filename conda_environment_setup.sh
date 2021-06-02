@@ -92,5 +92,9 @@ conda list | grep arboreto
 
 
 
-# TO DO:
-LoomXpy
+# TO update for release:
+git clone git://github.com/aertslab/LoomXpy
+cd loomxpy
+pip install .
+
+
