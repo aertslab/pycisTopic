@@ -1,3 +1,80 @@
+### Python 3.8
+
+ssh r23i27n24
+source /staging/leuven/stg_00002/lcb/saibar/software/anaconda3/etc/profile.d/conda.sh # equivalent to my_conda_initialize
+
+# Create conda environment 
+# conda create -n pycisTopic_env python=3.8
+
+conda activate pycisTopic_env
+module load GCC
+conda update -n base conda
+conda install ipykernel  # for Jupyter
+
+conda install matplotlib seaborn
+conda install -c anaconda xlrd cytoolz
+conda install -c conda-forge igraph python-igraph IPython leidenalg gensim typing adjusttext python-annoy scikit-learn
+conda install -c bioconda pyBigWig pybedtools pyfasta harmonypy pybiomart pyfaidx pyranges ray bbknn
+conda install -c conda-forge fit-sne 
+
+# conda list | grep XX
+for PKG in igraph python-igraph IPython leidenalg gensim typing adjusttext python-annoy matplotlib seaborn
+#for PKG in pyBigWig pybedtools pyfasta harmonypy pybiomart pyfaidx pyranges ray bbknn
+do
+  conda list | grep $PKG
+done
+conda list | grep pyBigWig
+
+# pycistopic  & related
+conda install statsmodels numba pytables
+conda install -c conda-forge louvain multicore-tsne
+pip install scanpy   #  requires pandas!=1.1,>=1.0
+
+conda install pandas #==1.2.0
+pip install arboreto
+pip install pyscenic
+
+conda list | grep pandas
+conda list | grep pyscenic 
+conda list | grep arboreto
+
+cd $SAIBAR/software/
+git clone git://github.com/aertslab/LoomXpy
+cd LoomXpy
+git pull
+pip install .
+cd ..
+rm -rf LoomXpy
+
+
+# not for py3.8 in conda, or requires downgrading:
+pip install scrublet
+pip install lda 
+pip install umap
+pip install scanorama
+
+
+## fitsne
+#conda install -c conda-forge scipy==1.5
+#conda list | grep scipy
+#pip install tmtoolkit # requires pandas <1.2
+#conda install -c conda-forge cython fftw 
+#pip install fitsne
+#conda install fitsne
+
+                  ## install pycisTopic
+                  cd $SAIBAR/software/ # (temporary)
+                  git clone https://github.com/aertslab/pycisTopic
+                  cd pycisTopic
+                  git pull
+                  python setup.py install
+
+                  # To confirm whether it has been installed properly, try:
+                  python
+                  import pycisTopic
+              
+              
+### Python 3.7
 ssh ...
 my_conda_initialize
 # source /etc/profile.d/z01_modules.sh 
