@@ -14,7 +14,7 @@ from scipy import sparse
 
 def region_names_to_coordinates(region_names):
     chrom = pd.DataFrame([i.split(':', 1)[0] for i in region_names])
-    coor = [i.split(':', 1)[1] for i in region_names]
+    coor = [i.split(':', 1)[1] for i in region_names if ':' in i]
     start = pd.DataFrame([int(i.split('-', 1)[0]) for i in coor])
     end = pd.DataFrame([int(i.split('-', 1)[1]) for i in coor])
     regiondf = pd.concat([chrom, start, end], axis=1, sort=False)
