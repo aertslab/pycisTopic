@@ -11,7 +11,7 @@ module load GCC
 conda update -n base conda
 conda install ipykernel  # for Jupyter
 
-conda install matplotlib seaborn
+conda install matplotlib seaborn pandas
 conda install -c anaconda xlrd cytoolz
 conda install -c conda-forge igraph python-igraph IPython leidenalg gensim typing adjusttext python-annoy scikit-learn
 conda install -c bioconda pyBigWig pybedtools pyfasta harmonypy pybiomart pyfaidx pyranges ray bbknn
@@ -30,7 +30,6 @@ conda install statsmodels numba pytables
 conda install -c conda-forge louvain multicore-tsne
 pip install scanpy   #  requires pandas!=1.1,>=1.0
 
-conda install pandas #==1.2.0
 pip install arboreto
 pip install pyscenic
 
@@ -53,27 +52,28 @@ pip install lda
 pip install umap
 pip install scanorama
 
+conda install ipywidgets
+pip install -U "tmtoolkit[recommended]" # recommended installation without topic modeling
 
-## fitsne
-#conda install -c conda-forge scipy==1.5
-#conda list | grep scipy
-#pip install tmtoolkit # requires pandas <1.2
-#conda install -c conda-forge cython fftw 
-#pip install fitsne
-#conda install fitsne
 
-                  ## install pycisTopic
-                  cd $SAIBAR/software/ # (temporary)
-                  git clone https://github.com/aertslab/pycisTopic
-                  cd pycisTopic
-                  git pull
-                  python setup.py install
+## install pycisTopic
+cd $SAIBAR/software/ # (temporary)
+git clone https://github.com/aertslab/pycisTopic
+cd pycisTopic
+git pull
+python setup.py install
 
-                  # To confirm whether it has been installed properly, try:
-                  python
-                  import pycisTopic
-              
-              
+# To confirm whether it has been installed properly, try:
+python
+import pycisTopic
+
+      ## fitsne
+      #conda install -c conda-forge scipy==1.5
+      #conda list | grep scipy
+      #conda install -c conda-forge cython fftw 
+      #pip install fitsne
+
+
 ### Python 3.7
 ssh ...
 my_conda_initialize
