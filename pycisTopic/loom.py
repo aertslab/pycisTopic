@@ -1,6 +1,6 @@
 import json
 import logging
-from loomxpy import SCopeLoom
+from loomxpy.loomxpy import SCopeLoom
 import loompy
 import numpy as np
 import pandas as pd
