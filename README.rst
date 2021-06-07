@@ -13,6 +13,9 @@ To install pycisTopic::
 	git clone https://github.com/aertslab/pycisTopic.git
 	cd pycisTopic
 	pip install . 
+	
+Depending on your pip version, you may need to run this pip command instead ::
+	pip install . --use-feature=in-tree-build
 
 
 Check version
