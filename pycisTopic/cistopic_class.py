@@ -4,11 +4,12 @@ import numpy as np
 import pandas as pd
 import pyranges as pr
 import ray
-from scipy import sparse
 import sklearn.preprocessing as sp
 import sys
-from typing import Optional, Union
+from scipy import sparse
 from typing import List, Dict
+from typing import Optional, Union
+
 from .lda_models import *
 from .utils import *
 
@@ -69,7 +70,7 @@ class CistopicObject:
 
     def __str__(self):
         descr = f"CistopicObject from project {self.project} with n_cells × n_regions = {len(self.cell_names)} × {len(self.region_names)}"
-        return(descr)
+        return (descr)
 
     def add_cell_data(self,
                       cell_data: pd.DataFrame):
@@ -93,7 +94,10 @@ class CistopicObject:
             check_cell_names = prepare_tag_cells(self.cell_names)
             if len(set(check_cell_names) & set(cell_data.index)) < len(
                     set(self.cell_names) & set(cell_data.index)):
-                print("Warning: Some cells in this CistopicObject are not present in this cell_data. Values will be filled with Nan \n")
+                print(
+                    "Warning: Some cells in this CistopicObject are not present in this cell_data. Values will be "
+                    "filled with Nan\n"
+                )
             else:
                 flag = True
         if len(set(self.cell_data.columns) & set(cell_data.columns)) > 0:
@@ -135,7 +139,10 @@ class CistopicObject:
         """
         if len(set(self.region_names) & set(
                 region_data.index)) < len(self.region_names):
-            print("Warning: Some regions in this CistopicObject are not present in this region_data. Values will be filled with Nan \n")
+            print(
+                "Warning: Some regions in this CistopicObject are not present in this region_data. Values will be "
+                "filled with Nan\n"
+            )
         if len(set(self.region_data.columns.values) &
                set(region_data.columns.values)) > 0:
             print(
@@ -275,8 +282,10 @@ class CistopicObject:
         path_to_fragments_list = [
             x.path_to_fragments for x in cistopic_obj_list]
         path_to_fragments_dict = {
-            k: v for ptf in path_to_fragments_list for k,
-            v in ptf.items()}
+            k: v
+            for ptf in path_to_fragments_list
+            for k, v in ptf.items()
+        }
 
         if len(project_list) > len(set(project_list)):
             ori_project_list = project_list
@@ -293,8 +302,7 @@ class CistopicObject:
                             'Conflicting sample_id on project ' +
                             ori_project_list[i] +
                             ' will be updated to match with the new project name.')
-                        cell_data_list[i]['sample_id'] = [
-                            project_list[i]] * len(cell_data_list[i]['sample_id'])
+                        cell_data_list[i]['sample_id'] = [project_list[i]] * len(cell_data_list[i]['sample_id'])
                 if list(path_to_fragments_list[i].keys()) == 1:
                     if list(
                             path_to_fragments_list[i].keys()) == ori_project_list[i]:
@@ -312,10 +320,11 @@ class CistopicObject:
         fragment_matrix = fragment_matrix_list[0]
         region_names = region_names_list[0]
         cell_names = [
-            n + '-' + s for n,
-            s in zip(
+            n + '-' + s
+            for n, s in zip(
                 cell_names_list[0],
-                cell_data_list[0]['sample_id'].tolist())]
+                cell_data_list[0]['sample_id'].tolist())
+        ]
         object_id = [project_list[0]] * len(cell_names)
 
         cell_data_list[0].index = cell_names
@@ -326,10 +335,11 @@ class CistopicObject:
             cell_names_to_add = cell_names_list[i]
             object_id_to_add = [project_list[i]] * len(cell_names_to_add)
             cell_names_to_add = [
-                n + '-' + s for n,
-                s in zip(
+                n + '-' + s
+                for n, s in zip(
                     cell_names_to_add,
-                    cell_data_list[i]['sample_id'].tolist())]
+                    cell_data_list[i]['sample_id'].tolist())
+            ]
             cell_data_list[i].index = cell_names_to_add
             cell_names = cell_names + cell_names_to_add
 
@@ -492,15 +502,13 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
             ":" +
             str(start) +
             '-' +
-            str(end) for chrom,
-            start,
-            end in zip(
-                list(
-                    regions.Chromosome),
-                list(
-                    regions.Start),
-                list(
-                    regions.End))]
+            str(end)
+            for chrom, start, end in zip(
+                list(regions.Chromosome),
+                list(regions.Start),
+                list(regions.End)
+            )
+        ]
         index = get_position_index(selected_regions, region_names)
         fragment_matrix = fragment_matrix[index, ]
         region_names = selected_regions
@@ -565,7 +573,7 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
         path_to_fragments,
         project)
     log.info('Done!')
-    return(cistopic_obj)
+    return cistopic_obj
 
 
 def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
@@ -641,7 +649,7 @@ def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
         else:
             log.error(
                 'Provide path_to_fragments with keys matching levels in sample_id!')
-    return(cistopic_obj)
+    return cistopic_obj
 
 
 def create_cistopic_object_from_fragments(path_to_fragments: str,
@@ -716,8 +724,10 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         fragments_df = fragments.df
         if check_for_duplicates:
             log.info("Collapsing duplicates")
-            fragments_df = pd.concat([collapse_duplicates(fragments_df[fragments_df.Chromosome == x])
-             for x in fragments_df.Chromosome.cat.categories.values])
+            fragments_df = pd.concat([
+                collapse_duplicates(fragments_df[fragments_df.Chromosome == x])
+                for x in fragments_df.Chromosome.cat.categories.values]
+            )
         else:
             fragments_df['Score'] = 1
         fragments = pr.PyRanges(fragments_df)
@@ -729,15 +739,12 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         ":" +
         str(start) +
         '-' +
-        str(end) for chrom,
-        start,
-        end in zip(
-            list(
-                regions.Chromosome),
-            list(
-                regions.Start),
-            list(
-                regions.End))]
+        str(end)
+        for chrom, start, end in zip(
+            list(regions.Chromosome),
+            list(regions.Start),
+            list(regions.End))
+    ]
 
     # If CellRanger metrics, select valid barcodes
     if metrics is not None:
@@ -776,7 +783,8 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
             level="Name", fill_value=0).astype(np.int32)
         fragment_matrix.columns.names = [None]
     except ValueError:
-        log.info('Data is too big, making partitions. This is a reported error in Pandas versions > 0.21 (https://github.com/pandas-dev/pandas/issues/26314)')
+        log.info(
+            'Data is too big, making partitions. This is a reported error in Pandas versions > 0.21 (https://github.com/pandas-dev/pandas/issues/26314)')
         barcode_list = np.array_split(
             list(set(counts_df.Name.to_list())), partition)
         dfList = [counts_df[counts_df.Name.isin(
@@ -806,7 +814,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
     else:
         FPB_DF['barcode'] = FPB_DF.index.tolist()
         cistopic_obj.add_cell_data(FPB_DF)
-    return(cistopic_obj)
+    return cistopic_obj
 
 
 def merge(cistopic_obj_list: List['CistopicObject'],
