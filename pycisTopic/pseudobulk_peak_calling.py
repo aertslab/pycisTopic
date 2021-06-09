@@ -10,8 +10,7 @@ import re
 import subprocess
 import sys
 
-from typing import Optional, Union
-from typing import List, Dict
+from typing import Dict, List, Optional, Union
 
 from .cistopic_class import *
 from .utils import *
