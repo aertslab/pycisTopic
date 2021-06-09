@@ -1,20 +1,19 @@
-import sklearn
-import scipy
-from scipy.stats import ranksums
+import logging
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import ray
-import logging
-import sys
+import scipy
 import scipy.sparse as sparse
-import matplotlib.pyplot as plt
-import matplotlib
+import sklearn
+import sys
+from scipy.stats import ranksums
+from typing import List
+from typing import Optional, Union
 
 from .cistopic_class import *
 from .utils import *
-
-from typing import Optional, Union
-from typing import List
 
 
 class CistopicImputedFeatures:
@@ -48,7 +47,7 @@ class CistopicImputedFeatures:
 
     def __str__(self):
         descr = f"CistopicImputedFeatures from project {self.project} with nCells × nFeatures = {len(self.cell_names)} × {len(self.feature_names)}"
-        return(descr)
+        return descr
 
     def subset(self,
                cells: Optional[List[str]] = None,
@@ -200,7 +199,7 @@ class CistopicImputedFeatures:
 def impute_accessibility(cistopic_obj: 'CistopicObject',
                          selected_cells: Optional[List[str]] = None,
                          selected_regions: Optional[List[str]] = None,
-                         scale_factor: Optional[int] = 10**6,
+                         scale_factor: Optional[int] = 10 ** 6,
                          project: Optional[str] = 'cisTopic_Impute'):
     """
     Impute region accessibility.
@@ -267,11 +266,11 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
     imputed_acc_obj = CistopicImputedFeatures(
         imputed_acc, region_names, cell_names, project)
     log.info('Done!')
-    return(imputed_acc_obj)
+    return imputed_acc_obj
 
 
 def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
-                     scale_factor: Optional[int] = 10**4):
+                     scale_factor: Optional[int] = 10 ** 4):
     """
     Log-normalize imputation data. Feature counts for each cell are divided by the total counts for that cell and multiplied by the scale_factor.
 
@@ -312,11 +311,10 @@ def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
             index=input_mat.index.tolist(),
             columns=input_mat.columns)
     log.info('Done!')
-    return(output)
+    return output
 
 
-def find_highly_variable_features(input_mat: Union[pd.DataFrame,
-                                                   'CistopicImputedFeatures'],
+def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
                                   min_disp: Optional[float] = 0.05,
                                   min_mean: Optional[float] = 0.0125,
                                   max_disp: Optional[float] = np.inf,
@@ -404,10 +402,10 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame,
     disp_mean_bin[one_feature_per_bin.values] = 0
     # Normalize
     df['dispersions_norm'] = (
-        (
-            df['dispersions'].values  # use values here as index differs
-            - disp_mean_bin[df['mean_bin'].values].values
-        ) / disp_std_bin[df['mean_bin'].values].values
+            (
+                    df['dispersions'].values  # use values here as index differs
+                    - disp_mean_bin[df['mean_bin'].values].values
+            ) / disp_std_bin[df['mean_bin'].values].values
     )
 
     dispersion_norm = df['dispersions_norm'].values.astype('float32')
@@ -514,14 +512,19 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
                 contrasts[i][0]) +
             '_VS_' +
             '_'.join(
-                contrasts[i][1]) for i in range(
-                len(contrasts))]
+                contrasts[i][1])
+            for i in range(len(contrasts))
+        ]
     # Get barcodes in each class per contrats
-    barcode_groups = [[group_var[group_var.isin(contrasts[x][0])].index.tolist(
-    ), group_var[group_var.isin(contrasts[x][1])].index.tolist()] for x in range(len(contrasts))]
+    barcode_groups = [
+        [group_var[group_var.isin(contrasts[x][0])].index.tolist(),
+         group_var[group_var.isin(contrasts[x][1])].index.tolist()]
+        for x in range(len(contrasts))
+    ]
     # Subset imputed accessibility matrix
     subset_imputed_features_obj = imputed_features_obj.subset(
-        cells=None, features=var_features, copy=True)
+        cells=None, features=var_features, copy=True
+    )
     # Compute p-val and log2FC
     ray.init(num_cpus=n_cpu, **kwargs)
     markers_list = ray.get(
@@ -531,8 +534,8 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
                 barcode_groups[i],
                 contrasts_names[i],
                 adjpval_thr=adjpval_thr,
-                log2fc_thr=log2fc_thr) for i in range(
-                len(contrasts))])
+                log2fc_thr=log2fc_thr)
+            for i in range(len(contrasts))])
     ray.shutdown()
     markers_dict = {contrasts_names[i]: markers_list[i]
                     for i in range(len(markers_list))}
@@ -586,35 +589,49 @@ def markers_ray(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
     bg_cells_index = get_position_index(barcode_group[1], samples)
     log.info('Computing p-value for ' + contrast_name)
     if sparse.issparse(mat):
-        wilcox_test = [ranksums(mat[x, fg_cells_index].toarray(
-        )[0], y=mat[x, bg_cells_index].toarray()[0]) for x in range(mat.shape[0])]
+        wilcox_test = [
+            ranksums(mat[x, fg_cells_index].toarray()[0],
+                     y=mat[x, bg_cells_index].toarray()[0])
+            for x in range(mat.shape[0])
+        ]
     else:
-        wilcox_test = [ranksums(
-            mat[x, fg_cells_index], y=mat[x, bg_cells_index]) for x in range(mat.shape[0])]
+        wilcox_test = [
+            ranksums(mat[x, fg_cells_index],
+                     y=mat[x, bg_cells_index])
+            for x in range(mat.shape[0])
+        ]
 
     log.info('Computing log2FC for ' + contrast_name)
     if sparse.issparse(mat):
-        logFC = [np.log2((np.mean(mat[x, fg_cells_index].toarray()[0]) + 10**-12) / (
-            (np.mean(mat[x, bg_cells_index].toarray()[0]) + 10**-12))) for x in range(mat.shape[0])]
+        logFC = [
+            np.log2(
+                (np.mean(mat[x, fg_cells_index].toarray()[0]) + 10 ** -12)
+                / ((np.mean(mat[x, bg_cells_index].toarray()[0]) + 10 ** -12))
+            )
+            for x in range(mat.shape[0])
+        ]
     else:
-        logFC = [np.log2((np.mean(mat[x, fg_cells_index]) +
-                          10**-
-                          12) /
-                         ((np.mean(mat[x, bg_cells_index]) +
-                           10**-
-                           12))) for x in range(mat.shape[0])]
+        logFC = [
+            np.log2(
+                (np.mean(mat[x, fg_cells_index]) + 10 ** -12)
+                / ((np.mean(mat[x, bg_cells_index]) + 10 ** -12))
+            )
+            for x in range(mat.shape[0])
+        ]
 
     pvalue = [wilcox_test[x].pvalue for x in range(len(wilcox_test))]
     adj_pvalue = p_adjust_bh(pvalue)
     name = [contrast_name] * len(adj_pvalue)
-    markers_dataframe = pd.DataFrame([logFC, adj_pvalue, name], index=[
-                                     'Log2FC', 'Adjusted_pval', 'Contrast'], columns=features).transpose()
-    markers_dataframe = markers_dataframe.loc[markers_dataframe['Adjusted_pval']
-                                              <= adjpval_thr, :]
-    markers_dataframe = markers_dataframe.loc[markers_dataframe['Log2FC']
-                                              >= log2fc_thr, :]
+    markers_dataframe = pd.DataFrame(
+        [logFC, adj_pvalue, name],
+        index=['Log2FC', 'Adjusted_pval', 'Contrast'],
+        columns=features
+    ).transpose()
+    markers_dataframe = markers_dataframe.loc[markers_dataframe['Adjusted_pval'] <= adjpval_thr, :]
+    markers_dataframe = markers_dataframe.loc[markers_dataframe['Log2FC'] >= log2fc_thr, :]
     markers_dataframe = markers_dataframe.sort_values(
-        ['Log2FC', 'Adjusted_pval'], ascending=[False, True])
+        ['Log2FC', 'Adjusted_pval'], ascending=[False, True]
+    )
     log.info(contrast_name + ' done!')
     return markers_dataframe
 
