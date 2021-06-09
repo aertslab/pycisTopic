@@ -1,15 +1,14 @@
-from adjustText import adjust_text
-from itertools import compress
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from adjustText import adjust_text
+from itertools import compress
 from statsmodels.stats import proportion
-
-from typing import Optional, Union
 from typing import Dict, Tuple
+from typing import Optional, Union
 
 from .cistopic_class import *
 
@@ -45,16 +44,17 @@ def compute_topic_metrics(cistopic_obj: 'CistopicObject',
     marginal_dist = model.marg_topic['Marg_Topic']
     gini_values = pd.DataFrame([gini_coefficient(
         model.cell_topic.iloc[i, :].to_numpy()) for i in range(model.cell_topic.shape[0])])
-    topic_qc_metrics = pd.concat([np.log10(
-        topic_ass['Assignments']), topic_ass, topic_coh, marginal_dist, gini_values], axis=1)
+    topic_qc_metrics = pd.concat(
+        [np.log10(topic_ass['Assignments']), topic_ass, topic_coh, marginal_dist, gini_values],
+        axis=1
+    )
     topic_qc_metrics.columns = ['Log10_Assignments'] + topic_ass.columns.tolist() + [
         'Coherence', 'Marginal_topic_dist', 'Gini_index']
     topic_qc_metrics.index = [
         'Topic' +
-        str(i) for i in range(
-            1,
-            model.cell_topic.shape[0] +
-            1)]
+        str(i)
+        for i in range(1, model.cell_topic.shape[0] + 1)
+    ]
     cistopic_obj.selected_model.topic_qc_metrics = topic_qc_metrics
     if return_metrics is True:
         return topic_qc_metrics
@@ -271,13 +271,14 @@ def topic_annotation(cistopic_obj: 'CistopicObject',
         x: ', '.join(
             topic_annot_dict[x]) for x in topic_annot_dict.keys()}
     topic_annot = pd.DataFrame([list(topic_annot_dict.values()),
-                                [binarized_cell_topic[topic].shape[0] / cell_topic.shape[1] for topic in cell_topic.index.tolist()],
-                                [sum(group_size_dict[topic]) / cell_topic.shape[1] for topic in cell_topic.index.tolist()]],
+                                [binarized_cell_topic[topic].shape[0] / cell_topic.shape[1]
+                                 for topic in cell_topic.index.tolist()],
+                                [sum(group_size_dict[topic]) / cell_topic.shape[1]
+                                 for topic in cell_topic.index.tolist()]],
                                index=[annot_var, 'Ratio_cells_in_topic', 'Ratio_group_in_population']).T
     topic_annot.index = list(topic_annot_dict.keys())
-    topic_annot['is_general'] = (
-        topic_annot['Ratio_cells_in_topic'] -
-        topic_annot['Ratio_group_in_population']) > general_topic_thr
+    topic_annot['is_general'] = (topic_annot['Ratio_cells_in_topic'] - topic_annot['Ratio_group_in_population']
+                                 ) > general_topic_thr
     return topic_annot
 
 
@@ -288,4 +289,4 @@ def gini_coefficient(x):
     diffsum = 0
     for i, xi in enumerate(x[:-1], 1):
         diffsum += np.sum(np.abs(xi - x[i:]))
-    return diffsum / (len(x)**2 * np.mean(x))
+    return diffsum / (len(x) ** 2 * np.mean(x))
