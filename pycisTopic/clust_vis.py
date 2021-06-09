@@ -1,4 +1,3 @@
-from adjustText import adjust_text
 import harmonypy as hm
 import igraph as ig
 import leidenalg as la
@@ -13,12 +12,12 @@ import pandas as pd
 import random
 import seaborn as sns
 import sklearn
-from sklearn.neighbors import kneighbors_graph
 import sys
 import umap
-
-from typing import Optional, Union
+from adjustText import adjust_text
+from sklearn.neighbors import kneighbors_graph
 from typing import Dict, List, Tuple
+from typing import Optional, Union
 
 from .cistopic_class import *
 
@@ -405,8 +404,9 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
                 color_dict = color_dictionary[var]
             except BaseException:
                 random.seed(seed)
-                color = list(map(lambda i: "#" + "%06x" %
-                                 random.randint(0, 0xFFFFFF), range(len(categories))))
+                color = list(map(
+                    lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF), range(len(categories))
+                ))
                 color_dict = dict(zip(categories, color))
 
             if num_columns > 1:
@@ -795,8 +795,7 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
     cell_data = cistopic_obj.cell_data
 
     if selected_topics is not None:
-        cell_topic = cell_topic.loc[[
-            'Topic' + str(x) for x in selected_topics], ]
+        cell_topic = cell_topic.loc[['Topic' + str(x) for x in selected_topics], ]
     if selected_cells is not None:
         cell_topic = cell_topic.loc[:, selected_cells]
         cell_data = cell_data.loc[selected_cells]
@@ -827,13 +826,14 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
                 color_dict = color_dictionary[var]
             except BaseException:
                 random.seed(seed)
-                color = list(map(lambda i: "#" + "%06x" %
-                                 random.randint(0, 0xFFFFFF), range(len(categories))))
+                color = list(map(
+                    lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF), range(len(categories))
+                ))
                 color = [mcolors.to_rgb(x) for x in color]
                 color_dict[var] = dict(zip(categories, color))
             col_colors[var] = var_data.map(color_dict[var])
         col_colors = pd.concat([col_colors[var]
-                               for var in variables], axis=1, sort=False)
+                                for var in variables], axis=1, sort=False)
 
         g = sns.clustermap(cell_topic,
                            row_cluster=cluster_topics,
