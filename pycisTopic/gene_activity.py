@@ -1,15 +1,13 @@
-import pandas as pd
+import logging
 import numpy as np
+import pandas as pd
 import pyranges as pr
 import scipy.sparse as sparse
-import logging
 import sys
+from typing import List, Optional, Union
 
-from .utils import *
 from .diff_features import *
-
-from typing import Optional, Union
-from typing import List
+from .utils import *
 
 pd.options.mode.chained_assignment = None
 
@@ -112,7 +110,7 @@ def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
     region_weights_df.loc[:, 'Index'] = get_position_index(
         region_weights_df.Name, imputed_acc_object.feature_names)
     region_weights_df.loc[:, 'Weight'] = region_weights_df.Gene_size_weight * \
-        region_weights_df.Distance_weight * region_weights_df.Gini_weight
+                                         region_weights_df.Distance_weight * region_weights_df.Gini_weight
     region_weights_df = region_weights_df.loc[region_weights_df.Weight > 0, :]
     genes = list(set(region_weights_df.Gene))
     log.info('Getting gene activity scores')
@@ -251,15 +249,13 @@ def region_weights(imputed_acc_object,
         pr_annot.Gene_size_weight = 1
 
     # Prepare promoters annotation
-    pd_promoters = pr_annot.df.loc[:, [
-        'Chromosome', 'Transcription_Start_Site', 'Strand', 'Gene']]
+    pd_promoters = pr_annot.df.loc[:, ['Chromosome', 'Transcription_Start_Site', 'Strand', 'Gene']]
     pd_promoters['Transcription_Start_Site'] = (
-        pd_promoters.loc[:, 'Transcription_Start_Site']).astype(np.int32)
-    pd_promoters['End'] = (pd_promoters.loc[:,
-                                            'Transcription_Start_Site']).astype(np.int32)
+        pd_promoters.loc[:, 'Transcription_Start_Site']
+    ).astype(np.int32)
+    pd_promoters['End'] = (pd_promoters.loc[:, 'Transcription_Start_Site']).astype(np.int32)
     pd_promoters.columns = ['Chromosome', 'Start', 'Strand', 'Gene', 'End']
-    pd_promoters = pd_promoters.loc[:, [
-        'Chromosome', 'Start', 'End', 'Strand', 'Gene']]
+    pd_promoters = pd_promoters.loc[:, ['Chromosome', 'Start', 'End', 'Strand', 'Gene']]
     pr_promoters = pr.PyRanges(pd_promoters)
     pr_promoters = extend_pyranges(pr_promoters, extend_tss[0], extend_tss[1])
 
@@ -269,11 +265,10 @@ def region_weights(imputed_acc_object,
         chromsizes_begin_pos = chromsizes.df
         chromsizes_begin_pos['End'] = [1] * len(chromsizes_begin_pos)
         chromsizes_begin_pos['Strand'] = ['+'] * len(chromsizes_begin_pos)
-        chromsizes_begin_pos['Gene'] = [
-            'Chrom_Begin'] * len(chromsizes_begin_pos)
+        chromsizes_begin_pos['Gene'] = ['Chrom_Begin'] * len(chromsizes_begin_pos)
         chromsizes_begin_neg = chromsizes_begin_pos
         chromsizes_begin_neg.loc[:, 'Strand'] = [
-            '-'] * len(chromsizes_begin_pos)
+                                                    '-'] * len(chromsizes_begin_pos)
         chromsizes_end_pos = chromsizes.df
         chromsizes_end_pos['Start'] = chromsizes_end_pos['End'] - 1
         chromsizes_end_pos['Strand'] = ['+'] * len(chromsizes_end_pos)
@@ -287,7 +282,10 @@ def region_weights(imputed_acc_object,
                     chromsizes_begin_pos,
                     chromsizes_begin_neg,
                     chromsizes_end_pos,
-                    chromsizes_end_neg]))
+                    chromsizes_end_neg
+                ]
+            )
+        )
         # Get distance to nearest promoter (of a differrent gene)
         pr_annot_nodup = pr_annot[['Chromosome',
                                    'Start',
@@ -374,7 +372,7 @@ def region_weights(imputed_acc_object,
         # Distance weight
         regions_gene_list = []
         regions_gene_body = regions_per_gene[(regions_per_gene.Distance <= extend_gene_body_upstream) & (
-            regions_per_gene.Distance >= extend_gene_body_downstream)]
+                regions_per_gene.Distance >= extend_gene_body_downstream)]
         if len(regions_gene_body) > 0:
             regions_gene_body.Distance_weight = 1 + np.exp(-1)
             regions_gene_list.append(regions_gene_body.df)
@@ -421,88 +419,63 @@ def region_weights(imputed_acc_object,
             index=subset_imputed_acc_object.feature_names)
         gini_weight['Gini_weight'] = np.exp(
             (1 - gini_weight['Gini'])) + np.exp(-1)
-        gini_weight = gini_weight.loc[regions_per_gene.Name, ]
+        gini_weight = gini_weight.loc[regions_per_gene.Name,]
         regions_per_gene.Gini_weight = gini_weight.loc[:, 'Gini_weight']
     else:
         regions_per_gene.Gini_weight = 1
     # Return weights
     if use_gene_boundaries:
         weights_df = regions_per_gene.df.loc[:,
-                                             ['Name',
-                                              'Gene',
-                                              'Distance',
-                                              'Distance_upstream',
-                                              'Distance_downstream',
-                                              'Gene_size_weight',
-                                              'Distance_weight',
-                                              'Gini_weight']]
+                     ['Name',
+                      'Gene',
+                      'Distance',
+                      'Distance_upstream',
+                      'Distance_downstream',
+                      'Gene_size_weight',
+                      'Distance_weight',
+                      'Gini_weight']]
     else:
-        weights_df = regions_per_gene.df.loc[:, [
-            'Name', 'Gene', 'Distance', 'Gene_size_weight', 'Distance_weight', 'Gini_weight']]
+        weights_df = regions_per_gene.df.loc[
+                     :, ['Name', 'Gene', 'Distance', 'Gene_size_weight', 'Distance_weight', 'Gini_weight']
+                     ]
     return weights_df
 
 
 def extend_pyranges_with_limits(pr_obj: pr.PyRanges):
     """
     A helper function to extend coordinates downstream/upstream in a pyRanges with Distance_upstream and
-    Distance_dorwnstream columns.
+    Distance_downstream columns.
     """
     # Split per strand
     positive_pr = pr_obj[pr_obj.Strand == '+']
     negative_pr = pr_obj[pr_obj.Strand == '-']
     # Extend space
     if len(positive_pr) > 0:
-        positive_pr.Start = (
-            positive_pr.Start -
-            positive_pr.Distance_upstream).astype(
-            np.int32)
-        positive_pr.End = (
-            positive_pr.End +
-            positive_pr.Distance_downstream).astype(
-            np.int32)
+        positive_pr.Start = (positive_pr.Start - positive_pr.Distance_upstream).astype(np.int32)
+        positive_pr.End = (positive_pr.End + positive_pr.Distance_downstream).astype(np.int32)
     if len(negative_pr) > 0:
-        negative_pr.Start = (
-            negative_pr.Start -
-            negative_pr.Distance_downstream).astype(
-            np.int32)
-        negative_pr.End = (
-            negative_pr.End +
-            negative_pr.Distance_upstream).astype(
-            np.int32)
-    extended_pr = pr.PyRanges(
-        pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
+        negative_pr.Start = (negative_pr.Start - negative_pr.Distance_downstream).astype(np.int32)
+        negative_pr.End = (negative_pr.End + negative_pr.Distance_upstream).astype(np.int32)
+    extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
     return extended_pr
 
 
 def reduce_pyranges_with_limits_b(pr_obj: pr.PyRanges):
     """
     A helper function to reduce coordinates downstream/upstream in a pyRanges with Distance_upstream and
-    Distance_dorwnstream columns.
+    Distance_downstream columns.
     """
     # Split per strand
     positive_pr = pr_obj[pr_obj.Strand == '+']
     negative_pr = pr_obj[pr_obj.Strand == '-']
     # Extend space
     if len(positive_pr) > 0:
-        positive_pr.Start_b = (
-            positive_pr.Start_b +
-            positive_pr.Distance_upstream).astype(
-            np.int32)
-        positive_pr.End_b = (
-            positive_pr.End_b -
-            positive_pr.Distance_downstream).astype(
-            np.int32)
+        positive_pr.Start_b = (positive_pr.Start_b + positive_pr.Distance_upstream).astype(np.int32)
+        positive_pr.End_b = (positive_pr.End_b - positive_pr.Distance_downstream).astype(np.int32)
     if len(negative_pr) > 0:
-        negative_pr.Start_b = (
-            negative_pr.Start_b +
-            negative_pr.Distance_downstream).astype(
-            np.int32)
-        negative_pr.End_b = (
-            negative_pr.End_b -
-            negative_pr.Distance_upstream).astype(
-            np.int32)
-    extended_pr = pr.PyRanges(
-        pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
+        negative_pr.Start_b = (negative_pr.Start_b + negative_pr.Distance_downstream).astype(np.int32)
+        negative_pr.End_b = (negative_pr.End_b - negative_pr.Distance_upstream).astype(np.int32)
+    extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
     return extended_pr
 
 
@@ -543,13 +516,9 @@ def reduce_pyranges_b(pr_obj: pr.PyRanges,
         positive_pr.Start_b = (positive_pr.Start_b + upstream).astype(np.int32)
         positive_pr.End_b = (positive_pr.End_b - downstream).astype(np.int32)
     if len(negative_pr) > 0:
-        negative_pr.Start_b = (
-            negative_pr.Start_b +
-            downstream).astype(
-            np.int32)
+        negative_pr.Start_b = (negative_pr.Start_b + downstream).astype(np.int32)
         negative_pr.End_b = (negative_pr.End_b - upstream).astype(np.int32)
-    extended_pr = pr.PyRanges(
-        pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
+    extended_pr = pr.PyRanges(pd.concat([positive_pr.df, negative_pr.df], axis=0, sort=False))
     return extended_pr
 
 
@@ -561,30 +530,21 @@ def calculate_distance_join(pr_obj: pr.PyRanges):
     pr_obj_df = pr_obj.df
     distance_df = pd.DataFrame(
         [
-            pr_obj_df.Start_b -
-            pr_obj_df.Start,
-            pr_obj_df.End_b -
-            pr_obj_df.Start,
-            pr_obj_df.Strand],
-        index=[
-            'start_dist',
-            'end_dist',
-            'strand'])
+            pr_obj_df.Start_b - pr_obj_df.Start,
+            pr_obj_df.End_b - pr_obj_df.Start,
+            pr_obj_df.Strand
+        ],
+        index=['start_dist', 'end_dist', 'strand']
+    )
     distance_df = distance_df.transpose()
-    distance_df.loc[:, 'min_distance'] = abs(
-        distance_df.loc[:, ['start_dist', 'end_dist']].transpose()).min()
+    distance_df.loc[:, 'min_distance'] = abs(distance_df.loc[:, ['start_dist', 'end_dist']].transpose()).min()
     distance_df.strand[distance_df.strand == '+'] = 1
     distance_df.strand[distance_df.strand == '-'] = -1
     distance_df.loc[:, 'location'] = 0
-    distance_df.loc[(distance_df.start_dist > 0) & (
-        distance_df.end_dist > 0), 'location'] = 1
-    distance_df.loc[(distance_df.start_dist < 0) & (
-        distance_df.end_dist < 0), 'location'] = -1
-    distance_df.loc[:, 'location'] = distance_df.loc[:,
-                                                     'location'] * distance_df.loc[:, 'strand']
-    pr_obj.Distance = distance_df.loc[:,
-                                      'location'] * distance_df.loc[:,
-                                                                    'min_distance'].astype(np.int32)
+    distance_df.loc[(distance_df.start_dist > 0) & (distance_df.end_dist > 0), 'location'] = 1
+    distance_df.loc[(distance_df.start_dist < 0) & (distance_df.end_dist < 0), 'location'] = -1
+    distance_df.loc[:, 'location'] = distance_df.loc[:, 'location'] * distance_df.loc[:, 'strand']
+    pr_obj.Distance = distance_df.loc[:, 'location'] * distance_df.loc[:, 'min_distance'].astype(np.int32)
     pr_obj = pr_obj[['Chromosome',
                      'Start',
                      'End',
@@ -610,26 +570,18 @@ def calculate_distance_with_limits_join(pr_obj: pr.PyRanges):
             pr_obj_df.Start,
             pr_obj_df.End_b -
             pr_obj_df.Start,
-            pr_obj_df.Strand],
-        index=[
-            'start_dist',
-            'end_dist',
-            'strand'])
+            pr_obj_df.Strand
+        ],
+        index=['start_dist', 'end_dist', 'strand'])
     distance_df = distance_df.transpose()
-    distance_df.loc[:, 'min_distance'] = abs(
-        distance_df.loc[:, ['start_dist', 'end_dist']].transpose()).min()
+    distance_df.loc[:, 'min_distance'] = abs(distance_df.loc[:, ['start_dist', 'end_dist']].transpose()).min()
     distance_df.strand[distance_df.strand == '+'] = 1
     distance_df.strand[distance_df.strand == '-'] = -1
     distance_df.loc[:, 'location'] = 0
-    distance_df.loc[(distance_df.start_dist > 0) & (
-        distance_df.end_dist > 0), 'location'] = 1
-    distance_df.loc[(distance_df.start_dist < 0) & (
-        distance_df.end_dist < 0), 'location'] = -1
-    distance_df.loc[:, 'location'] = distance_df.loc[:,
-                                                     'location'] * distance_df.loc[:, 'strand']
-    pr_obj.Distance = distance_df.loc[:,
-                                      'location'] * distance_df.loc[:,
-                                                                    'min_distance'].astype(np.int32)
+    distance_df.loc[(distance_df.start_dist > 0) & (distance_df.end_dist > 0), 'location'] = 1
+    distance_df.loc[(distance_df.start_dist < 0) & (distance_df.end_dist < 0), 'location'] = -1
+    distance_df.loc[:, 'location'] = distance_df.loc[:, 'location'] * distance_df.loc[:, 'strand']
+    pr_obj.Distance = distance_df.loc[:, 'location'] * distance_df.loc[:, 'min_distance'].astype(np.int32)
     pr_obj = pr_obj[['Chromosome',
                      'Start',
                      'End',
