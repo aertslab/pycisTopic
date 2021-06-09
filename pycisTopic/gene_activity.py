@@ -262,19 +262,18 @@ def region_weights(imputed_acc_object,
     if use_gene_boundaries:
         log.info('Calculating gene boundaries')
         # Add chromosome limits
-        chromsizes_begin_pos = chromsizes.df
-        chromsizes_begin_pos['End'] = [1] * len(chromsizes_begin_pos)
-        chromsizes_begin_pos['Strand'] = ['+'] * len(chromsizes_begin_pos)
-        chromsizes_begin_pos['Gene'] = ['Chrom_Begin'] * len(chromsizes_begin_pos)
-        chromsizes_begin_neg = chromsizes_begin_pos
-        chromsizes_begin_neg.loc[:, 'Strand'] = [
-                                                    '-'] * len(chromsizes_begin_pos)
-        chromsizes_end_pos = chromsizes.df
+        chromsizes_begin_pos = chromsizes.df.copy()
+        chromsizes_begin_pos['End'] = 1
+        chromsizes_begin_pos['Strand'] = '+'
+        chromsizes_begin_pos['Gene'] = 'Chrom_Begin'
+        chromsizes_begin_neg = chromsizes_begin_pos.copy()
+        chromsizes_begin_neg['Strand'] = '-'
+        chromsizes_end_pos = chromsizes.df.copy()
         chromsizes_end_pos['Start'] = chromsizes_end_pos['End'] - 1
-        chromsizes_end_pos['Strand'] = ['+'] * len(chromsizes_end_pos)
-        chromsizes_end_pos['Gene'] = ['Chrom_End'] * len(chromsizes_end_pos)
-        chromsizes_end_neg = chromsizes_end_pos
-        chromsizes_end_neg.loc[:, 'Strand'] = ['-'] * len(chromsizes_end_pos)
+        chromsizes_end_pos['Strand'] = '+'
+        chromsizes_end_pos['Gene'] = 'Chrom_End'
+        chromsizes_end_neg = chromsizes_end_pos.copy()
+        chromsizes_end_neg['Strand'] = '-'
         pr_gene_bound = pr.PyRanges(
             pd.concat(
                 [
