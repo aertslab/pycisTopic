@@ -1,16 +1,14 @@
 import json
 import logging
-from loomxpy.loomxpy import SCopeLoom
 import loompy
 import numpy as np
 import pandas as pd
-from pyscenic import export
-from pyscenic.genesig import Regulon
 import scipy.sparse as sparse
 import sys
-
-from typing import Optional, Union
-from typing import List, Dict, Sequence, Mapping
+from loomxpy.loomxpy import SCopeLoom
+from pyscenic import export
+from pyscenic.genesig import Regulon
+from typing import Dict, List, Mapping, Optional, Sequence, Union
 
 
 def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFeatures', pd.DataFrame],
@@ -89,8 +87,7 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
                 cells=selected_cells, features=selected_genes, copy=True)
         else:
             if selected_genes is not None:
-                gene_activity_matrix = gene_activity_matrix.loc[:,
-                                                                selected_genes]
+                gene_activity_matrix = gene_activity_matrix.loc[:, selected_genes]
             if selected_cells is not None:
                 gene_activity_matrix = gene_activity_matrix.loc[selected_cells, :]
 
@@ -187,12 +184,16 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
         for x in annotation_not_in_markers:
             log.info(x, 'is not in the cluster markers dictionary')
         cluster_markers = {
-            k: v for k,
-            v in cluster_markers.items() if k in annotation_in_markers}
-        # Keeep genes in data
+            k: v
+            for k, v in cluster_markers.items()
+            if k in annotation_in_markers
+        }
+        # Keep genes in data
         for y in cluster_markers:
-            cluster_markers[y] = {x: cluster_markers[y][x][cluster_markers[y][x].index.isin(
-                gene_names)] for x in cluster_markers[y].keys()}
+            cluster_markers[y] = {
+                x: cluster_markers[y][x][cluster_markers[y][x].index.isin(gene_names)]
+                for x in cluster_markers[y].keys()
+            }
         add_markers(loom, cluster_markers)
 
     log.info('Exporting')
@@ -273,8 +274,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
                 cells=selected_cells, features=selected_regions, copy=True)
         else:
             if selected_regions is not None:
-                accessibility_matrix = accessibility_matrix.loc[:,
-                                                                selected_regions]
+                accessibility_matrix = accessibility_matrix.loc[:, selected_regions]
             if selected_cells is not None:
                 accessibility_matrix = accessibility_matrix.loc[selected_cells, :]
 
@@ -289,18 +289,16 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     cell_data = cistopic_obj.cell_data.loc[cell_names, :]
 
     # Check ups
-    if not set(
-            binarized_topic_region.keys()) == set(
-            binarized_cell_topic.keys()):
-        log.error(
-            'Keys in binarized_topic_region and binarized_cell_topic do not agree.')
+    if not set(binarized_topic_region.keys()) == set(binarized_cell_topic.keys()):
+        log.error('Keys in binarized_topic_region and binarized_cell_topic do not agree.')
     if cluster_annotation is not None:
         for annotation in cluster_annotation:
             if annotation not in cell_data:
                 log.error(
                     'The cluster annotation',
                     annotation,
-                    ' is not included in cistopic_obj.cell_data')
+                    ' is not included in cistopic_obj.cell_data'
+                )
 
     # Prepare data for minimum loom file
     # Matrix
@@ -309,12 +307,14 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
             ex_mtx = pd.DataFrame.sparse.from_spmatrix(
                 accessibility_matrix.mtx.T,
                 index=cell_names,
-                columns=region_names).sparse.to_dense()
+                columns=region_names
+            ).sparse.to_dense()
         else:
             ex_mtx = pd.DataFrame(
                 accessibility_matrix.mtx.T,
                 index=cell_names,
-                columns=region_names)
+                columns=region_names
+            )
     else:
         ex_mtx = accessibility_matrix
     # Cell-topic values
@@ -322,14 +322,19 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     ex_mtx = pd.concat([ex_mtx, cell_topic], axis=1)
     # Topics
     # Keep only regions in data
-    binarized_topic_region = {x: binarized_topic_region[x][binarized_topic_region[x].index.isin(
-        region_names)] for x in binarized_topic_region.keys()}
+    binarized_topic_region = {
+        x: binarized_topic_region[x][binarized_topic_region[x].index.isin(region_names)]
+        for x in binarized_topic_region.keys()
+    }
     topics = [
         Regulon(
             name=x,
             gene2weight=binarized_topic_region[x].to_dict()[x],
             transcription_factor=x,
-            gene2occurrence=[]) for x in binarized_topic_region.keys()]
+            gene2occurrence=[]
+        )
+        for x in binarized_topic_region.keys()
+    ]
     # Cell annotations and metrics
     metrics = []
     annotations = []
@@ -347,10 +352,16 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     annotations = pd.concat(annotations, axis=1)
     # Auc thresholds
     # Keep only cells in data
-    binarized_cell_topic = {x: binarized_cell_topic[x][binarized_cell_topic[x].index.isin(
-        cell_names)] for x in cell_topic.keys()}
-    topic_thresholds = pd.Series([cell_topic.sort_values(x, ascending=False)[x][len(
-        binarized_cell_topic[x])] for x in binarized_cell_topic.keys()], index=binarized_cell_topic.keys())
+    binarized_cell_topic = {
+        x: binarized_cell_topic[x][binarized_cell_topic[x].index.isin(cell_names)]
+        for x in cell_topic.keys()
+    }
+    topic_thresholds = pd.Series(
+        [cell_topic.sort_values(x, ascending=False)[x][len(binarized_cell_topic[x])]
+         for x in binarized_cell_topic.keys()
+         ],
+        index=binarized_cell_topic.keys()
+    )
     # Embeddings. Cell embeddings in this case
     embeddings = {x: cistopic_obj.projections['cell'][x].loc[cell_names, :]
                   for x in cistopic_obj.projections['cell'].keys()}
@@ -386,18 +397,24 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     if cluster_markers is not None:
         log.info('Adding markers')
         annotation_in_markers = [
-            x for x in cluster_annotation if x in cluster_markers.keys()]
+            x for x in cluster_annotation if x in cluster_markers.keys()
+        ]
         annotation_not_in_markers = [
             x for x in cluster_annotation if x not in cluster_markers.keys()]
+
         for x in annotation_not_in_markers:
             log.info(x, 'is not in the cluster markers dictionary')
         cluster_markers = {
-            k: v for k,
-            v in cluster_markers.items() if k in annotation_in_markers}
+            k: v
+            for k, v in cluster_markers.items()
+            if k in annotation_in_markers
+        }
         # Keeep regions in data
         for y in cluster_markers:
-            cluster_markers[y] = {x: cluster_markers[y][x][cluster_markers[y][x].index.isin(
-                region_names)] for x in cluster_markers[y].keys()}
+            cluster_markers[y] = {
+                x: cluster_markers[y][x][cluster_markers[y][x].index.isin(region_names)]
+                for x in cluster_markers[y].keys()
+            }
         add_markers(loom, cluster_markers)
 
     log.info('Exporting')
@@ -412,7 +429,7 @@ def get_metadata(loom):
     annot_mt_column_names = [annot_metadata[x]['name']
                              for x in range(len(annot_metadata))]
     annot_mt = pd.concat([pd.DataFrame(loom.col_attrs[annot_mt_column_names[x]])
-                         for x in range(len(annot_mt_column_names))], axis=1)
+                          for x in range(len(annot_mt_column_names))], axis=1)
     annot_mt.columns = [annot_mt_column_names[x]
                         for x in range(len(annot_mt_column_names))]
     annot_mt.index = loom.get_cell_ids().tolist()
@@ -438,8 +455,10 @@ def add_annotation(loom, annots: pd.DataFrame):
     for annot in annots:
         vals = list(annots[annot])
         uniq_vals = np.unique(vals)
-        md_annot.append({"name": annot, "values": list(
-            map(lambda x: str(x), uniq_vals.tolist()))})
+        md_annot.append({
+            "name": annot,
+            "values": list(map(lambda x: str(x), uniq_vals.tolist()))
+        })
         loom.col_attrs[annot] = np.array(annots[annot])
     loom.global_attrs["MetaData"].update({'annotations': md_annot})
 
@@ -466,8 +485,10 @@ def add_clusterings(loom: SCopeLoom,
         cluster_marker_method = cluster_name
 
         num_clusters = len(np.unique(cluster_data[cluster_name]))
-        cluster_2_number = {np.unique(cluster_data[cluster_name])[
-            i]: i for i in range(num_clusters)}
+        cluster_2_number = {
+            np.unique(cluster_data[cluster_name])[i]: i
+            for i in range(num_clusters)
+        }
 
         # Data
         clusterings[str(clustering_id)] = [cluster_2_number[x]
@@ -512,7 +533,8 @@ def add_clusterings(loom: SCopeLoom,
     col_attrs = {**col_attrs, **col_attrs_clusterings}
     loom.col_attrs = col_attrs
     loom.global_attrs["MetaData"].update(
-        {'clusterings': attrs_metadata["clusterings"]})
+        {'clusterings': attrs_metadata["clusterings"]}
+    )
 
 
 def add_markers(loom: SCopeLoom,
@@ -527,8 +549,10 @@ def add_markers(loom: SCopeLoom,
                if attrs_metadata['clusterings'][i]["name"] == cluster_name][0]
         clustering_id = attrs_metadata['clusterings'][idx]["id"]
         num_clusters = len(attrs_metadata['clusterings'][idx]["clusters"])
-        cluster_description = [attrs_metadata['clusterings'][idx][
-            "clusters"][x]['description'] for x in range(num_clusters)]
+        cluster_description = [
+            attrs_metadata['clusterings'][idx]["clusters"][x]['description']
+            for x in range(num_clusters)
+        ]
 
         # Initialize
         cluster_markers = pd.DataFrame(
@@ -547,10 +571,8 @@ def add_markers(loom: SCopeLoom,
         # Populate
         for i in range(0, num_clusters):
             try:
-                gene_names = markers_dict[cluster_name][cluster_description[i]].index.tolist(
-                )
-                pvals_adj = markers_dict[cluster_name][cluster_description[i]
-                                                       ]['Adjusted_pval']
+                gene_names = markers_dict[cluster_name][cluster_description[i]].index.tolist()
+                pvals_adj = markers_dict[cluster_name][cluster_description[i]]['Adjusted_pval']
                 logfoldchanges = markers_dict[cluster_name][cluster_description[i]]['Log2FC']
                 i = str(i)
                 num_genes = len(gene_names)
@@ -565,12 +587,10 @@ def add_markers(loom: SCopeLoom,
         # Update row attribute Dict
         row_attrs_cluster_markers = {
             f"ClusterMarkers_{str(idx)}": df_to_named_matrix(
-                cluster_markers.astype(
-                    np.int8)), f"ClusterMarkers_{str(idx)}_avg_logFC": df_to_named_matrix(
-                cluster_markers_avg_logfc.astype(
-                    np.float32)), f"ClusterMarkers_{str(idx)}_pval": df_to_named_matrix(
-                        cluster_markers_pval.astype(
-                            np.float32))}
+                cluster_markers.astype(np.int8)),
+            f"ClusterMarkers_{str(idx)}_avg_logFC": df_to_named_matrix(cluster_markers_avg_logfc.astype(np.float32)),
+            f"ClusterMarkers_{str(idx)}_pval": df_to_named_matrix(cluster_markers_pval.astype(np.float32))
+        }
         row_attrs = {**row_attrs, **row_attrs_cluster_markers}
         loom.row_attrs = row_attrs
 
@@ -581,11 +601,14 @@ def get_regulons(loom):
     """
     regulon_dict = pd.DataFrame(
         loom.get_regulons(),
-        index=loom.row_attrs['Gene']).to_dict()
+        index=loom.row_attrs['Gene']
+    ).to_dict()
     for t in regulon_dict:
         regulon_dict[t] = {x: y for x, y in regulon_dict[t].items() if y != 0}
-    motif_data = {x['regulon']: x['motifData']
-                  for x in loom.global_attrs['MetaData']['regulonThresholds']}
+    motif_data = {
+        x['regulon']: x['motifData']
+        for x in loom.global_attrs['MetaData']['regulonThresholds']
+    }
     regulon_list = [
         Regulon(
             name=x,
@@ -594,7 +617,10 @@ def get_regulons(loom):
             gene2occurrence=[],
             context=frozenset(
                 list(
-                    motif_data[x]))) for x in regulon_dict.keys()]
+                    motif_data[x]))
+        )
+        for x in regulon_dict.keys()
+    ]
     return regulon_list
 
 
