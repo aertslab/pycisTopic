@@ -72,12 +72,12 @@ def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
         Value to multiply for the final gene activity matrix. Default: 1
     extend_tss: list, optional
         Space around the TSS consider as promoter. Default: [10,10]
+    return_weights: bool, optional
+        Whether to return the final weight values. Default: True
     gini_weight: bool, optional
         Whether to add a gini index weigth. The more unique the region is, the higher this weight will be.
         Default: True
-    return_weigths: bool, optional
-        Whether to return the final weight values. Default: True
-    project: str, optiona;
+    project: str, optional;
         Project name for the :class:`CistopicImputedFeatures` with the gene activity
 
     Return
@@ -212,7 +212,6 @@ def region_weights(imputed_acc_object,
     gini_weight: bool, optional
         Whether to add a gini index weigth. The more unique the region is, the higher this weight will be.
         Default: True
-    return_weigths: bool, optional
 
 
     Return
@@ -240,7 +239,7 @@ def region_weights(imputed_acc_object,
         pr_annot = pr.PyRanges(pr_annot.df.fillna(value={'Gene': 'na'}))
     pr_annot.Gene_width = abs(pr_annot.End - pr_annot.Start).astype(np.int32)
     if gene_size_weight:
-        log.info('Calculating gene size weigths')
+        log.info('Calculating gene size weights')
         if isinstance(gene_size_scale_factor, str):
             gene_size_scale_factor = np.median(pr_annot.Gene_width)
         pr_annot.Gene_size_weight = gene_size_scale_factor / pr_annot.Gene_width
