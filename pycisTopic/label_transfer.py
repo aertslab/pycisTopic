@@ -1,17 +1,15 @@
-from anndata import AnnData
-from sklearn.metrics.pairwise import cosine_distances
-from sklearn.cross_decomposition import CCA
-from sklearn.preprocessing import StandardScaler
-import scanpy as sc
-import pandas as pd
-import numpy as np
-import scanorama
 import logging
+import numpy as np
+import pandas as pd
 import ray
+import scanorama
+import scanpy as sc
 import sys
-
-from typing import Optional
-from typing import List
+from anndata import AnnData
+from sklearn.cross_decomposition import CCA
+from sklearn.metrics.pairwise import cosine_distances
+from sklearn.preprocessing import StandardScaler
+from typing import List, Optional
 
 
 def label_transfer(ref_anndata: AnnData,
@@ -25,10 +23,8 @@ def label_transfer(ref_anndata: AnnData,
                                                    'bbknn',
                                                    'scanorama',
                                                    'cca'],
-                   pca_ncomps: Optional[List[int]] = [50,
-                                                      50],
-                   n_neighbours: Optional[List[int]] = [10,
-                                                        10],
+                   pca_ncomps: Optional[List[int]] = [50, 50],
+                   n_neighbours: Optional[List[int]] = [10, 10],
                    bbknn_components: Optional[int] = 30,
                    cca_components: Optional[int] = 30,
                    return_label_weights: Optional[bool] = False,
@@ -104,7 +100,8 @@ def label_transfer(ref_anndata: AnnData,
         ref_anndata,
         min_mean=0.0125,
         max_mean=3,
-        min_disp=0.5)
+        min_disp=0.5
+    )
     if variable_genes:
         ref_anndata = ref_anndata[:, ref_anndata.var.highly_variable]
     sc.pp.scale(ref_anndata, max_value=10)
@@ -116,44 +113,49 @@ def label_transfer(ref_anndata: AnnData,
     log.info('Processing ' + str(len(query_samples)) + ' query sample(s) using ' + str(n_cpu) + ' cpu(s)')
 
     ray.init(num_cpus=n_cpu, **kwargs)
-    transfer_dict_list = ray.get([label_transfer_ray.remote(
-                    ref_anndata,
-                    query_anndata,
-                    labels_to_transfer,
-                    i,
-                    sample_id_col=sample_id_col,
-                    variable_genes=variable_genes,
-                    methods=methods,
-                    pca_ncomps=pca_ncomps,
-                    n_neighbours=n_neighbours,
-                    bbknn_components=bbknn_components,
-                    cca_components=cca_components,
-                    return_label_weights=return_label_weights) for i in query_samples
-                ])
+    transfer_dict_list = ray.get([
+        label_transfer_ray.remote(
+            ref_anndata,
+            query_anndata,
+            labels_to_transfer,
+            i,
+            sample_id_col=sample_id_col,
+            variable_genes=variable_genes,
+            methods=methods,
+            pca_ncomps=pca_ncomps,
+            n_neighbours=n_neighbours,
+            bbknn_components=bbknn_components,
+            cca_components=cca_components,
+            return_label_weights=return_label_weights
+        )
+        for i in query_samples
+    ])
     ray.shutdown()
     # merge result and re-order
-    transfer_dict = {key: pd.concat([x[key] for x in transfer_dict_list]).loc[query_anndata.obs_names] for key in methods}
+    transfer_dict = {
+        key: pd.concat([x[key] for x in transfer_dict_list]).loc[query_anndata.obs_names]
+        for key in methods
+    }
     return transfer_dict
+
 
 @ray.remote
 def label_transfer_ray(ref_anndata: AnnData,
-                   query_anndata: AnnData,
-                   labels_to_transfer: List[str],
-                   sample_id: str,
-                   sample_id_col: Optional[str] = 'sample_id',
-                   variable_genes: Optional[bool] = True,
-                   methods: Optional[List[str]] = ['ingest',
-                                                   'harmony',
-                                                   'bbknn',
-                                                   'scanorama',
-                                                   'cca'],
-                   pca_ncomps: Optional[List[int]] = [50,
-                                                      50],
-                   n_neighbours: Optional[List[int]] = [10,
-                                                        10],
-                   bbknn_components: Optional[int] = 30,
-                   cca_components: Optional[int] = 30,
-                   return_label_weights: Optional[bool] = False):
+                       query_anndata: AnnData,
+                       labels_to_transfer: List[str],
+                       sample_id: str,
+                       sample_id_col: Optional[str] = 'sample_id',
+                       variable_genes: Optional[bool] = True,
+                       methods: Optional[List[str]] = ['ingest',
+                                                       'harmony',
+                                                       'bbknn',
+                                                       'scanorama',
+                                                       'cca'],
+                       pca_ncomps: Optional[List[int]] = [50, 50],
+                       n_neighbours: Optional[List[int]] = [10, 10],
+                       bbknn_components: Optional[int] = 30,
+                       cca_components: Optional[int] = 30,
+                       return_label_weights: Optional[bool] = False):
     """
     Function to compute label transfer from single reference to single query sample.
 
@@ -221,7 +223,8 @@ def label_transfer_ray(ref_anndata: AnnData,
         query_anndata,
         min_mean=0.0125,
         max_mean=3,
-        min_disp=0.5)
+        min_disp=0.5
+    )
     if variable_genes:
         query_anndata = query_anndata[:, query_anndata.var.highly_variable]
     sc.pp.scale(query_anndata, max_value=10)
@@ -229,7 +232,8 @@ def label_transfer_ray(ref_anndata: AnnData,
     sc.pp.neighbors(query_anndata, n_neighbors=n_neighbours[1])
     # Select overlapping variable features
     var_names = ref_anndata.var_names.intersection(
-        set(query_anndata.var_names))
+        set(query_anndata.var_names)
+    )
     ref_anndata = ref_anndata[:, var_names]
     query_anndata = query_anndata[:, var_names]
     # Concatenate object
@@ -242,11 +246,8 @@ def label_transfer_ray(ref_anndata: AnnData,
         log.info('Running integration with ingest')
         for var in labels_to_transfer:
             sc.tl.ingest(query_anndata, ref_anndata, obs=var)
-            query_anndata.obs.loc[:,
-                                  var] = query_anndata.obs.loc[:,
-                                                               var].cat.remove_unused_categories()
-        transfer_data = pd.DataFrame(
-            query_anndata.obs.loc[:, labels_to_transfer])
+            query_anndata.obs.loc[:, var] = query_anndata.obs.loc[:, var].cat.remove_unused_categories()
+        transfer_data = pd.DataFrame(query_anndata.obs.loc[:, labels_to_transfer])
         transfer_data.columns = 'ingest_' + transfer_data.columns
         transfer_dict['ingest'] = transfer_data
     if 'harmony' in methods:
@@ -265,15 +266,12 @@ def label_transfer_ray(ref_anndata: AnnData,
             cp_df = pd.DataFrame(
                 StandardScaler().fit_transform(cp_df),
                 index=cp_df.index.to_list(),
-                columns=cp_df.columns)
+                columns=cp_df.columns
+            )
             label_weight_dict['harmony'] = {var: cp_df}
-            assigned_label = pd.DataFrame(
-                cp_df.idxmax(
-                    axis=1), columns=[
-                    'harmony_' + var])
+            assigned_label = pd.DataFrame(cp_df.idxmax(axis=1), columns=['harmony_' + var])
             harmony_transfer_list.append(assigned_label)
-        transfer_dict['harmony'] = pd.concat(
-            harmony_transfer_list, axis=1, sort=False)
+        transfer_dict['harmony'] = pd.concat(harmony_transfer_list, axis=1, sort=False)
     if 'bbknn' in methods:
         log.info('Running integration with bbknn')
         sc.external.pp.bbknn(adata_concat, batch_key='batch')
@@ -284,27 +282,26 @@ def label_transfer_ray(ref_anndata: AnnData,
         for var in labels_to_transfer:
             class_prob = label_transfer_coembedded(
                 distances, ref_anndata.obs.loc[:, var])
-            cp_df = pd.DataFrame(class_prob, columns=np.sort(
-                ref_anndata.obs.loc[:, var].unique()))
+            cp_df = pd.DataFrame(class_prob, columns=np.sort(ref_anndata.obs.loc[:, var].unique()))
             cp_df.index = query_anndata.obs.index
             cp_df = pd.DataFrame(
                 StandardScaler().fit_transform(cp_df),
                 index=cp_df.index.to_list(),
-                columns=cp_df.columns)
+                columns=cp_df.columns
+            )
             label_weight_dict['bbknn'] = {var: cp_df}
             assigned_label = pd.DataFrame(
-                cp_df.idxmax(
-                    axis=1), columns=[
-                    'bbknn_' + var])
+                cp_df.idxmax(axis=1), columns=['bbknn_' + var])
             bbknn_transfer_list.append(assigned_label)
-        transfer_dict['bbknn'] = pd.concat(
-            bbknn_transfer_list, axis=1, sort=False)
+        transfer_dict['bbknn'] = pd.concat(bbknn_transfer_list, axis=1, sort=False)
     if 'scanorama' in methods:
         log.info('Running integration with scanorama')
         integrated = scanorama.correct_scanpy(
-            [ref_anndata, query_anndata], return_dimred=True)
+            [ref_anndata, query_anndata],
+            return_dimred=True
+        )
         embedding = np.concatenate([x.obsm['X_scanorama']
-                                   for x in integrated], axis=0)
+                                    for x in integrated], axis=0)
         adata_concat.obsm["scanorama_embedding"] = embedding
         distances = 1 - cosine_distances(adata_concat[adata_concat.obs.batch == "RNA"].obsm["scanorama_embedding"],
                                          adata_concat[adata_concat.obs.batch == "ATAC"].obsm["scanorama_embedding"])
@@ -312,18 +309,15 @@ def label_transfer_ray(ref_anndata: AnnData,
         for var in labels_to_transfer:
             class_prob = label_transfer_coembedded(
                 distances, ref_anndata.obs.loc[:, var])
-            cp_df = pd.DataFrame(class_prob, columns=np.sort(
-                ref_anndata.obs.loc[:, var].unique()))
+            cp_df = pd.DataFrame(class_prob, columns=np.sort(ref_anndata.obs.loc[:, var].unique()))
             cp_df.index = query_anndata.obs.index
             cp_df = pd.DataFrame(
                 StandardScaler().fit_transform(cp_df),
                 index=cp_df.index.to_list(),
-                columns=cp_df.columns)
+                columns=cp_df.columns
+            )
             label_weight_dict['scanorama'] = {var: cp_df}
-            assigned_label = pd.DataFrame(
-                cp_df.idxmax(
-                    axis=1), columns=[
-                    'scanorama_' + var])
+            assigned_label = pd.DataFrame(cp_df.idxmax(axis=1), columns=['scanorama_' + var])
             scanorama_transfer_list.append(assigned_label)
         transfer_dict['scanorama'] = pd.concat(
             scanorama_transfer_list, axis=1, sort=False)
@@ -340,16 +334,17 @@ def label_transfer_ray(ref_anndata: AnnData,
         for var in labels_to_transfer:
             class_prob = label_transfer_coembedded(
                 distances, ref_anndata.obs.loc[:, var])
-            cp_df = pd.DataFrame(class_prob, columns=np.sort(
-                ref_anndata.obs.loc[:, var].unique()))
+            cp_df = pd.DataFrame(class_prob, columns=np.sort(ref_anndata.obs.loc[:, var].unique()))
             cp_df.index = query_anndata.obs.index
             cp_df = pd.DataFrame(
                 StandardScaler().fit_transform(cp_df),
                 index=cp_df.index.to_list(),
-                columns=cp_df.columns)
+                columns=cp_df.columns
+            )
             label_weight_dict['cca'] = {var: cp_df}
             assigned_label = pd.DataFrame(
-                cp_df.idxmax(axis=1), columns=['cca_' + var])
+                cp_df.idxmax(axis=1), columns=['cca_' + var]
+            )
             cca_transfer_list.append(assigned_label)
         transfer_dict['cca'] = pd.concat(cca_transfer_list, axis=1, sort=False)
     log.info('Sample ' + sample_id + ' done!')
