@@ -75,9 +75,9 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
     """
     # Create logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     # Feature names
@@ -262,9 +262,9 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
 
     # Create logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     # Feature names

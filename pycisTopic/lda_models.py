@@ -216,9 +216,9 @@ def run_cgs_model(binary_matrix: sparse.csr_matrix,
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     # Suppress lda logger
@@ -718,9 +718,9 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     binary_matrix = cistopic_obj.binary_matrix
@@ -821,9 +821,9 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     # Set models

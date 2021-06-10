@@ -87,9 +87,9 @@ def label_transfer(ref_anndata: AnnData,
 
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
     # Process rna data
     log.info('Normalizing RNA data')
@@ -210,9 +210,9 @@ def label_transfer_ray(ref_anndata: AnnData,
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
     # process atac data
     log.info('Normalizing ATAC data from sample ' + sample_id)

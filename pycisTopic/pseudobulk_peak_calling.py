@@ -73,9 +73,9 @@ def export_pseudobulk(input_data: Union['CistopicObject',
     """
     # Create logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     # Get fragments file
@@ -202,9 +202,9 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
     """
     # Create logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     log.info('Creating pseudobulk for ' + str(group))
@@ -378,9 +378,9 @@ def macs_call_peak_ray(macs_path: str,
     """
     # Create logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     MACS_peak_calling = MACSCallPeak(
@@ -442,7 +442,7 @@ class MACSCallPeak():
         self.treatment = bed_path
         self.name = name
         self.outdir = outdir
-        self.format = input_format
+        self.input_format = input_format
         self.gsize = genome_size
         self.shift = shift
         self.ext_size = ext_size
@@ -456,16 +456,16 @@ class MACSCallPeak():
         """
         # Create logger
         level = logging.INFO
-        format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
         handlers = [logging.StreamHandler(stream=sys.stdout)]
-        logging.basicConfig(level=level, format=format, handlers=handlers)
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
         log = logging.getLogger('cisTopic')
 
         cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
             '--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits --nolambda'
 
         cmd = cmd % (
-            self.treatment, self.name, self.outdir, self.format, self.gsize,
+            self.treatment, self.name, self.outdir, self.input_format, self.gsize,
             self.qvalue, self.shift, self.ext_size, self.keep_dup
         )
         log.info("Calling peaks for " + self.name + " with %s", cmd)

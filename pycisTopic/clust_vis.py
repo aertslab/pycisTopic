@@ -62,9 +62,9 @@ def find_clusters(cistopic_obj: 'CistopicObject',
 
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     log.info(f"Finding neighbours")
@@ -156,9 +156,9 @@ def run_umap(cistopic_obj: 'CistopicObject',
 
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     model = cistopic_obj.selected_model
@@ -242,9 +242,9 @@ def run_tsne(cistopic_obj: 'CistopicObject',
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     model = cistopic_obj.selected_model

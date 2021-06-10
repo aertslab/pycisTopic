@@ -86,9 +86,9 @@ def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
     # Calculate region weights
     region_weights_df = region_weights(imputed_acc_object,
@@ -221,9 +221,9 @@ def region_weights(imputed_acc_object,
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
     # Check up on imputed_acc_object
     features_index = non_zero_rows(imputed_acc_object.mtx)
