@@ -5,8 +5,7 @@ import pandas as pd
 from pyscenic import binarization
 import sys
 
-from typing import Optional
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from .cistopic_class import *
 
