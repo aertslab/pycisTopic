@@ -788,7 +788,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
             axis=1,
             sort=False).fillna(0).astype(
             np.int32)
-        fragment_matrix.columns = list(set(counts_df.Name.to_list()))
+        fragment_matrix.columns = sum([dfList[i].columns.tolist() for i in range(0, len(dfList))],[])
 
     # Create CistopicObject
     cistopic_obj = create_cistopic_object(
