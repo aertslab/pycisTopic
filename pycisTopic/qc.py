@@ -1,18 +1,18 @@
 import collections as cl
 import gc
-import pandas as pd
-import pyranges as pr
 import logging
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import pyranges as pr
 import ray
 import seaborn as sns
+import sys
 from scipy.stats import gaussian_kde
 from scipy.stats import norm
-import sys
-from typing import Optional, Union
-from typing import List, Dict, Tuple
+from typing import Dict, List, Optional, Tuple, Union
+
 from .cistopic_class import *
 from .utils import multiplot_from_generator, collapse_duplicates, read_fragments_from_file
 
@@ -110,8 +110,7 @@ def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
     if n_frag is None:
         if n_bc is None:
             if valid_bc is None:
-                log.error(
-                    "Please provide a list of valid barcodes, the minimal number of barcodes or the minimal number of fragments per barcode to select")
+                log.error("Please provide a list of valid barcodes, the minimal number of barcodes or the minimal number of fragments per barcode to select")
                 return
             else:
                 log.info('Marking valid barcodes contained')
@@ -137,12 +136,12 @@ def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
         else:
             ax.plot(sel, NF, color[0], nosel, NF, color[1])
         ax.legend((f'Selected BC: {selected_bc}',
-               f'Non-selected BC: {len(BR-selected_bc)}'))
+                   f'Non-selected BC: {len(BR - selected_bc)}'))
         plt.xscale("log")
         plt.yscale("log")
         plt.xlabel("Barcode Rank", fontsize=10)
         plt.ylabel("Number of fragments", fontsize=10)
-        
+
         if save is not None:
             fig.savefig(save)
         if plot:
@@ -234,7 +233,7 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
 
     x = FPB['Unique_nr_frag']
     y = FPB['Dupl_rate']
-    
+
     if plot is True or save is True:
         try:
             fig = plt.figure()
@@ -340,10 +339,7 @@ def insert_size_distribution(fragments: Union[str, pd.DataFrame],
                 name='Nr_frag').rename_axis(None).reset_index().rename(
                 columns={
                     "index": "Width"})
-        FPW_DF['Ratio_frag'] = (
-            FPW_DF['Nr_frag'].values /
-            np.sum(
-                FPW_DF['Nr_frag']))
+        FPW_DF['Ratio_frag'] = (FPW_DF['Nr_frag'].values / np.sum(FPW_DF['Nr_frag']))
         FPW_DF = FPW_DF.sort_values(by=['Width'], ascending=False)
 
     if plot is True or save is not None:
@@ -366,7 +362,7 @@ def insert_size_distribution(fragments: Union[str, pd.DataFrame],
     if return_plot_data:
         log.info('Returning plot data')
         output.update({'fragment_size_plot_data': FPW_DF})
-        return(output)
+        return output
 
 
 def profile_tss(fragments: Union[str, pd.DataFrame],
@@ -486,34 +482,35 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
         tss_space_annotation = tss_space_annotation[[
             "Chromosome", "Start", "End", "Strand"]]
         tss_space_annotation = pr.PyRanges(tss_space_annotation)
-        
+
         log.info('Creating coverage matrix')
         if partition > 1:
             barcode_list = np.array_split(valid_bc, partition)
             TSS_matrix = pd.concat([get_tss_matrix(fragments[fragments.Name.isin(set(barcode_list[x]))],
-         flank_window, tss_space_annotation).fillna(0) for x in range(partition)])
+                                                   flank_window, tss_space_annotation).fillna(0)
+                                    for x in range(partition)])
         else:
             TSS_matrix = get_tss_matrix(fragments, flank_window, tss_space_annotation)
-        log.info('Coverage matrix done') 
+        log.info('Coverage matrix done')
         if not TSS_matrix.columns.tolist() == list(range(2 * flank_window + 1)):
             missing_values = list(set(TSS_matrix.columns.tolist()).symmetric_difference(
                 list(range(2 * flank_window + 1))))
             for x in missing_values:
                 TSS_matrix[x] = 0
-        
+
             TSS_matrix = TSS_matrix.reindex(sorted(TSS_matrix.columns), axis=1)
-        
+
         if rolling_window is not None:
             TSS_matrix = TSS_matrix.rolling(
                 window=rolling_window, min_periods=0, axis=1).mean()
-        
-        TSS_counts = TSS_matrix.values.sum(axis=0) 
+
+        TSS_counts = TSS_matrix.values.sum(axis=0)
         div = max((np.mean(TSS_counts[-minimum_signal_window:]) +
-                  np.mean(TSS_counts[0:minimum_signal_window])) / 2, min_norm)    
+                   np.mean(TSS_counts[0:minimum_signal_window])) / 2, min_norm)
         if plot is True or save is not None:
             fig, ax = plt.subplots()
             ax.plot(range(-flank_window - 1, flank_window),
-                TSS_counts / div, color=color)
+                    TSS_counts / div, color=color)
             plt.xlim(-flank_window, flank_window)
             plt.xlabel("Position from TSS", fontsize=10)
             plt.ylabel("Normalized enrichment", fontsize=10)
@@ -523,13 +520,14 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
                 log.info('Plotting normalized sample TSS enrichment')
                 plt.show()
             else:
-                   plt.close(fig)
+                plt.close(fig)
 
     output = {}
     flag = False
     if return_TSS_enrichment_per_barcode:
         TSS_enrich = TSS_matrix.apply(
-            lambda x: x / max([((np.mean(x[-minimum_signal_window:]) + np.mean(x[0:minimum_signal_window])) / 2), min_norm]), axis=1)
+            lambda x: x / max(
+                [((np.mean(x[-minimum_signal_window:]) + np.mean(x[0:minimum_signal_window])) / 2), min_norm]), axis=1)
         TSS_enrich = pd.DataFrame(TSS_enrich.iloc[:, range(
             flank_window - tss_window, flank_window + tss_window)].mean(axis=1))
         TSS_enrich.columns = ['TSS_enrichment']
@@ -538,7 +536,8 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
     if return_TSS_coverage_matrix_per_barcode:
         log.info('Returning normalized TSS coverage matrix per barcode')
         TSS_mat = TSS_matrix.apply(
-            lambda x: x / max([((np.mean(x[-minimum_signal_window:]) + np.mean(x[0:minimum_signal_window])) / 2), min_norm]), axis=1)
+            lambda x: x / max(
+                [((np.mean(x[-minimum_signal_window:]) + np.mean(x[0:minimum_signal_window])) / 2), min_norm]), axis=1)
         output.update({'TSS_coverage_mat': TSS_mat})
         flag = True
     if return_plot_data:
@@ -629,8 +628,7 @@ def frip(fragments: Union[str, pd.DataFrame],
             fragments = fragments[fragments.Name.isin(set(valid_bc))]
 
         regions = read_fragments_from_file(path_to_regions)
-        regions = regions[['Chromosome', 'Start', 'End']
-                          ].drop_duplicate_positions()
+        regions = regions[['Chromosome', 'Start', 'End']].drop_duplicate_positions()
 
         if isinstance(path_to_blacklist, str):
             blacklist = read_fragments_from_file(path_to_blacklist)
@@ -662,14 +660,10 @@ def frip(fragments: Union[str, pd.DataFrame],
         FPB_FPBIR_DF = pd.concat([FPB_DF, FPBIR_DF], axis=1, sort=False)
 
         if not remove_duplicates:
-            FPB_FPBIR_DF['FRIP'] = (
-                FPB_FPBIR_DF.Total_nr_frag_in_regions /
-                FPB_FPBIR_DF.Total_nr_frag)
+            FPB_FPBIR_DF['FRIP'] = (FPB_FPBIR_DF.Total_nr_frag_in_regions / FPB_FPBIR_DF.Total_nr_frag)
         else:
-            FPB_FPBIR_DF['FRIP'] = (
-                FPB_FPBIR_DF.Unique_nr_frag_in_regions /
-                FPB_FPBIR_DF.Unique_nr_frag)
-                
+            FPB_FPBIR_DF['FRIP'] = (FPB_FPBIR_DF.Unique_nr_frag_in_regions / FPB_FPBIR_DF.Unique_nr_frag)
+
         if plot is True or save is not None:
             fig = plt.figure()
             if as_density:
@@ -855,7 +849,7 @@ def compute_qc_stats(fragments_dict: Dict[str,
     if n_cpu > len(fragments_list):
         log.info('n_cpu is larger than the number of samples. Setting n_cpu to the number of samples')
         n_cpu = len(fragments_list)
-        
+
     ray.init(num_cpus=n_cpu, **kwargs)
     qc_stats = ray.get(
         [
@@ -873,10 +867,12 @@ def compute_qc_stats(fragments_dict: Dict[str,
                 tss_minimum_signal_window=tss_minimum_signal_window,
                 tss_rolling_window=tss_rolling_window,
                 min_norm=min_norm,
-                partition = partition,
+                partition=partition,
                 check_for_duplicates=check_for_duplicates,
-                remove_duplicates=remove_duplicates) for i in range(
-                    len(fragments_list))])
+                remove_duplicates=remove_duplicates)
+            for i in range(len(fragments_list))
+        ]
+    )
     ray.shutdown()
     metadata_dict = {key: x[key] for x in list(
         list(zip(*qc_stats))[0]) for key in x.keys()}
@@ -973,7 +969,7 @@ def compute_qc_stats_ray(fragments,
         if check_for_duplicates:
             log.info("Collapsing duplicates")
             fragments_df = pd.concat([collapse_duplicates(fragments_df[fragments_df.Chromosome == x])
-             for x in fragments_df.Chromosome.cat.categories.values])
+                                      for x in fragments_df.Chromosome.cat.categories.values])
         else:
             fragments_df['Score'] = 1
     else:
@@ -1009,7 +1005,7 @@ def compute_qc_stats_ray(fragments,
                                                    valid_bc=valid_bc,
                                                    plot=False,
                                                    return_plot_data=True)
-    
+
     gc.collect()
     # Fragment size
     if 'insert_size_distribution' in stats:
@@ -1033,7 +1029,7 @@ def compute_qc_stats_ray(fragments,
             valid_bc=valid_bc,
             plot=False,
             n_cpu=1,
-            partition = partition,
+            partition=partition,
             flank_window=tss_flank_window,
             tss_window=tss_window,
             minimum_signal_window=tss_minimum_signal_window,
@@ -1059,7 +1055,7 @@ def compute_qc_stats_ray(fragments,
     del fragments_df
     gc.collect()
     metadata_bc, profile_data = metrics2data(metrics)
-    
+
     if isinstance(metadata_bc, pd.DataFrame):
         metadata_bc = metadata_bc.fillna(0)
 
@@ -1219,7 +1215,7 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
             else:
                 legend_labels.append(f'Selected BC: {sum(sel.mask)}')
                 legend_labels.append(
-                    f'Non-selected BC: {plot_data.shape[0]-sum(sel.mask)}')
+                    f'Non-selected BC: {plot_data.shape[0] - sum(sel.mask)}')
 
             if not remove_duplicates:
                 NF = plot_data['Total_nr_frag']
@@ -1266,8 +1262,7 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
             if 'insert_size_distribution' not in profile_data_dict[label_list[i]]:
                 log.error(
                     'insert_size_distribution is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]
-                                          ]['insert_size_distribution']
+            plot_data = profile_data_dict[label_list[i]]['insert_size_distribution']
             if color is not None:
                 if len(color[i]) > 2:
                     selected_color = color[i][0]
@@ -1773,7 +1768,8 @@ def plot_barcode_metrics(input_metrics: Union[Dict,
     if var_group is None:
         input_metrics = {'Sample': input_metrics}
         fig_dict, selected_cells = plot_barcode_metrics_per_group(
-            input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot, save)
+            input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins,
+            plot_as_hexbin, plot, save)
     else:
         input_metrics_dict = {x: input_metrics[input_metrics.loc[:, var_group] == x] for x in list(
             set(input_metrics.loc[:, var_group]))}
@@ -1834,7 +1830,8 @@ def plot_barcode_metrics(input_metrics: Union[Dict,
 
         else:
             fig_dict, selected_cells = plot_barcode_metrics_per_group(
-                input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins, plot_as_hexbin, plot, save)
+                input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins,
+                plot_as_hexbin, plot, save)
 
     if return_cells:
         if len(selected_cells) == 1:
@@ -1868,8 +1865,7 @@ def merge_metadata(metadata_bc_dict: Dict):
     """
 
     for key in metadata_bc_dict.keys():
-        metadata_bc_dict[key]['Sample'] = [
-            key] * metadata_bc_dict[key].shape[0]
+        metadata_bc_dict[key]['Sample'] = [key] * metadata_bc_dict[key].shape[0]
 
     metadata_bc_list = [metadata_bc_dict[key]
                         for key in metadata_bc_dict.keys()]
