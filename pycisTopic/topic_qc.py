@@ -7,8 +7,7 @@ import pandas as pd
 from adjustText import adjust_text
 from itertools import compress
 from statsmodels.stats import proportion
-from typing import Dict, Tuple
-from typing import Optional, Union
+from typing import Dict, Optional, Tuple, Union
 
 from .cistopic_class import *
 
