@@ -6,7 +6,6 @@ import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import polars as pl
 import pyranges as pr
 import re
 import sys
@@ -386,6 +385,8 @@ def read_fragments_from_file(fragments_bed_filename, use_polars: bool = False) -
         )
 
     if use_polars:
+        import polars as pl
+
         # Read fragments BED file with polars.
         df = pl.read_csv(
             fragments_bed_filename,
