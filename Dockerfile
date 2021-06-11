@@ -10,7 +10,7 @@ RUN BUILDPKGS="build-essential \
         wget \
         " && \
     apt-get update && \
-    apt-get install -y --no-install-recommends apt-utils debconf locales && dpkg-reconfigure locales && \
+    apt-get install -y --no-install-recommends apt-utils debconf locales locales-all && dpkg-reconfigure locales && \
     apt-get install -y --no-install-recommends $BUILDPKGS
 
 RUN python -m venv /opt/venv

@@ -179,9 +179,9 @@ class CistopicObject:
         """
         # Create logger
         level = logging.INFO
-        format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
         handlers = [logging.StreamHandler(stream=sys.stdout)]
-        logging.basicConfig(level=level, format=format, handlers=handlers)
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
         log = logging.getLogger('cisTopic')
 
         # Select cells
@@ -268,9 +268,9 @@ class CistopicObject:
         """
         # Create logger
         level = logging.INFO
-        format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
         handlers = [logging.StreamHandler(stream=sys.stdout)]
-        logging.basicConfig(level=level, format=format, handlers=handlers)
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
         log = logging.getLogger('cisTopic')
 
         cistopic_obj_list.insert(0, self)
@@ -473,9 +473,9 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
     """
     # Create logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     if isinstance(fragment_matrix, pd.DataFrame):
@@ -619,9 +619,9 @@ def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
     """
     # Create logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     log.info('Reading data')
@@ -706,9 +706,9 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
     """
     # Create logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     # Read data

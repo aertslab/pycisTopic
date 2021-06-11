@@ -126,9 +126,9 @@ class CistopicImputedFeatures:
         """
         # Create cisTopic logger
         level = logging.INFO
-        format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
         handlers = [logging.StreamHandler(stream=sys.stdout)]
-        logging.basicConfig(level=level, format=format, handlers=handlers)
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
         log = logging.getLogger('cisTopic')
 
         cistopic_imputed_features_list.insert(0, self)
@@ -224,9 +224,9 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
 
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     model = cistopic_obj.selected_model
@@ -288,9 +288,9 @@ def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     log.info('Normalizing imputed data')
@@ -354,9 +354,9 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImpute
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     log.info('Calculating mean and variance')
@@ -493,9 +493,9 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     selected_cells = list(set(cistopic_obj.cell_data.index.tolist()) & set(
@@ -571,9 +571,9 @@ def markers_ray(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
     """
     # Create cisTopic logger
     level = logging.INFO
-    format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=format, handlers=handlers)
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
     if isinstance(input_mat, pd.DataFrame):
