@@ -782,38 +782,67 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         fragment_matrix = counts_df.groupby(["Name", "regionID"], sort=False, observed=True).size().unstack(
             level="Name", fill_value=0).astype(np.int32)
         fragment_matrix.columns.names = [None]
+        # Create CistopicObject
+        cistopic_obj = create_cistopic_object(
+            fragment_matrix=fragment_matrix,
+            path_to_blacklist=path_to_blacklist,
+            min_frag=min_frag,
+            min_cell=min_cell,
+            is_acc=is_acc,
+            path_to_fragments={
+            project: path_to_fragments},
+            project=project)
     except (ValueError, MemoryError):
         log.info(
             'Data is too big, making partitions. This is a reported error in Pandas versions > 0.21 (https://github.com/pandas-dev/pandas/issues/26314)')
         barcode_list = np.array_split(
             list(set(counts_df.Name.to_list())), partition)
-        dfList = [counts_df[counts_df.Name.isin(
+        cistopic_obj_list = [counts_df[counts_df.Name.isin(
             set(barcode_list[x]))] for x in range(0, partition)]
-        dfList = [x.groupby(["Name", "regionID"], sort=False, observed=True).size().unstack(
-            level="Name", fill_value=0).astype(np.int32).rename_axis(None) for x in dfList]
-        fragment_matrix = pd.concat(
-            dfList,
-            axis=1,
-            sort=False).fillna(0).astype(
-            np.int32)
-        fragment_matrix.columns = sum([dfList[i].columns.tolist() for i in range(0, len(dfList))],[])
-
-    # Create CistopicObject
-    cistopic_obj = create_cistopic_object(
-        fragment_matrix=fragment_matrix,
-        path_to_blacklist=path_to_blacklist,
-        min_frag=min_frag,
-        min_cell=min_cell,
-        is_acc=is_acc,
-        path_to_fragments={
-            project: path_to_fragments},
-        project=project)
+        del counts_df
+        cistopic_obj_list = [create_cistopic_object_chunk(cistopic_obj_list[i],
+                                path_to_blacklist,
+                                min_frag,
+                                min_cell,
+                                is_acc,
+                                path_to_fragments={
+                                project: path_to_fragments},
+                                project=str(i),
+                                project_all=project) for i in range(partition)]
+        cistopic_obj = merge(cistopic_obj_list, project=project)
+        cistopic_obj.project = project
+        cistopic_obj.path_to_fragments = {
+            project: path_to_fragments}
+        
     if metrics is not None:
         metrics['barcode'] = metrics.index.tolist()
         cistopic_obj.add_cell_data(metrics)
     else:
         FPB_DF['barcode'] = FPB_DF.index.tolist()
         cistopic_obj.add_cell_data(FPB_DF)
+    return cistopic_obj
+
+def create_cistopic_object_chunk(df,
+                                path_to_blacklist,
+                                min_frag,
+                                min_cell,
+                                is_acc,
+                                path_to_fragments,
+                                project,
+                                project_all):
+    df = df.groupby(["Name", "regionID"], sort=False, observed=True).size().unstack(
+            level="Name", fill_value=0).astype(np.int32).rename_axis(None)
+    cistopic_obj = create_cistopic_object(
+            fragment_matrix=df,
+            path_to_blacklist=path_to_blacklist,
+            min_frag=min_frag,
+            min_cell=min_cell,
+            is_acc=is_acc,
+            path_to_fragments={
+            project: path_to_fragments},
+            project=project,
+            tag_cells = False)
+    cistopic_obj.cell_data['sample_id'] = [project_all] * len(cistopic_obj.cell_names)
     return cistopic_obj
 
 
