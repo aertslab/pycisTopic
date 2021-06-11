@@ -782,7 +782,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         fragment_matrix = counts_df.groupby(["Name", "regionID"], sort=False, observed=True).size().unstack(
             level="Name", fill_value=0).astype(np.int32)
         fragment_matrix.columns.names = [None]
-    except ValueError:
+    except (ValueError, MemoryError):
         log.info(
             'Data is too big, making partitions. This is a reported error in Pandas versions > 0.21 (https://github.com/pandas-dev/pandas/issues/26314)')
         barcode_list = np.array_split(
