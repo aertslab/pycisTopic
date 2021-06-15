@@ -736,7 +736,7 @@ def metrics2data(metrics: Optional[Dict]):
         metrics_list.append(metrics['profile_tss']['TSS_enrichment'])
 
     if len(metrics_list) > 1:
-        metadata_bc = pd.concat(metrics_list, axis=1, sort=False)
+        metadata_bc = pd.concat(metrics_list, axis=1, sort=False, join='inner')
     elif len(metrics_list) == 1:
         metadata_bc = metrics_list[0]
     elif len(metrics_list) < 1:
