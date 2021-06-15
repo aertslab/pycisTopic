@@ -9,8 +9,7 @@ import pyranges as pr
 import ray
 import seaborn as sns
 import sys
-from scipy.stats import gaussian_kde
-from scipy.stats import norm
+from scipy.stats import gaussian_kde, norm
 from typing import Dict, List, Optional, Tuple, Union
 
 from .cistopic_class import *
@@ -87,25 +86,31 @@ def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
             fragments = read_fragments_from_file(fragments).df
 
         log.info('Counting fragments')
-        fragments_per_barcode_dup = fragments.groupby(
-            ["Name"], sort=False, observed=True).agg({"Score": np.sum}).rename_axis(None)
-        fragments_per_barcode_dup.columns = ['Total_nr_frag']
-        fragments_per_barcode_nodup = fragments.groupby(
-            ["Name"], sort=False).size().to_frame(
-            name='Unique_nr_frag').rename_axis(None)
+
+        # Group per cell barcode.
+        fragments_groupby_name = fragments.groupby(["Name"], sort=False, observed=True)
+
+        # Get total number of fragments and unique number of fragments per cell barcode.
         FPB_DF = pd.concat(
-            [fragments_per_barcode_dup, fragments_per_barcode_nodup], axis=1)
+            [
+                # Count number of fragments per barcodes.
+                fragments_groupby_name.agg(Total_nr_frag=("Score", "sum")).rename_axis(None),
+                # Count number of unique fragments per barcode.
+                fragments_groupby_name.size().to_frame(name='Unique_nr_frag').rename_axis(None)
+            ],
+            axis=1
+        )
 
     if not remove_duplicates:
         FPB_DF = FPB_DF.sort_values(by=['Total_nr_frag'], ascending=False)
-        NF = FPB_DF.loc[:, 'Total_nr_frag']
+        NF = FPB_DF['Total_nr_frag']
     else:
         FPB_DF = FPB_DF.sort_values(by=['Unique_nr_frag'], ascending=False)
-        NF = FPB_DF.loc[:, 'Unique_nr_frag']
+        NF = FPB_DF['Unique_nr_frag']
 
     FPB_DF['Barcode_rank'] = range(1, len(FPB_DF) + 1)
 
-    BR = FPB_DF.loc[:, 'Barcode_rank']
+    BR = FPB_DF['Barcode_rank']
 
     if n_frag is None:
         if n_bc is None:
