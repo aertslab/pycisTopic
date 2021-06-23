@@ -14,7 +14,8 @@ To install pycisTopic::
 	cd pycisTopic
 	pip install . 
 	
-Depending on your pip version, you may need to run this pip command instead ::
+Depending on your pip version, you may need to run this pip command instead::
+
 	pip install . --use-feature=in-tree-build
 
 
