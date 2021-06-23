@@ -247,7 +247,7 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
         else:
             group_pr.to_bigwig(
                 path=bigwig_path_group,
-                chromsizes=chromsizes,
+                chromosome_sizes=chromsizes,
                 rpm=normalize_bigwig,
                 value_col='Score')
     if isinstance(bed_path, str):
@@ -270,6 +270,7 @@ def peak_calling(macs_path: str,
                  ext_size: Optional[int] = 146,
                  keep_dup: Optional[str] = 'all',
                  q_value: Optional[float] = 0.05,
+                 nolambda: Optional[bool] = True,
                  **kwargs):
     """
     Performs pseudobulk peak calling with MACS2. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -321,7 +322,8 @@ def peak_calling(macs_path: str,
                 shift,
                 ext_size,
                 keep_dup,
-                q_value) for name in list(
+                q_value,
+                nolambda) for name in list(
                 bed_paths.keys())])
     ray.shutdown()
     narrow_peaks_dict = {
@@ -341,7 +343,8 @@ def macs_call_peak_ray(macs_path: str,
                        shift: Optional[int] = 73,
                        ext_size: Optional[int] = 146,
                        keep_dup: Optional[str] = 'all',
-                       q_value: Optional[int] = 0.05):
+                       q_value: Optional[int] = 0.05,
+                       nolambda: Optional[bool] = True):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
 
@@ -393,7 +396,8 @@ def macs_call_peak_ray(macs_path: str,
         shift=shift,
         ext_size=ext_size,
         keep_dup=keep_dup,
-        q_value=q_value)
+        q_value=q_value,
+        nolambda=nolambda)
     log.info(name + ' done!')
     return MACS_peak_calling
 
@@ -437,7 +441,8 @@ class MACSCallPeak():
                  shift: Optional[int] = 73,
                  ext_size: Optional[int] = 146,
                  keep_dup: Optional[str] = 'all',
-                 q_value: Optional[int] = 0.05):
+                 q_value: Optional[int] = 0.05,
+                 nolambda: Optional[bool] = True):
         self.macs_path = macs_path
         self.treatment = bed_path
         self.name = name
@@ -448,6 +453,7 @@ class MACSCallPeak():
         self.ext_size = ext_size
         self.keep_dup = keep_dup
         self.qvalue = q_value
+        self.nolambda = nolambda
         self.call_peak()
 
     def call_peak(self):
@@ -461,8 +467,12 @@ class MACSCallPeak():
         logging.basicConfig(level=level, format=log_format, handlers=handlers)
         log = logging.getLogger('cisTopic')
 
-        cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
+        if self.nolambda is True:
+        	cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
             '--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits --nolambda'
+        else:
+        	cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
+            '--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits'
 
         cmd = cmd % (
             self.treatment, self.name, self.outdir, self.input_format, self.gsize,

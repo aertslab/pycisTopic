@@ -632,11 +632,11 @@ def frip(fragments: Union[str, pd.DataFrame],
             log.info('Using provided valid barcodes')
             fragments = fragments[fragments.Name.isin(set(valid_bc))]
 
-        regions = read_fragments_from_file(path_to_regions)
+        regions = pr.read_bed(path_to_regions)
         regions = regions[['Chromosome', 'Start', 'End']].drop_duplicate_positions()
 
         if isinstance(path_to_blacklist, str):
-            blacklist = read_fragments_from_file(path_to_blacklist)
+            blacklist = pr.read_bed(path_to_blacklist)
             regions = regions.overlap(blacklist, invert=True)
 
         log.info('Counting fragments')

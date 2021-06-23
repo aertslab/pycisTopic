@@ -378,12 +378,6 @@ def read_fragments_from_file(fragments_bed_filename, use_polars: bool = False) -
                 # Stop reading the BED file.
                 break
 
-    if nbr_columns < 4:
-        raise ValueError(
-            f'Fragments BED file needs to have at least 4 columns. "{fragments_bed_filename}" contains only '
-            f'{nbr_columns} columns.'
-        )
-
     if use_polars:
         import polars as pl
 

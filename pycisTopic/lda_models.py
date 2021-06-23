@@ -142,7 +142,7 @@ def run_cgs_models(cistopic_obj: 'cisTopicObject',
     Griffiths, T. L., & Steyvers, M. (2004). Finding scientific topics. Proceedings of the National academy of Sciences, 101(suppl 1), 5228-5235.
     """
 
-    binary_matrix = cistopic_obj.binary_matrix.transpose()
+    binary_matrix = sparse.csr_matrix(cistopic_obj.binary_matrix.transpose(), dtype=np.integer)
     region_names = cistopic_obj.region_names
     cell_names = cistopic_obj.cell_names
     ray.init(num_cpus=n_cpu, **kwargs)
