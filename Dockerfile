@@ -30,11 +30,6 @@ RUN  cd /tmp/pycisTopic && \
      pip install . && \
      cd .. && rm -rf pycisTopic
 
-# install loomxpy from local copy:
-COPY LoomXpy /tmp/LoomXpy
-RUN  cd /tmp/LoomXpy && \
-     pip install . && \
-     cd .. && rm -rf LoomXpy
 
 FROM python:3.8-slim AS build-image
 
