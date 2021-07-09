@@ -25,7 +25,7 @@ from .cistopic_class import *
 def find_clusters(cistopic_obj: 'CistopicObject',
                   target: Optional[str] = 'cell',
                   k: Optional[int] = 10,
-                  res: Optional[float] = 0.6,
+                  res: Optional[List[float]] = [0.6],
                   seed: Optional[int] = 555,
                   scale: Optional[bool] = False,
                   prefix: Optional[str] = '',
@@ -99,24 +99,25 @@ def find_clusters(cistopic_obj: 'CistopicObject',
     edges = list(zip(sources, targets))
     G.add_edges(edges)
     log.info(f"Finding clusters")
-    partition = la.find_partition(
-        G,
-        la.RBConfigurationVertexPartition,
-        resolution_parameter=res,
-        seed=seed)
-    cluster = pd.DataFrame(
-        partition.membership,
-        index=data_names,
-        columns=[
-            prefix +
-            'leiden_' +
-            str(k) +
-            '_' +
-            str(res)]).astype(str)
-    if target == 'cell':
-        cistopic_obj.add_cell_data(cluster)
-    if target == 'region':
-        cistopic_obj.add_region_data(cluster)
+    for C in res :
+        partition = la.find_partition(
+            G,
+            la.RBConfigurationVertexPartition,
+            resolution_parameter=C,
+            seed=seed)
+        cluster = pd.DataFrame(
+            partition.membership,
+            index=data_names,
+            columns=[
+                prefix +
+                'leiden_' +
+                str(k) +
+                '_' +
+                str(C)]).astype(str)
+        if target == 'cell':
+            cistopic_obj.add_cell_data(cluster)
+        if target == 'region':
+            cistopic_obj.add_region_data(cluster)
 
 
 def run_umap(cistopic_obj: 'CistopicObject',
