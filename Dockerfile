@@ -22,6 +22,7 @@ COPY pycisTopic/requirements.txt /tmp/
 RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir Cython numpy && \
     pip install --no-cache-dir fitsne && \
+    pip install --no-cache-dir papermill && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
 # install pycisTopic from local copy:
@@ -30,11 +31,20 @@ RUN  cd /tmp/pycisTopic && \
      pip install . && \
      cd .. && rm -rf pycisTopic
 
+# install Mallet (https://github.com/mimno/Mallet)
+# https://github.com/docker-library/openjdk/blob/0584b2804ed12dca7c5e264b5fc55fc07a3ac148/8-jre/slim/Dockerfile#L51-L54
+RUN mkdir -p /usr/share/man/man1 && \
+    apt-get install -y --no-install-recommends ant openjdk-11-jdk && \
+    git clone --depth=1 https://github.com/mimno/Mallet.git /tmp/Mallet && \
+    cd /tmp/Mallet && \
+    ant
 
 FROM python:3.8-slim AS build-image
 
-RUN apt-get -y update && \
+RUN mkdir -p /usr/share/man/man1 && \
+    apt-get -y update && \
     apt-get -y --no-install-recommends install \
+        openjdk-11-jdk \
         procps \
         bash-completion \
         curl \
@@ -44,7 +54,9 @@ RUN apt-get -y update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=compile-image /opt/venv /opt/venv
+COPY --from=compile-image /tmp/Mallet /opt/mallet
 
 # Make sure we use the virtualenv:
 ENV PATH="/opt/venv/bin:$PATH"
+ENV PATH="/opt/mallet/bin:$PATH"
 
