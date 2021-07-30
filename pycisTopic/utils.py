@@ -418,3 +418,11 @@ def read_fragments_from_file(fragments_bed_filename, use_polars: bool = False) -
     # Convert pandas dataframe to PyRanges dataframe.
     # This will convert "Chromosome" and "Strand" columns to pd.Categorical.
     return pr.PyRanges(df)
+    
+def coord_to_region_names(coord):
+    """
+    PyRanges to region names
+    """
+    if isinstance(coord, pr.PyRanges):
+        coord = coord.as_df()
+        return list(coord['Chromosome'].astype(str) + ':' + coord['Start'].astype(str) + '-' + coord['End'].astype(str))
