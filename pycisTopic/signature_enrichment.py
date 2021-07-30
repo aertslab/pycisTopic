@@ -52,7 +52,7 @@ def signature_enrichment(input: Union[pd.DataFrame, 'CistopicImputedFeatures'],
                      normalize = normalize,
                      seed = seed)
     auc_sig.columns.names = [None]
-    return signature_enrichment
+    return auc_sig
 
 
 def region_set_to_signature(query_region_set: pr.PyRanges,
