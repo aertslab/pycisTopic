@@ -18,6 +18,7 @@ from adjustText import adjust_text
 from sklearn.neighbors import kneighbors_graph
 from typing import Dict, List, Tuple
 from typing import Optional, Union
+from igraph import intersection
 
 from .cistopic_class import *
 
@@ -31,7 +32,11 @@ def find_clusters(cistopic_obj: 'CistopicObject',
                   prefix: Optional[str] = '',
                   selected_topics: Optional[List[int]] = None,
                   selected_features: Optional[List[str]] = None,
-                  harmony: Optional[bool] = False):
+                  harmony: Optional[bool] = False,
+                  rna_components: Optional[pd.DataFrame] = None,
+                  use_umap_integration: Optional[bool] = False,
+                  rna_weight: Optional[float] = 0.5,
+                  **kwargs):
     """
     Performing leiden cell or region clustering and add results to cisTopic object's metadata.
 
@@ -58,6 +63,13 @@ def find_clusters(cistopic_obj: 'CistopicObject',
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
     harmony: bool, optional
             If target is 'cell', whether to use harmony processed topic contributions. Default: False.
+    rna_components: pd.DataFrame, optional
+            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna) 
+            will be considered for clustering.
+    use_umap_integration: bool, optional
+            Whether to use a weighted UMAP representation for the clustering or directly integrating the two graphs. Default: True
+    rna_weight: float, optional
+            Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
     """
 
     # Create cisTopic logger
@@ -92,13 +104,34 @@ def find_clusters(cistopic_obj: 'CistopicObject',
         data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
             data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
     data_mat = data_mat.T
-    A = kneighbors_graph(data_mat, k)
-    sources, targets = A.nonzero()
-    G = ig.Graph(directed=True)
-    G.add_vertices(A.shape[0])
-    edges = list(zip(sources, targets))
-    G.add_edges(edges)
-    log.info(f"Finding clusters")
+    
+    if rna_components is not None:
+        atac_topics, rna_components, data_names = input_check(data_mat, rna_components)
+    if use_umap_integration == True:
+        intersect, data_mat = weighted_integration(atac_topics, rna_components, data_names, rna_weight)
+    
+    if rna_components is None or use_umap_integration == True:
+        A = kneighbors_graph(data_mat, k)
+        sources, targets = A.nonzero()
+        G = ig.Graph(directed=True)
+        G.add_vertices(A.shape[0])
+        edges = list(zip(sources, targets))
+        G.add_edges(edges)
+    elif rna_components is not None and use_umap_integration == False:
+        A = kneighbors_graph(atac_topics, k)
+        sources, targets = A.nonzero()
+        G1 = ig.Graph(directed=False)
+        G1.add_vertices(A.shape[0])
+        edges = list(zip(sources, targets))
+        G1.add_edges(edges)
+        A = kneighbors_graph(rna_components, k)
+        sources, targets = A.nonzero()
+        G2 = ig.Graph(directed=False)
+        G2.add_vertices(A.shape[0])
+        edges = list(zip(sources, targets))
+        G2.add_edges(edges)
+        G = intersection([G1,G2], keep_all_vertices=False)
+        log.info(f"Finding clusters")
     for C in res :
         partition = la.find_partition(
             G,
@@ -118,7 +151,7 @@ def find_clusters(cistopic_obj: 'CistopicObject',
             cistopic_obj.add_cell_data(cluster)
         if target == 'region':
             cistopic_obj.add_region_data(cluster)
-
+                
 
 def run_umap(cistopic_obj: 'CistopicObject',
              target: Optional[str] = 'cell',
@@ -128,6 +161,8 @@ def run_umap(cistopic_obj: 'CistopicObject',
              selected_topics: Optional[List[int]] = None,
              selected_features: Optional[List[str]] = None,
              harmony: Optional[bool] = False,
+             rna_components: Optional[pd.DataFrame] = None,
+             rna_weight: Optional[float] = 0.5,
              **kwargs):
     """
     Run UMAP and add it to the dimensionality reduction dictionary.
@@ -151,6 +186,11 @@ def run_umap(cistopic_obj: 'CistopicObject',
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
     harmony: bool, optional
             If target is 'cell', whether to use harmony processed topic contributions. Default: False.
+    rna_components: pd.DataFrame, optional
+            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna) 
+            will be considered for clustering.
+    rna_weight: float, optional
+            Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
     **kwargs
             Parameters to pass to umap.UMAP.
     """
@@ -189,8 +229,12 @@ def run_umap(cistopic_obj: 'CistopicObject',
     data_mat = data_mat.T
 
     log.info(f"Running UMAP")
-    reducer = umap.UMAP(random_state=random_state, **kwargs)
-    embedding = reducer.fit_transform(data_mat)
+    if rna_components is None:
+        reducer = umap.UMAP(random_state=random_state, **kwargs)
+        embedding = reducer.fit_transform(data_mat)
+    else:
+        atac_topics, rna_components, data_names = input_check(data_mat, rna_components)
+        intersect, embedding = weighted_integration(atac_topics, rna_components, data_names, rna_weight, **kwargs)
     dr = pd.DataFrame(
         embedding,
         index=data_names,
@@ -211,7 +255,10 @@ def run_tsne(cistopic_obj: 'CistopicObject',
              perplexity: Optional[int] = 30,
              selected_topics: Optional[List[int]] = None,
              selected_features: Optional[List[str]] = None,
-             harmony: Optional[bool] = False):
+             harmony: Optional[bool] = False,
+             rna_components: Optional[pd.DataFrame] = None,
+             rna_weight: Optional[float] = 0.5,
+             **kwargs):
     """
     Run tSNE and add it to the dimensionality reduction dictionary. If FItSNE is installed it will be used, otherwise sklearn TSNE implementation will be used.
 
@@ -236,6 +283,13 @@ def run_tsne(cistopic_obj: 'CistopicObject',
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
     harmony: bool, optional
             If target is 'cell', whether to use harmony processed topic contributions. Default: False
+    rna_components: pd.DataFrame, optional
+            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna) 
+            will be considered for clustering.
+    rna_weight: float, optional
+            Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
+    **kwargs
+            Parameters to pass to fitsne.FItSNE or sklearn.manifold.TSNE.
 
     Reference
     ---------
@@ -273,7 +327,11 @@ def run_tsne(cistopic_obj: 'CistopicObject',
             data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
 
     data_mat = data_mat.T
-
+    
+    if rna_components is not None:
+        atac_topics, rna_components, data_names = input_check(data_mat, rna_components)
+        intersect, data_mat = weighted_integration(atac_topics, rna_components, data_names, rna_weight)
+        
     try:
         import fitsne
         log.info(f"Running FItSNE")
@@ -281,12 +339,12 @@ def run_tsne(cistopic_obj: 'CistopicObject',
             np.ascontiguousarray(
                 data_mat.to_numpy()),
             rand_seed=random_state,
-            perplexity=perplexity)
+            perplexity=perplexity, **kwargs)
     except BaseException:
         log.info(f"Running TSNE")
         embedding = sklearn.manifold.TSNE(
             n_components=2, random_state=random_state).fit_transform(
-            data_mat.to_numpy())
+            data_mat.to_numpy(), **kwargs)
     dr = pd.DataFrame(
         embedding,
         index=data_names,
@@ -921,3 +979,46 @@ def harmony(cistopic_obj: 'CistopicObject',
         index=model.cell_topic.index.to_list(),
         columns=model.cell_topic.columns)
     cistopic_obj.selected_model.cell_topic_harmony = cell_topic_harmony
+    
+# Helper functions for integration
+def input_check(atac_topics: pd.DataFrame,
+               rna_pca: pd.DataFrame):
+    """
+    A function to select cells present in both the RNA and the ATAC layers
+    """
+    # Cell names
+    atac_cell_names = atac_topics.index.tolist()
+    rna_cell_names = rna_pca.index.tolist()
+    # Common cells
+    common_cells = list(set(atac_cell_names).intersection(set(rna_cell_names)))
+    atac_topics = atac_topics.loc[common_cells,:]
+    rna_pca = rna_pca.loc[common_cells,:]
+    return atac_topics, rna_pca, common_cells
+    
+def weighted_integration(atac_topics: pd.DataFrame,
+                 rna_pca: pd.DataFrame,
+                 common_cells: List[str],
+                 weight = 0.5,
+                 **kwargs):
+    """
+    A function for weighted integration via UMAP
+    """
+    # Fit
+    fit1 = umap.UMAP(random_state=123, **kwargs).fit(atac_topics)
+    fit2 = umap.UMAP(random_state=123, **kwargs).fit(rna_pca)
+    # Intersection 
+    intersection = umap.umap_.general_simplicial_set_intersection(fit1.graph_, 
+                                                               fit2.graph_, 
+                                                               weight = weight)
+    # Embedding
+    intersection = umap.umap_.reset_local_connectivity(intersection)
+    weighted_comp = umap.umap_.simplicial_set_embedding(fit1._raw_data, intersection, 
+                                                fit1.n_components, 
+                                                fit1.learning_rate, 
+                                                fit1._a, fit1._b, 
+                                                fit1.repulsion_strength, 
+                                                fit1.negative_sample_rate, 
+                                                1000, 'random', np.random.RandomState(123), 
+                                                fit1.metric, 
+                                                fit1._metric_kwds, False, {}, False)
+    return intersection, weighted_comp[0]
