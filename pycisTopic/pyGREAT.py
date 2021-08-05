@@ -9,7 +9,7 @@ import sys
 import tempfile
 from typing import Dict
 
-from .utils import coord_to_region_names
+from .utils import coord_to_region_names, region_names_to_coordinates
 
 # Set stderr to null when using ray.init to avoid ray printing Broken pipe million times
 _stderr = sys.stderr                                                         

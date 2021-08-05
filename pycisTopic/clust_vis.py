@@ -739,9 +739,7 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
         embedding = cistopic_obj.projections['cell'][reduction_name]
         if selected_cells is not None:
             embedding = embedding.loc[selected_cells]
-        feature_index = get_position_index(
-            [feature], imputed_data.feature_names)
-        feature_data = imputed_data.mtx[feature_index, :]
+        feature_data = imputed_data.subset(cells=embedding.index.tolist(), features=[feature], copy=True).mtx
         if scale:
             try:
                 feature_data = sklearn.preprocessing.scale(
