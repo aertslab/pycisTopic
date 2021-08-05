@@ -28,7 +28,7 @@ To build a Docker image, then create a Singularity image from this::
 	git clone https://github.com/aertslab/pycisTopic.git
 	git clone https://github.com/aertslab/pycistarget.git
 
-	# Copy your target Dockerfile to your workdir and build image
+	# Build image
 	podman build -t aertslab/pycistopic:latest . -f pycisTopic/Dockerfile
 
 	# Export to oci 
