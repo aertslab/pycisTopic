@@ -16,7 +16,7 @@ To install pycisTopic::
 	
 Depending on your pip version, you may need to run this pip command instead::
 
-	pip install . --use-feature=in-tree-build
+	pip install -e .
 
 
 Creating a Docker/Singularity Image
@@ -24,11 +24,21 @@ Creating a Docker/Singularity Image
 
 To build a Docker image, then create a Singularity image from this::
 
-    git clone https://github.com/aertslab/pycisTopic.git
+	# Clone repositories (pycisTopic and pycistarget)
+	git clone https://github.com/aertslab/pycisTopic.git
+	git clone https://github.com/aertslab/pycistarget.git
 
-    docker build -t aertslab/pycistopic:latest . -f pycisTopic/Dockerfile
+	# Copy your target Dockerfile to your workdir and build image
+	podman build -t aertslab/pycistopic:latest . -f pycisTopic/Dockerfile
 
-    singularity build aertslab-pycistopic-latest.sif docker-daemon://aertslab/pycistopic:latest
+	# Export to oci 
+	podman save --format oci-archive --output pycistopic_img.tar localhost/aertslab/pycistopic
+
+	# Build to singularity
+	singularity build pycistopic.sif oci-archive://pycistopic_img.tar
+
+	# Add all binding paths where you would need to access
+	singularity exec -B /lustre1,/staging,/data,/vsc-hard-mounts,/scratch pycistopic.sif ipython3
 
 
 Check version

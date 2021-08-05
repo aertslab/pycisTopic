@@ -23,6 +23,10 @@ RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir Cython numpy && \
     pip install --no-cache-dir fitsne && \
     pip install --no-cache-dir papermill && \
+    pip install --no-cache-dir igv_jupyterlab && \
+    pip install --no-cache-dir bs4 && \
+    pip install --no-cache-dir MACS2 && \
+    pip install --no-cache-dir ctxcore && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
 # install pycisTopic from local copy:
@@ -38,6 +42,12 @@ RUN mkdir -p /usr/share/man/man1 && \
     git clone --depth=1 https://github.com/mimno/Mallet.git /tmp/Mallet && \
     cd /tmp/Mallet && \
     ant
+
+# install pycistarget
+COPY pycistarget /tmp/pycistarget
+RUN cd /tmp/pycistarget && \
+    pip install . && \
+    cd .. && rm -rf pycistarget
 
 FROM python:3.8-slim AS build-image
 
