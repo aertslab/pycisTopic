@@ -497,18 +497,9 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
         regions = pr.PyRanges(region_names_to_coordinates(region_names))
         blacklist = pr.read_bed(path_to_blacklist)
         regions = regions.overlap(blacklist, invert=True)
-        selected_regions = [
-            str(chrom) +
-            ":" +
-            str(start) +
-            '-' +
-            str(end)
-            for chrom, start, end in zip(
-                list(regions.Chromosome),
-                list(regions.Start),
-                list(regions.End)
-            )
-        ]
+        selected_regions = (
+                regions.Chromosome.astype(str) + ":" + regions.Start.astype(str) + "-" + regions.End.astype(str)
+        ).to_list()
         index = get_position_index(selected_regions, region_names)
         fragment_matrix = fragment_matrix[index, ]
         region_names = selected_regions
@@ -734,17 +725,9 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
 
     regions = pr.read_bed(path_to_regions)
     regions = regions[['Chromosome', 'Start', 'End']]
-    regions.regionID = [
-        str(chrom) +
-        ":" +
-        str(start) +
-        '-' +
-        str(end)
-        for chrom, start, end in zip(
-            list(regions.Chromosome),
-            list(regions.Start),
-            list(regions.End))
-    ]
+    regions.regionID = (
+        regions.Chromosome.astype(str) + ":" + regions.Start.astype(str) + "-" + regions.End.astype(str)
+    ).to_list()
 
     # If CellRanger metrics, select valid barcodes
     if metrics is not None:
