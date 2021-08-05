@@ -89,7 +89,7 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
             if selected_genes is not None:
                 gene_activity_matrix = gene_activity_matrix.loc[:, selected_genes]
             if selected_cells is not None:
-                gene_activity_matrix = gene_activity_matrix.loc[selected_cells, :]
+                gene_activity_matrix = gene_activity_matrix.loc[selected_cells]
 
     if not isinstance(gene_activity_matrix, pd.DataFrame):
         gene_names = gene_activity_matrix.feature_names
@@ -99,7 +99,7 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
         cell_names = gene_activity_matrix.index.tolist()
 
     # Extract cell data information and gene names
-    cell_data = cistopic_obj.cell_data.loc[cell_names, :]
+    cell_data = cistopic_obj.cell_data.loc[cell_names]
 
     # Check ups
     if cluster_annotation is not None:
@@ -145,7 +145,7 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
     metrics = pd.concat(metrics, axis=1).fillna(0)
     annotations = pd.concat(annotations, axis=1)
     # Embeddings. Cell embeddings in this case
-    embeddings = {x: cistopic_obj.projections['cell'][x].loc[cell_names, :]
+    embeddings = {x: cistopic_obj.projections['cell'][x].loc[cell_names]
                   for x in cistopic_obj.projections['cell'].keys()}
 
     # Create minimal loom
@@ -276,7 +276,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
             if selected_regions is not None:
                 accessibility_matrix = accessibility_matrix.loc[:, selected_regions]
             if selected_cells is not None:
-                accessibility_matrix = accessibility_matrix.loc[selected_cells, :]
+                accessibility_matrix = accessibility_matrix.loc[selected_cells]
 
     if not isinstance(accessibility_matrix, pd.DataFrame):
         region_names = accessibility_matrix.feature_names
@@ -286,7 +286,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
         cell_names = accessibility_matrix.index.tolist()
 
     # Extract cell data information and region names
-    cell_data = cistopic_obj.cell_data.loc[cell_names, :]
+    cell_data = cistopic_obj.cell_data.loc[cell_names]
 
     # Check ups
     if not set(binarized_topic_region.keys()) == set(binarized_cell_topic.keys()):
@@ -363,7 +363,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
         index=binarized_cell_topic.keys()
     )
     # Embeddings. Cell embeddings in this case
-    embeddings = {x: cistopic_obj.projections['cell'][x].loc[cell_names, :]
+    embeddings = {x: cistopic_obj.projections['cell'][x].loc[cell_names]
                   for x in cistopic_obj.projections['cell'].keys()}
 
     # Create minimal loom

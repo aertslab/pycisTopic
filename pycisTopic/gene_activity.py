@@ -111,7 +111,7 @@ def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
         region_weights_df.Name, imputed_acc_object.feature_names)
     region_weights_df.loc[:, 'Weight'] = region_weights_df.Gene_size_weight * \
                                          region_weights_df.Distance_weight * region_weights_df.Gini_weight
-    region_weights_df = region_weights_df.loc[region_weights_df.Weight > 0, :]
+    region_weights_df = region_weights_df.loc[region_weights_df.Weight > 0]
     genes = list(set(region_weights_df.Gene))
     log.info('Getting gene activity scores')
     gene_act = np.array([weighted_aggregation(imputed_acc_object.mtx,

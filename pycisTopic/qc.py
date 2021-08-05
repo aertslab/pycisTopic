@@ -1429,17 +1429,17 @@ def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 
     if isinstance(barcode, str):
-        plot_data_df = pd.DataFrame(tss_profile_per_barcode.loc[barcode, :]).T
+        plot_data_df = pd.DataFrame(tss_profile_per_barcode.loc[barcode]).T
         i_iter = [0]
     else:
-        plot_data_df = tss_profile_per_barcode.loc[barcode, :]
+        plot_data_df = tss_profile_per_barcode.loc[barcode]
         i_iter = range(plot_data_df.shape[0])
 
     plot_data_df = plot_data_df.rolling(
         window=100, min_periods=0, axis=1).mean()
 
     for i in i_iter:
-        plot_data = plot_data_df.iloc[i, :]
+        plot_data = plot_data_df.iloc[i]
         if color is not None:
             if len(color[i]) > 2:
                 selected_color = color[i][0]
@@ -1576,19 +1576,19 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
             if min_x is not None:
                 plt.axvline(x=min_x, color='skyblue', linestyle='--')
                 input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_x] > min_x, :]
+                                                            [var_x] > min_x]
             if max_x is not None:
                 plt.axvline(x=max_x, color='tomato', linestyle='--')
                 input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_x] < max_x, :]
+                                                            [var_x] < max_x]
             if min_y is not None:
                 plt.axhline(y=min_y, color='skyblue', linestyle='--')
                 input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_y] > min_y, :]
+                                                            [var_y] > min_y]
             if max_y is not None:
                 plt.axhline(y=max_y, color='tomato', linestyle='--')
                 input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_y] < max_y, :]
+                                                            [var_y] < max_y]
 
             # first barplot on axis
             fig.add_axes([0, 0.8, 0.8, 0.2])
@@ -1658,11 +1658,11 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
             if min_x is not None:
                 plt.axvline(x=min_x, color='skyblue', linestyle='--')
                 input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_x] > min_x, :]
+                                                            [var_x] > min_x]
                 if max_x is not None:
                     plt.axvline(x=max_x, color='tomato', linestyle='--')
                     input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                                [var_x] < max_x, :]
+                                                                [var_x] < max_x]
 
             if save is not None:
                 pdf.savefig(fig, bbox_inches='tight')

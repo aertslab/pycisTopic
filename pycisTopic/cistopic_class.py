@@ -117,10 +117,10 @@ class CistopicObject:
             new_cell_data = pd.concat(
                 [self.cell_data, cell_data], axis=1, sort=False)
             new_cell_data = new_cell_data.loc[prepare_tag_cells(
-                self.cell_names), :]
+                self.cell_names)]
             new_cell_data.index = self.cell_names
 
-        self.cell_data = new_cell_data.loc[self.cell_names, :]
+        self.cell_data = new_cell_data.loc[self.cell_names]
 
     def add_region_data(self,
                         region_data: pd.DataFrame):
@@ -153,7 +153,7 @@ class CistopicObject:
             set(self.region_names) & set(region_data.index)), ]
         new_region_data = pd.concat(
             [self.region_data, region_data], axis=1, sort=False)
-        self.region_data = new_region_data.loc[self.region_names, :]
+        self.region_data = new_region_data.loc[self.region_names]
 
     def subset(self,
                cells: Optional[List[str]] = None,
@@ -422,7 +422,7 @@ class CistopicObject:
             Selected cisTopic LDA model results (see `LDAModels.evaluate_models`)
         """
         # Check that region and cell names are in the same order
-        model.region_topic = model.topic_region.loc[self.region_names, :]
+        model.region_topic = model.topic_region.loc[self.region_names]
         model.cell_topic = model.cell_topic.loc[:, self.cell_names]
         self.selected_model = model
 
