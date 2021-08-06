@@ -259,7 +259,6 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
             imputed_acc.data = imputed_acc.data * np.float32(scale_factor)
             log.info('Keep non zero rows')
             keep_regions_index = non_zero_rows(imputed_acc)
-            log.info('Filter rows with only zeros')
             imputed_acc = imputed_acc[keep_regions_index, ]
             region_names = subset_list(region_names, keep_regions_index)
     log.info('Create CistopicImputedFeatures object')

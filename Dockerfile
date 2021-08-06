@@ -69,4 +69,3 @@ COPY --from=compile-image /tmp/Mallet /opt/mallet
 # Make sure we use the virtualenv:
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PATH="/opt/mallet/bin:$PATH"
-
