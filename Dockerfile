@@ -27,6 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir bs4 && \
     pip install --no-cache-dir MACS2 && \
     pip install --no-cache-dir ctxcore && \
+    pip install --no-cache-dir lxml && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
 # install pycisTopic from local copy:
