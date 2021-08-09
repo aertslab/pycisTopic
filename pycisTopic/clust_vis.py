@@ -519,6 +519,7 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
                     pdf.savefig(fig, bbox_inches='tight')
                 plt.show()
         else:
+        	var_data = data_mat.copy().loc[:, var].to_list()
             o = np.argsort(var_data)
             if num_columns > 1:
                 plt.subplot(num_rows, num_columns, i)
