@@ -95,7 +95,7 @@ def find_clusters(cistopic_obj: 'CistopicObject',
         data_names = cistopic_obj.region_names
 
     if selected_topics is not None:
-        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics], :]
+        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics]]
     if selected_features is not None:
         data_mat = data_mat[selected_features]
         data_names = selected_cells
@@ -217,7 +217,7 @@ def run_umap(cistopic_obj: 'CistopicObject',
         data_names = cistopic_obj.region_names
 
     if selected_topics is not None:
-        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics], :]
+        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics]]
     if selected_features is not None:
         data_mat = data_mat[selected_features]
         data_names = selected_features
@@ -317,7 +317,7 @@ def run_tsne(cistopic_obj: 'CistopicObject',
         data_names = cistopic_obj.region_names
 
     if selected_topics is not None:
-        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics], :]
+        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics]]
     if selected_features is not None:
         data_mat = data_mat[selected_features]
         data_names = selected_features
@@ -643,7 +643,7 @@ def plot_topic(cistopic_obj: 'CistopicObject',
     for var in topic:
         var_data = data_mat.loc[:, var]
         var_data = var_data.sort_values()
-        embedding_plot = embedding.loc[var_data.index.tolist(), :]
+        embedding_plot = embedding.loc[var_data.index.tolist()]
         o = np.argsort(var_data)
         if num_columns > 1:
             plt.subplot(num_rows, num_columns, i)
@@ -757,7 +757,7 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
                 feature_data.transpose(),
                 index=embedding.index.tolist())
         color_data = color_data.sort_values(by=0)
-        embedding = embedding.loc[color_data.index.tolist(), :]
+        embedding = embedding.loc[color_data.index.tolist()]
         var_data = color_data.iloc[:, 0].to_list()
         o = np.argsort(var_data)
         if num_columns > 1:
@@ -870,7 +870,7 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
 
     var = variables[0]
     var_data = cell_data.loc[:, var].sort_values()
-    cell_topic = cell_topic.loc[var_data.index.to_list(), :]
+    cell_topic = cell_topic.loc[var_data.index.to_list()]
     df = pd.concat([cell_topic, var_data], axis=1, sort=False)
     topic_order = df.groupby(var).mean().idxmax().sort_values().index.to_list()
     cell_topic = cell_topic.loc[:, topic_order].T
@@ -990,8 +990,8 @@ def input_check(atac_topics: pd.DataFrame,
     rna_cell_names = rna_pca.index.tolist()
     # Common cells
     common_cells = list(set(atac_cell_names).intersection(set(rna_cell_names)))
-    atac_topics = atac_topics.loc[common_cells,:]
-    rna_pca = rna_pca.loc[common_cells,:]
+    atac_topics = atac_topics.loc[common_cells]
+    rna_pca = rna_pca.loc[common_cells]
     return atac_topics, rna_pca, common_cells
     
 def weighted_integration(atac_topics: pd.DataFrame,

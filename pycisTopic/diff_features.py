@@ -233,12 +233,12 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
     cell_names = cistopic_obj.cell_names
     cell_topic = model.cell_topic.loc[:, cell_names]
     region_names = cistopic_obj.region_names
-    topic_region = model.topic_region.loc[region_names, :]
+    topic_region = model.topic_region.loc[region_names]
     if selected_cells is not None:
         cell_topic = cell_topic.loc[:, selected_cells]
         cell_names = selected_cells
     if selected_regions is not None:
-        topic_region = topic_region.loc[selected_regions, :]
+        topic_region = topic_region.loc[selected_regions]
         region_names = selected_regions
     # Convert cell_topic and topic_region 2d arrays to np.float32 so
     # multiplying them uses 4 times less memory than with np.float64
@@ -626,8 +626,8 @@ def markers_ray(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
         index=['Log2FC', 'Adjusted_pval', 'Contrast'],
         columns=features
     ).transpose()
-    markers_dataframe = markers_dataframe.loc[markers_dataframe['Adjusted_pval'] <= adjpval_thr, :]
-    markers_dataframe = markers_dataframe.loc[markers_dataframe['Log2FC'] >= log2fc_thr, :]
+    markers_dataframe = markers_dataframe.loc[markers_dataframe['Adjusted_pval'] <= adjpval_thr]
+    markers_dataframe = markers_dataframe.loc[markers_dataframe['Log2FC'] >= log2fc_thr]
     markers_dataframe = markers_dataframe.sort_values(
         ['Log2FC', 'Adjusted_pval'], ascending=[False, True]
     )

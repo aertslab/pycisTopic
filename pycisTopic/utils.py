@@ -123,20 +123,9 @@ def regions_overlap(target, query):
         query_pr = query
 
     target_pr = target_pr.overlap(query_pr)
-    selected_regions = [
-        str(chrom) +
-        ":" +
-        str(start) +
-        '-' +
-        str(end) for chrom,
-                     start,
-                     end in zip(
-            list(
-                target_pr.Chromosome),
-            list(
-                target_pr.Start),
-            list(
-                target_pr.End))]
+    selected_regions = (
+        target_pr.Chromosome.astype(str) + ":" + target_pr.Start.astype(str) + "-" + target_pr.End.astype(str)
+    ).to_list()
     return selected_regions
 
 

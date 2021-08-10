@@ -42,7 +42,7 @@ def compute_topic_metrics(cistopic_obj: 'CistopicObject',
     topic_ass = model.topic_ass.drop('Topic', axis=1)
     marginal_dist = model.marg_topic['Marg_Topic']
     gini_values = pd.DataFrame([gini_coefficient(
-        model.cell_topic.iloc[i, :].to_numpy()) for i in range(model.cell_topic.shape[0])])
+        model.cell_topic.iloc[i].to_numpy()) for i in range(model.cell_topic.shape[0])])
     topic_qc_metrics = pd.concat(
         [np.log10(topic_ass['Assignments']), topic_ass, topic_coh, marginal_dist, gini_values],
         axis=1
