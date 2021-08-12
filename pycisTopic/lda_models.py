@@ -996,8 +996,8 @@ def evaluate_models(models: List['CistopicLDAModel'],
         Metrics to use for plotting and model selection:
             Minmo_2011: Uses the average model coherence as calculated by Mimno et al (2011). In order to reduce the impact of the number of topics, we calculate the average coherence based on the top selected average values. The better the model, the higher coherence.
             log-likelihood: Uses the log-likelihood in the last iteration as calculated by Griffiths and Steyvers (2004). The better the model, the higher the log-likelihood.
-            Arun_2010: Uses a density-based metric as in Arun et al (2010) using the topic-region distribution, the cell-topic distribution and the cell coverage. The better the model, the lower the metric.
-            Cao_Juan_2009: Uses a divergence-based metric as in Cao Juan et al (2009) using the topic-region distribution. The better the model, the lower the metric.
+            Arun_2010: Uses a divergence-based metric as in Arun et al (2010) using the topic-region distribution, the cell-topic distribution and the cell coverage. The better the model, the lower the metric.
+            Cao_Juan_2009: Uses a density-based metric as in Cao Juan et al (2009) using the topic-region distribution. The better the model, the lower the metric.
         Default: all metrics.
     min_topics_coh: int, optional
         Minimum number of topics on a topic to use its coherence for model selection. Default: 5.
