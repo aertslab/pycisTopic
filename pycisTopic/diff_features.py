@@ -525,17 +525,27 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
         cells=None, features=var_features, copy=True
     )
     # Compute p-val and log2FC
-    ray.init(num_cpus=n_cpu, **kwargs)
-    markers_list = ray.get(
-        [
-            markers_ray.remote(
-                subset_imputed_features_obj,
-                barcode_groups[i],
-                contrasts_names[i],
-                adjpval_thr=adjpval_thr,
-                log2fc_thr=log2fc_thr)
-            for i in range(len(contrasts))])
-    ray.shutdown()
+    if n_cpu > 1:
+        ray.init(num_cpus=n_cpu, **kwargs)
+        markers_list = ray.get(
+            [
+                markers_ray.remote(
+                    subset_imputed_features_obj,
+                    barcode_groups[i],
+                    contrasts_names[i],
+                    adjpval_thr=adjpval_thr,
+                    log2fc_thr=log2fc_thr)
+                for i in range(len(contrasts))])
+        ray.shutdown()
+    else:
+        markers_list = [
+                markers_one(
+                    subset_imputed_features_obj,
+                    barcode_groups[i],
+                    contrasts_names[i],
+                    adjpval_thr=adjpval_thr,
+                    log2fc_thr=log2fc_thr)
+                for i in range(len(contrasts))]
     markers_dict = {contrasts_names[i]: markers_list[i]
                     for i in range(len(markers_list))}
     return markers_dict
@@ -543,6 +553,39 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
 
 @ray.remote
 def markers_ray(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
+                barcode_group: List[List[str]],
+                contrast_name: str,
+                adjpval_thr: Optional[float] = 0.05,
+                log2fc_thr: Optional[float] = 1):
+    """
+    Find differential imputed features.
+
+    Parameters
+    ---------
+    input_mat: :class:`pd.DataFrame` or :class:`CistopicImputedFeatures`
+        A data frame or a cisTopic imputation data object.
+    barcode_group: List
+        List of length 2, including foreground cells on the first slot and background on the second.
+    contrast_name: str
+        Name of the contrast
+    adjpval_thr: float, optional
+        Adjusted p-values threshold. Default: 0.05
+    log2fc_thr: float, optional
+        Log2FC threshold. Default: np.log2(1.5)
+
+    Return
+    ------
+    List
+        `class::pd.DataFrame` with the selected features and logFC and adjusted p-values.
+    """
+    return markers_one(
+                    subset_imputed_features_obj,
+                    barcode_group,
+                    contrasts_name,
+                    adjpval_thr=adjpval_thr,
+                    log2fc_thr=log2fc_thr)
+
+def markers_one(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
                 barcode_group: List[List[str]],
                 contrast_name: str,
                 adjpval_thr: Optional[float] = 0.05,
