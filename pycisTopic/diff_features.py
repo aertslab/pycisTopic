@@ -579,11 +579,11 @@ def markers_ray(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
         `class::pd.DataFrame` with the selected features and logFC and adjusted p-values.
     """
     return markers_one(
-                    subset_imputed_features_obj,
+                    input_mat,
                     barcode_group,
-                    contrasts_name,
-                    adjpval_thr=adjpval_thr,
-                    log2fc_thr=log2fc_thr)
+                    contrast_name,
+                    adjpval_thr,
+                    log2fc_thr)
 
 def markers_one(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
                 barcode_group: List[List[str]],
