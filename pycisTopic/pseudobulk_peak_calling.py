@@ -137,21 +137,33 @@ def export_pseudobulk(input_data: Union['CistopicObject',
     if not os.path.exists(bigwig_path):
         os.makedirs(bigwig_path)
     # Create pseudobulks
-    ray.init(num_cpus=n_cpu, **kwargs)
-    ray_handle = ray.wait(
-        [
-            export_pseudobulk_ray.remote(
-                cell_data,
-                group,
-                fragments_df_dict,
-                chromsizes,
-                bigwig_path,
-                bed_path,
-                sample_id_col,
-                normalize_bigwig,
-                remove_duplicates) for group in groups],
-        num_returns=len(groups))
-    ray.shutdown()
+    if n_cpu > 1:
+        ray.init(num_cpus=n_cpu, **kwargs)
+        ray_handle = ray.wait(
+            [
+                export_pseudobulk_ray.remote(
+                    cell_data,
+                    group,
+                    fragments_df_dict,
+                    chromsizes,
+                    bigwig_path,
+                    bed_path,
+                    sample_id_col,
+                    normalize_bigwig,
+                    remove_duplicates) for group in groups],
+            num_returns=len(groups))
+        ray.shutdown()
+    else:
+        [export_pseudobulk_one_sample(
+                    cell_data,
+                    group,
+                    fragments_df_dict,
+                    chromsizes,
+                    bigwig_path,
+                    bed_path,
+                    sample_id_col,
+                    normalize_bigwig,
+                    remove_duplicates) for group in groups]
     bw_paths = {
         group: os.path.join(
             bigwig_path,
@@ -165,8 +177,7 @@ def export_pseudobulk(input_data: Union['CistopicObject',
     return bw_paths, bed_paths
 
 
-@ray.remote
-def export_pseudobulk_ray(cell_data: pd.DataFrame,
+def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
                           group: str,
                           fragments_df_dict: Dict[str, pd.DataFrame],
                           chromsizes: pr.PyRanges,
@@ -258,6 +269,52 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
             chain=False)
 
     log.info(str(group) + ' done!')
+    
+@ray.remote
+def export_pseudobulk_ray(cell_data: pd.DataFrame,
+                          group: str,
+                          fragments_df_dict: Dict[str, pd.DataFrame],
+                          chromsizes: pr.PyRanges,
+                          bigwig_path: str,
+                          bed_path: str,
+                          sample_id_col: Optional[str] = 'sample_id',
+                          normalize_bigwig: Optional[bool] = True,
+                          remove_duplicates: Optional[bool] = True):
+    """
+    Create pseudobulk as bed and bigwig from single cell fragments file given a barcode annotation and a group.
+
+    Parameters
+    ---------
+    cell_data: pd.DataFrame
+            A cell metadata :class:`pd.Dataframe` containing barcodes, their annotation and their sample of origin.
+    group: str
+            A character string indicating the group for which pseudobulks will be created.
+    fragments_df_dict: dict
+            A dictionary containing data frames as values with 'Chromosome', 'Start', 'End', 'Name', and 'Score' as columns; and sample label
+            as keys. 'Score' indicates the number of times that a fragments is found assigned to that barcode.
+    chromsizes: pr.PyRanges
+            A :class:`pr.PyRanges` containing size of each column, containing 'Chromosome', 'Start' and 'End' columns.
+    bed_path: str
+            Path to folder where the fragments bed file will be saved.
+    bigwig_path: str
+            Path to folder where the bigwig file will be saved.
+    sample_id_col: str, optional
+            Name of the column containing the sample name per barcode in the input :class:`CistopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
+    normalize_bigwig: bool, optional
+            Whether bigwig files should be CPM normalized. Default: True.
+    remove_duplicates: bool, optional
+            Whether duplicates should be removed before converting the data to bigwig.
+    """
+    export_pseudobulk_one_sample(
+                    cell_data,
+                    group,
+                    fragments_df_dict,
+                    chromsizes,
+                    bigwig_path,
+                    bed_path,
+                    sample_id_col,
+                    normalize_bigwig,
+                    remove_duplicates)
 
 
 def peak_calling(macs_path: str,
@@ -468,10 +525,10 @@ class MACSCallPeak():
         log = logging.getLogger('cisTopic')
 
         if self.nolambda is True:
-        	cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
+            cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
             '--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits --nolambda'
         else:
-        	cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
+            cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
             '--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits'
 
         cmd = cmd % (
