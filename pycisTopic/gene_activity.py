@@ -265,7 +265,7 @@ def region_weights(imputed_acc_object,
     if use_gene_boundaries or predefined_boundaries:
         if predefined_boundaries:
             predefined_boundaries.Strand='+'
-            predefined_boundaries.Gene='TAD'
+            predefined_boundaries.Gene=['TAD'+str(i) for i in range(len(predefined_boundaries))]
             space=predefined_boundaries
             log.info('Using predefined domains')
             use_gene_boundaries=False
@@ -435,7 +435,7 @@ def region_weights(imputed_acc_object,
     else:
         regions_per_gene.Gini_weight = 1
     # Return weights
-    if use_gene_boundaries:
+    if use_gene_boundaries or predefined_boundaries:
         weights_df = regions_per_gene.df.loc[:,
                      ['Name',
                       'Gene',
