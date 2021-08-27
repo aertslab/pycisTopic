@@ -161,6 +161,7 @@ def weighted_aggregation(imputed_acc_obj_mtx: sparse.csr_matrix,
 def region_weights(imputed_acc_object,
                    pr_annot,
                    chromsizes,
+                   predefined_boundaries=None,
                    use_gene_boundaries=True,
                    upstream=[1000, 100000],
                    downstream=[1000, 100000],
@@ -185,6 +186,9 @@ def region_weights(imputed_acc_object,
         and Transcription Start Site.
     chromsizes: pr.PyRanges
         A :class:`pr.PyRanges` containing size of each chromosome, containing 'Chromosome', 'Start' and 'End' columns.
+    predefined_boundaries: pr.PyRanges
+        A :class:`pr.PyRanges` containing predefined genomic domain boundaries (e.g. TAD boundaries) to use as boundaries. If 
+        given, use_gene_boundaries will be ignored.
     use_gene_boundaries: bool, optional
         Whether to use the whole search space or stop when encountering another gene. Default: True
     upstream: List, optional
@@ -258,8 +262,16 @@ def region_weights(imputed_acc_object,
     pr_promoters = pr.PyRanges(pd_promoters)
     pr_promoters = extend_pyranges(pr_promoters, extend_tss[0], extend_tss[1])
 
-    if use_gene_boundaries:
-        log.info('Calculating gene boundaries')
+    if use_gene_boundaries or predefined_boundaries:
+        if predefined_boundaries:
+            predefined_boundaries.Strand='+'
+            predefined_boundaries.Gene='TAD'
+            space=predefined_boundaries
+            log.info('Using predefined domains')
+            use_gene_boundaries=False
+        if use_gene_boundaries:
+            space=pr_promoters
+            log.info('Calculating gene boundaries')
         # Add chromosome limits
         chromsizes_begin_pos = chromsizes.df.copy()
         chromsizes_begin_pos['End'] = 1
@@ -273,10 +285,10 @@ def region_weights(imputed_acc_object,
         chromsizes_end_pos['Gene'] = 'Chrom_End'
         chromsizes_end_neg = chromsizes_end_pos.copy()
         chromsizes_end_neg['Strand'] = '-'
-        pr_gene_bound = pr.PyRanges(
+        pr_bound = pr.PyRanges(
             pd.concat(
                 [
-                    pr_promoters.df,
+                    space.df,
                     chromsizes_begin_pos,
                     chromsizes_begin_neg,
                     chromsizes_end_pos,
@@ -284,6 +296,7 @@ def region_weights(imputed_acc_object,
                 ]
             )
         )
+        
         # Get distance to nearest promoter (of a differrent gene)
         pr_annot_nodup = pr_annot[['Chromosome',
                                    'Start',
@@ -293,29 +306,29 @@ def region_weights(imputed_acc_object,
                                    'Gene_width',
                                    'Gene_size_weight']].drop_duplicate_positions().copy()
         pr_annot_nodup = pr.PyRanges(
-            pr_annot_nodup.df.drop_duplicates(
-                subset="Gene", keep="first"))
-        closest_promoter_upstream = pr_annot_nodup.nearest(
-            pr_gene_bound, overlap=False, how='upstream')
-        closest_promoter_upstream = closest_promoter_upstream[[
+                pr_annot_nodup.df.drop_duplicates(
+                    subset="Gene", keep="first"))
+        closest_bound_upstream = pr_annot_nodup.nearest(
+            pr_bound, overlap=False, how='upstream')
+        closest_bound_upstream = closest_bound_upstream[[
             'Chromosome', 'Start', 'End', 'Strand', 'Gene', 'Distance']]
-        closest_promoter_downstream = pr_annot_nodup.nearest(
-            pr_gene_bound, overlap=False, how='downstream')
-        closest_promoter_downstream = closest_promoter_downstream[[
+        closest_bound_downstream = pr_annot_nodup.nearest(
+            pr_bound, overlap=False, how='downstream')
+        closest_bound_downstream = closest_bound_downstream[[
             'Chromosome', 'Start', 'End', 'Strand', 'Gene', 'Distance']]
         # Add distance information and limit if above/below thresholds
         pr_annot_df = pr_annot_nodup.df
         pr_annot_df = pr_annot_df.set_index('Gene')
-        closest_promoter_upstream_df = closest_promoter_upstream.df.set_index(
+        closest_bound_upstream_df = closest_bound_upstream.df.set_index(
             'Gene').Distance
-        closest_promoter_upstream_df.name = 'Distance_upstream'
+        closest_bound_upstream_df.name = 'Distance_upstream'
         pr_annot_df = pd.concat(
-            [pr_annot_df, closest_promoter_upstream_df], axis=1, sort=False)
-        closest_promoter_downstream_df = closest_promoter_downstream.df.set_index(
+            [pr_annot_df, closest_bound_upstream_df], axis=1, sort=False)
+        closest_bound_downstream_df = closest_bound_downstream.df.set_index(
             'Gene').Distance
-        closest_promoter_downstream_df.name = 'Distance_downstream'
+        closest_bound_downstream_df.name = 'Distance_downstream'
         pr_annot_df = pd.concat(
-            [pr_annot_df, closest_promoter_downstream_df], axis=1, sort=False).reset_index()
+            [pr_annot_df, closest_bound_downstream_df], axis=1, sort=False).reset_index()
         pr_annot_df.loc[pr_annot_df.Distance_upstream <
                         upstream[0], 'Distance_upstream'] = upstream[0]
         pr_annot_df.loc[pr_annot_df.Distance_upstream >
