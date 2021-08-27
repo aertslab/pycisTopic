@@ -369,7 +369,7 @@ def region_weights(imputed_acc_object,
     regions_per_gene.End = (regions_per_gene.Start + 1).astype(np.int32)
     # Calculate distance
     log.info('Calculating distances')
-    if use_gene_boundaries:
+    if use_gene_boundaries or predefined_boundaries:
         regions_per_gene = reduce_pyranges_with_limits_b(regions_per_gene)
         regions_per_gene = calculate_distance_with_limits_join(
             regions_per_gene)
