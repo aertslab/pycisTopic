@@ -264,8 +264,18 @@ def region_weights(imputed_acc_object,
 
     if use_gene_boundaries or predefined_boundaries:
         if predefined_boundaries:
-            predefined_boundaries.Strand='+'
-            predefined_boundaries.Gene=['TAD'+str(i) for i in range(len(predefined_boundaries))]
+            predefined_boundaries_pos = predefined_boundaries.df.copy()
+            predefined_boundaries_neg = predefined_boundaries.df.copy()
+            predefined_boundaries_pos['Strand'] = '+'
+            predefined_boundaries_neg['Strand'] = '-'
+            predefined_boundaries = pr.PyRanges(
+            pd.concat(
+                [
+                    predefined_boundaries_pos,
+                    predefined_boundaries_neg
+                ]
+            )
+            )
             space=predefined_boundaries
             log.info('Using predefined domains')
             use_gene_boundaries=False
