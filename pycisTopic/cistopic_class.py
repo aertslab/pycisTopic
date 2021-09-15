@@ -386,8 +386,17 @@ class CistopicObject:
         binary_matrix = sp.binarize(fragment_matrix, threshold=is_acc - 1)
         cell_data = pd.concat(cell_data_list, axis=0, sort=False)
         cell_data.index = cell_names
-        region_data = [x.region_data for x in cistopic_obj_list]
-        region_data = pd.concat(region_data, axis=0, sort=False)
+        region_data = region_names_to_coordinates(region_names)
+        region_data['Width'] = abs(region_data.End -region_data.Start).astype(np.int32)
+        region_data['cisTopic_nr_frag'] = np.array(
+        fragment_matrix.sum(axis=1)).flatten()
+        region_data['cisTopic_log_nr_frag'] = np.log10(
+        region_data['cisTopic_nr_frag'])
+        region_data['cisTopic_nr_acc'] = np.array(
+        binary_matrix.sum(axis=1)).flatten()
+        region_data['cisTopic_log_nr_acc'] = np.log10(
+        region_data['cisTopic_nr_acc'])
+        
         if copy is True:
             cistopic_obj = CistopicObject(
                 fragment_matrix,
