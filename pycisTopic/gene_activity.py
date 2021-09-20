@@ -15,6 +15,7 @@ pd.options.mode.chained_assignment = None
 def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
                       pr_annot: pr.PyRanges,
                       chromsizes: pr.PyRanges,
+                      predefined_boundaries: Optional[pr.PyRanges] = None,
                       use_gene_boundaries: Optional[bool] = True,
                       upstream: Optional[List[int]] = [1000, 100000],
                       downstream: Optional[List[int]] = [1000, 100000],
@@ -43,6 +44,9 @@ def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
         and Transcription Start Site.
     chromsizes: pr.PyRanges
         A :class:`pr.PyRanges` containing size of each chromosome, containing 'Chromosome', 'Start' and 'End' columns.
+    predefined_boundaries: pr.PyRanges
+        A :class:`pr.PyRanges` containing predefined genomic domain boundaries (e.g. TAD boundaries) to use as boundaries. If 
+        given, use_gene_boundaries will be ignored.
     use_gene_boundaries: bool, optional
         Whether to use the whole search space or stop when encountering another gene. Default: True
     upstream: List, optional
@@ -94,6 +98,7 @@ def get_gene_activity(imputed_acc_object: 'CistopicImputedFeatures',
     region_weights_df = region_weights(imputed_acc_object,
                                        pr_annot,
                                        chromsizes,
+                                       predefined_boundaries,
                                        use_gene_boundaries,
                                        upstream,
                                        downstream,
