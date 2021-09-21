@@ -145,8 +145,11 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
     metrics = pd.concat(metrics, axis=1).fillna(0)
     annotations = pd.concat(annotations, axis=1)
     # Embeddings. Cell embeddings in this case
-    embeddings = {x: cistopic_obj.projections['cell'][x].loc[list(set(cistopic_obj.projections['cell'][x].index.tolist()).intersection(set(cell_names)))]
-                  for x in cistopic_obj.projections['cell'].keys()}
+    embeddings = {}
+    for x in cistopic_obj.projections['cell'].keys():
+        emb_cell_names = list(set(cistopic_obj.projections['cell'][x].index.tolist()).intersection(set(cell_names)))
+        emb_cell_names_mask = cistopic_obj.projections['cell'][x].index.isin(emb_cell_names)
+        embeddings[x] = cistopic_obj.projections['cell'][x].loc[emb_cell_names_mask]
 
     # Create minimal loom
     log.info('Creating minimal loom')
@@ -363,8 +366,11 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
         index=binarized_cell_topic.keys()
     )
     # Embeddings. Cell embeddings in this case
-    embeddings = {x: cistopic_obj.projections['cell'][x].loc[list(set(cistopic_obj.projections['cell'][x].index.tolist()).intersection(set(cell_names)))]
-                  for x in cistopic_obj.projections['cell'].keys()}
+    embeddings = {}
+    for x in cistopic_obj.projections['cell'].keys():
+        emb_cell_names = list(set(cistopic_obj.projections['cell'][x].index.tolist()).intersection(set(cell_names)))
+        emb_cell_names_mask = cistopic_obj.projections['cell'][x].index.isin(emb_cell_names)
+        embeddings[x] = cistopic_obj.projections['cell'][x].loc[emb_cell_names_mask]
 
     # Create minimal loom
     log.info('Creating minimal loom')
