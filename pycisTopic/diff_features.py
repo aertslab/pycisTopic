@@ -194,6 +194,55 @@ class CistopicImputedFeatures:
             self.cell_names = cell_names
             self.feature_names = feature_names
             self.project = project
+            
+    def make_rankings(self, seed=123):
+        """
+        A function to generate rankings per cell based on the imputed accessibility scores per region.
+
+        Parameters
+        ---------
+        seed: int, optional
+            Random seed to ensure reproducibility of the rankings when there are ties
+        Return
+        ------
+           CistopicImputedFeatures
+            A :class:`CistopicImputedFeatures` containing with ranking values rather than scores.
+        """
+        # Initialize random number generator, for handling ties
+        rng = np.random.default_rng(seed=seed)
+
+           # Function to make rankings per array
+        def rank_scores_and_assign_random_ranking_in_range_for_ties(
+                scores_with_ties_for_motif_or_track_numpy: np.ndarray
+        ) -> np.ndarray:
+            # 
+            # Create random permutation so tied scores will have a different ranking each time.
+            random_permutations_to_break_ties_numpy = rng.permutation(
+                scores_with_ties_for_motif_or_track_numpy.shape[0]
+            )
+            ranking_with_broken_ties_for_motif_or_track_numpy = random_permutations_to_break_ties_numpy[
+                (-scores_with_ties_for_motif_or_track_numpy)[random_permutations_to_break_ties_numpy].argsort()
+            ].argsort().astype(imputed_acc_obj_ranking_db_dtype)
+
+            return ranking_with_broken_ties_for_motif_or_track_numpy
+
+        # Create zeroed imputed object rankings database.
+        imputed_acc_ranking = CistopicImputedFeatures(
+                np.zeros((len(self.feature_names), len(self.cell_names))), 
+                self.feature_names,
+                self.cell_names, 
+                self.project)
+
+        # Get dtype of the scores
+        imputed_acc_obj_ranking_db_dtype = imputed_acc_ranking.mtx.dtype
+
+        # Rank all scores per motif/track and assign a random ranking in range for regions/genes with the same score.
+        for col_idx in range(len(imputed_acc_ranking.cell_names)):
+                imputed_acc_ranking.mtx[:,col_idx] = rank_scores_and_assign_random_ranking_in_range_for_ties(
+                    imputed_acc_ranking.mtx[:,col_idx]
+                )
+
+        return imputed_acc_ranking
 
 
 def impute_accessibility(cistopic_obj: 'CistopicObject',

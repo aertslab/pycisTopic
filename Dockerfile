@@ -26,10 +26,15 @@ RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir igv_jupyterlab && \
     pip install --no-cache-dir bs4 && \
     pip install --no-cache-dir MACS2 && \
-    pip install --no-cache-dir ctxcore && \
     pip install --no-cache-dir lxml && \
     pip install --no-cache-dir tspex && \
     pip install --no-cache-dir -r /tmp/requirements.txt
+    
+# install ctxcore from local copy:
+COPY ctxcore /tmp/ctxcore
+RUN  cd /tmp/ctxcore && \
+     pip install . && \
+     cd .. && rm -rf ctxcore
 
 # install pycisTopic from local copy:
 COPY pycisTopic /tmp/pycisTopic
