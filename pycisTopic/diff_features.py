@@ -235,11 +235,14 @@ class CistopicImputedFeatures:
 
         # Get dtype of the scores
         imputed_acc_obj_ranking_db_dtype = 'uint32'
+        
+        # Convert to csc
+        mtx = self.mtx.tocsc()
 
         # Rank all scores per motif/track and assign a random ranking in range for regions/genes with the same score.
         for col_idx in range(len(imputed_acc_ranking.cell_names)):
                 imputed_acc_ranking.mtx[:,col_idx] = rank_scores_and_assign_random_ranking_in_range_for_ties(
-                    self.mtx[:,col_idx].toarray().T[0]
+                    mtx[:,col_idx].toarray().flatten()
                 )
 
         return imputed_acc_ranking
