@@ -273,10 +273,12 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     # Feature names
     if selected_regions is not None or selected_cells is not None:
         if not isinstance(accessibility_matrix, pd.DataFrame):
+        	selected_regions = list(set(selected_regions).intersection(accessibility_matrix.feature_names))
             accessibility_matrix = accessibility_matrix.subset(
                 cells=selected_cells, features=selected_regions, copy=True)
         else:
             if selected_regions is not None:
+            	selected_regions = list(set(selected_regions).intersection(accessibility_matrix.columns))
                 accessibility_matrix = accessibility_matrix.loc[:, selected_regions]
             if selected_cells is not None:
                 accessibility_matrix = accessibility_matrix.loc[selected_cells]
