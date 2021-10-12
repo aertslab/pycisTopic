@@ -162,7 +162,7 @@ class CistopicObject:
                cells: Optional[List[str]] = None,
                regions: Optional[List[str]] = None,
                copy: Optional[bool] = False,
-               split_pattern : Optional[str]: '___'):
+               split_pattern : Optional[str] = '___'):
         """
         Subset cells and/or regions from :class:`CistopicObject`. Existent :class:`CisTopicLDAModel` and projections will be deleted. This is to ensure that
         models contained in a :class:`CistopicObject` are derived from the cells it contains.
