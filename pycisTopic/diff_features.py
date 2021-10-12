@@ -7,6 +7,7 @@ import ray
 import scipy
 import scipy.sparse as sparse
 import sklearn
+from sklearn.preprocessing import normalize
 import sys
 from scipy.stats import ranksums
 from typing import List
@@ -157,9 +158,12 @@ class CistopicImputedFeatures:
                 common_features, feature_names)
             common_index_fm_to_add = get_position_index(
                 common_features, feature_names_to_add)
-            mtx_common = sparse.hstack(
-                [mtx[common_index_fm, ], mtx_to_add[common_index_fm_to_add, ]], format='csr')
-
+            if sparse.issparse(mtx):
+                mtx_common = sparse.hstack(
+                    [mtx[common_index_fm, ], mtx_to_add[common_index_fm_to_add, ]], format='csr')
+            else:
+                mtx_common = np.hstack(
+                    [mtx[common_index_fm, ], mtx_to_add[common_index_fm_to_add, ]])
             if len(diff_features) > 0:
                 diff_features_1 = list(
                     np.setdiff1d(
@@ -167,8 +171,12 @@ class CistopicImputedFeatures:
                         feature_names_to_add))
                 diff_index_fm_1 = get_position_index(
                     diff_features_1, feature_names)
-                mtx_diff_1 = sparse.hstack([mtx[diff_index_fm_1, ], np.zeros(
-                    (len(diff_features_1), mtx_to_add.shape[1]))], format='csr')
+                if sparse.issparse(mtx):
+                    mtx_diff_1 = sparse.hstack([mtx[diff_index_fm_1, ], np.zeros(
+                        (len(diff_features_1), mtx_to_add.shape[1]))], format='csr')
+                else:
+                    mtx_diff_1 = np.hstack([mtx[diff_index_fm_1, ], np.zeros(
+                        (len(diff_features_1), mtx_to_add.shape[1]))])
 
                 diff_features_2 = list(
                     np.setdiff1d(
@@ -176,11 +184,17 @@ class CistopicImputedFeatures:
                         feature_names))
                 diff_index_fm_2 = get_position_index(
                     diff_features_2, feature_names_to_add)
-                mtx_diff_2 = sparse.hstack([np.zeros(
-                    (len(diff_features_2), mtx.shape[1])), mtx_to_add[diff_index_fm_2, ]], format='csr')
+                if sparse.issparse(mtx):
+                    mtx_diff_2 = sparse.hstack([np.zeros(
+                        (len(diff_features_2), mtx.shape[1])), mtx_to_add[diff_index_fm_2, ]], format='csr')
+                    mtx = sparse.vstack(
+                        [mtx_common, mtx_diff_1, mtx_diff_2], format='csr')
+                else:
+                    mtx_diff_2 = np.hstack([np.zeros(
+                        (len(diff_features_2), mtx.shape[1])), mtx_to_add[diff_index_fm_2, ]])
+                    mtx = np.vstack(
+                        [mtx_common, mtx_diff_1, mtx_diff_2], format='csr')
 
-                mtx = sparse.vstack(
-                    [mtx_common, mtx_diff_1, mtx_diff_2], format='csr')
                 feature_names = common_features + diff_features_1 + diff_features_2
             else:
                 mtx = mtx_common
@@ -237,7 +251,10 @@ class CistopicImputedFeatures:
         imputed_acc_obj_ranking_db_dtype = 'uint32'
         
         # Convert to csc
-        mtx = self.mtx.tocsc()
+        if sparse.issparse(self.mtx):
+            mtx = self.mtx.tocsc()
+        else:
+            mtx = self.mtx
 
         # Rank all scores per motif/track and assign a random ranking in range for regions/genes with the same score.
         for col_idx in range(len(imputed_acc_ranking.cell_names)):
@@ -303,8 +320,8 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
         # Set all values smaller or equal than (1 / scale_factor) to zero (to
         # make sparse matrix more efficient).
         np.place(imputed_acc, imputed_acc < (1 / scale_factor), [0])
-        log.info('Converting to sparse matrix')
-        imputed_acc = sparse.csr_matrix(imputed_acc, dtype=np.float32)
+        #log.info('Converting to sparse matrix')
+        #imputed_acc = sparse.csr_matrix(imputed_acc, dtype=np.float32)
         if scale_factor != 1:
             log.info('Scaling')
             # Only multiply non-zero data of sparse matrix.
@@ -346,7 +363,7 @@ def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
 
     log.info('Normalizing imputed data')
     if isinstance(input_mat, CistopicImputedFeatures):
-        mtx = np.log1p(input_mat.mtx / input_mat.mtx.sum(0) * scale_factor)
+        mtx = np.log1p(normalize(input_mat.mtx, norm='l1', axis=0)* 10**4)
         output = CistopicImputedFeatures(
             mtx,
             input_mat.feature_names,
@@ -418,10 +435,14 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImpute
         mat = input_mat.mtx
         features = input_mat.feature_names
 
-    if not sparse.issparse(mat):
-        mat = sparse.csr_matrix(mat)
-
-    mean, var = sklearn.utils.sparsefuncs.mean_variance_axis(mat, axis=1)
+    if sparse.issparse(mat):
+        mean, var = sklearn.utils.sparsefuncs.mean_variance_axis(mat, axis=1)
+    else:
+        mean = np.mean(mat, axis=1, dtype=np.float32)
+        mean_sq = np.multiply(mat, mat).mean(axis=1, dtype=np.float32)
+        var = mean_sq - mean ** 2
+    
+    var *= mat.shape[1] / (mat.shape[1] - 1)
     mean[mean == 0] = 1e-12
     dispersion = var / mean
     # Logarithmic dispersion as in Seurat
@@ -430,7 +451,6 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImpute
     df = pd.DataFrame()
     df['means'] = mean
     df['dispersions'] = dispersion
-
     df['mean_bin'] = pd.cut(df['means'], bins=n_bins)
     disp_grouped = df.groupby('mean_bin')['dispersions']
     disp_mean_bin = disp_grouped.mean()
