@@ -73,7 +73,8 @@ class CistopicObject:
         return (descr)
 
     def add_cell_data(self,
-                      cell_data: pd.DataFrame):
+                      cell_data: pd.DataFrame,
+                      split_pattern: Optional[str] = '___'):
         """
         Add cell metadata to :class:`CistopicObject`. If the column already exist on the cell metadata, it will be overwritten.
 
@@ -81,7 +82,9 @@ class CistopicObject:
         ---------
         cell_data: pd.DataFrame
             A data frame containing metadata information, with cell names as indexes. If cells are missing from the metadata, values will be filled with Nan.
-
+		split_pattern: str
+			Pattern to split cell barcode from sample id. Default: ___
+			
         Return
         ------
         CistopicObject
@@ -91,7 +94,7 @@ class CistopicObject:
         flag = False
         if len(set(self.cell_names) & set(
                 cell_data.index)) < len(self.cell_names):
-            check_cell_names = prepare_tag_cells(self.cell_names)
+            check_cell_names = prepare_tag_cells(self.cell_names, split_pattern)
             if len(set(check_cell_names) & set(cell_data.index)) < len(
                     set(self.cell_names) & set(cell_data.index)):
                 print(
@@ -111,13 +114,13 @@ class CistopicObject:
             new_cell_data = pd.concat(
                 [self.cell_data, cell_data], axis=1, sort=False)
         elif flag:
-            self.cell_data.index = prepare_tag_cells(self.cell_names)
+            self.cell_data.index = prepare_tag_cells(self.cell_names, split_pattern)
             cell_data = cell_data.loc[list(
                 set(self.cell_data.index.tolist()) & set(cell_data.index)), ]
             new_cell_data = pd.concat(
                 [self.cell_data, cell_data], axis=1, sort=False)
             new_cell_data = new_cell_data.loc[prepare_tag_cells(
-                self.cell_names)]
+                self.cell_names, split_pattern)]
             new_cell_data.index = self.cell_names
 
         self.cell_data = new_cell_data.loc[self.cell_names]
@@ -158,7 +161,8 @@ class CistopicObject:
     def subset(self,
                cells: Optional[List[str]] = None,
                regions: Optional[List[str]] = None,
-               copy: Optional[bool] = False):
+               copy: Optional[bool] = False,
+               split_pattern : Optional[str]: '___'):
         """
         Subset cells and/or regions from :class:`CistopicObject`. Existent :class:`CisTopicLDAModel` and projections will be deleted. This is to ensure that
         models contained in a :class:`CistopicObject` are derived from the cells it contains.
@@ -171,7 +175,9 @@ class CistopicObject:
             A list containing the names of the regions to keep.
         copy: bool, optional
             Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
-
+		split_pattern: str
+			Pattern to split cell barcode from sample id. Default: ___
+			
         Return
         ------
         CistopicObject
@@ -191,7 +197,7 @@ class CistopicObject:
             except BaseException:
                 try:
                     keep_cells_index = get_position_index(
-                        cells, prepare_tag_cells(self.cell_names))
+                        cells, prepare_tag_cells(self.cell_names, split_pattern))
                 except BaseException:
                     log.error(
                         'None of the given cells is contained in this cisTopic object!')
@@ -247,7 +253,8 @@ class CistopicObject:
               cistopic_obj_list: List['CistopicObject'],
               is_acc: Optional[int] = 1,
               project: Optional[str] = 'cisTopic_merge',
-              copy: Optional[bool] = False):
+              copy: Optional[bool] = False,
+              split_pattern: Optional[str] = '___'):
         """
         Merge a list of :class:`CistopicObject` to the input :class:`CistopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`CistopicObject` are derived from the cells it contains.
 
@@ -260,7 +267,9 @@ class CistopicObject:
         project: str, optional
             Name of the cisTopic project.
         copy: bool, optional
-            Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
+            Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned		
+        split_pattern: str
+			Pattern to split cell barcode from sample id. Default: ___
         Return
         ------
         CistopicObject
@@ -315,12 +324,12 @@ class CistopicObject:
 
         cell_names_list = [
             prepare_tag_cells(
-                cell_names_list[x]) for x in range(
+                cell_names_list[x], split_pattern) for x in range(
                 len(cell_names_list))]
         fragment_matrix = fragment_matrix_list[0]
         region_names = region_names_list[0]
         cell_names = [
-            n + '-' + s
+            n + split_pattern + s
             for n, s in zip(
                 cell_names_list[0],
                 cell_data_list[0]['sample_id'].tolist())
@@ -335,7 +344,7 @@ class CistopicObject:
             cell_names_to_add = cell_names_list[i]
             object_id_to_add = [project_list[i]] * len(cell_names_to_add)
             cell_names_to_add = [
-                n + '-' + s
+                n + split_pattern + s
                 for n, s in zip(
                     cell_names_to_add,
                     cell_data_list[i]['sample_id'].tolist())
@@ -445,7 +454,8 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
                            is_acc: Optional[int] = 1,
                            path_to_fragments: Optional[Union[str, Dict[str, str]]] = {},
                            project: Optional[str] = 'cisTopic',
-                           tag_cells: Optional[bool] = True):
+                           tag_cells: Optional[bool] = True,
+                           split_pattern: Optional[str] = '___'):
     """
     Creates a CistopicObject from a count matrix.
 
@@ -471,6 +481,8 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
         Name of the cisTopic project. Default: 'cisTopic'
     tag_cells: bool, optional
         Whether to add the project name as suffix to the cell names. Default: True
+    split_pattern: str
+		Pattern to split cell barcode from sample id. Default: ___
 
     Return
     ------
@@ -497,7 +509,7 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
     if tag_cells:
         cell_names = [
             cell_names[x] +
-            '-' +
+            split_pattern +
             project for x in range(
                 len(cell_names))]
 
@@ -584,7 +596,8 @@ def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
                                             is_acc: Optional[int] = 1,
                                             path_to_fragments: Optional[Dict[str, str]] = {},
                                             sample_id: Optional[pd.DataFrame] = None,
-                                            project: Optional[str] = 'cisTopic'):
+                                            project: Optional[str] = 'cisTopic',
+                                            split_pattern: Optional[str] = '___'):
     """
     Creates a CistopicObject from a count matrix file (tsv).
 
@@ -608,6 +621,8 @@ def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
         A data frame indicating from which sample each barcode is derived. Required if path_to_fragments is provided. Levels must agree with keys in path_to_fragments. Default: None.
     project: str, optional
         Name of the cisTopic project. Default: 'cisTopic'
+    split_pattern: str
+		Pattern to split cell barcode from sample id. Default: ___
 
     Return
     ------
@@ -645,7 +660,7 @@ def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
 
     if sample_id is not None:
         if (isinstance(path_to_fragments, dict)):
-            cistopic_obj.add_cell_data(sample_id)
+            cistopic_obj.add_cell_data(sample_id, split_pattern)
         else:
             log.error(
                 'Provide path_to_fragments with keys matching levels in sample_id!')
@@ -664,7 +679,8 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
                                           check_for_duplicates: Optional[bool] = True,
                                           project: Optional[str] = 'cisTopic',
                                           partition: Optional[int] = 5,
-                                          fragments_df: Optional[Union[pd.DataFrame, pr.PyRanges]] = None):
+                                          fragments_df: Optional[Union[pd.DataFrame, pr.PyRanges]] = None,
+                                          split_pattern: Optional[str] = '___'):
     """
     Creates a CistopicObject from a fragments file and defined genomic intervals (compatible with CellRangerATAC output)
 
@@ -696,6 +712,9 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         When using Pandas > 0.21, counting may fail (https://github.com/pandas-dev/pandas/issues/26314). In that case, the fragments data frame is divided in this number of partitions, and after counting data is merged.
     fragments_df: pd.DataFrame or pr.PyRanges, optional
         A PyRanges or DataFrame containing chromosome, start, end and assigned barcode for each read, corresponding to the data in path_to_fragments.
+    split_pattern: str
+		Pattern to split cell barcode from sample id. Default: ___
+		
     Return
     ------
     CistopicObject
@@ -808,10 +827,10 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         
     if metrics is not None:
         metrics['barcode'] = metrics.index.tolist()
-        cistopic_obj.add_cell_data(metrics)
+        cistopic_obj.add_cell_data(metrics, split_pattern)
     else:
         FPB_DF['barcode'] = FPB_DF.index.tolist()
-        cistopic_obj.add_cell_data(FPB_DF)
+        cistopic_obj.add_cell_data(FPB_DF, split_pattern)
     return cistopic_obj
 
 def create_cistopic_object_chunk(df,

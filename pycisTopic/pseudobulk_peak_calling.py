@@ -31,6 +31,7 @@ def export_pseudobulk(input_data: Union['CistopicObject',
                       n_cpu: Optional[int] = 1,
                       normalize_bigwig: Optional[bool] = True,
                       remove_duplicates: Optional[bool] = True,
+                      split_pattern: Optional[str] = '___',
                       **kwargs):
     """
     Create pseudobulks as bed and bigwig from single cell fragments file given a barcode annotation.
@@ -63,7 +64,9 @@ def export_pseudobulk(input_data: Union['CistopicObject',
     normalize_bigwig: bool, optional
             Whether bigwig files should be CPM normalized. Default: True.
     remove_duplicates: bool, optional
-            Whether duplicates should be removed before converting the data to bigwig.
+            Whether duplicates should be removed before converting the data to bigwig.		
+    split_pattern: str
+			Pattern to split cell barcode from sample id. Default: ___
 
     Return
     ------
@@ -115,7 +118,7 @@ def export_pseudobulk(input_data: Union['CistopicObject',
                     cell_data['barcode'].tolist())]
             else:
                 fragments_df = fragments_df.loc[fragments_df['Name'].isin(
-                    prepare_tag_cells(cell_data.index.tolist()))]
+                    prepare_tag_cells(cell_data.index.tolist(), split_pattern))]
             fragments_df_dict[sample_id] = fragments_df
 
     # Set groups
@@ -150,7 +153,8 @@ def export_pseudobulk(input_data: Union['CistopicObject',
                     bed_path,
                     sample_id_col,
                     normalize_bigwig,
-                    remove_duplicates) for group in groups],
+                    remove_duplicates,
+                    split_pattern) for group in groups],
             num_returns=len(groups))
         ray.shutdown()
     else:
@@ -163,7 +167,8 @@ def export_pseudobulk(input_data: Union['CistopicObject',
                     bed_path,
                     sample_id_col,
                     normalize_bigwig,
-                    remove_duplicates) for group in groups]
+                    remove_duplicates,
+                    split_pattern) for group in groups]
     bw_paths = {
         group: os.path.join(
             bigwig_path,
@@ -185,7 +190,8 @@ def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
                           bed_path: str,
                           sample_id_col: Optional[str] = 'sample_id',
                           normalize_bigwig: Optional[bool] = True,
-                          remove_duplicates: Optional[bool] = True):
+                          remove_duplicates: Optional[bool] = True,
+                          split_pattern: Optional[str] = '___'):
     """
     Create pseudobulk as bed and bigwig from single cell fragments file given a barcode annotation and a group.
 
@@ -210,6 +216,8 @@ def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
             Whether bigwig files should be CPM normalized. Default: True.
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
+    split_pattern: str
+			Pattern to split cell barcode from sample id. Default: ___
     """
     # Create logger
     level = logging.INFO
@@ -227,7 +235,7 @@ def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
         if 'barcode' in sample_data:
             sample_data.index = sample_data['barcode'].tolist()
         else:
-            sample_data.index = prepare_tag_cells(sample_data.index.tolist())
+            sample_data.index = prepare_tag_cells(sample_data.index.tolist(), split_pattern)
         group_var = sample_data.iloc[:, 0]
         barcodes = group_var[group_var.isin([group])].index.tolist()
         fragments_df = fragments_df_dict[sample_id]
@@ -279,7 +287,8 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
                           bed_path: str,
                           sample_id_col: Optional[str] = 'sample_id',
                           normalize_bigwig: Optional[bool] = True,
-                          remove_duplicates: Optional[bool] = True):
+                          remove_duplicates: Optional[bool] = True,
+                          split_pattern: Optional[str] = '___'):
     """
     Create pseudobulk as bed and bigwig from single cell fragments file given a barcode annotation and a group.
 
@@ -304,6 +313,8 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
             Whether bigwig files should be CPM normalized. Default: True.
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
+    split_pattern: str
+			Pattern to split cell barcode from sample id. Default: ___
     """
     export_pseudobulk_one_sample(
                     cell_data,
@@ -314,7 +325,8 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
                     bed_path,
                     sample_id_col,
                     normalize_bigwig,
-                    remove_duplicates)
+                    remove_duplicates,
+                    split_pattern)
 
 
 def peak_calling(macs_path: str,

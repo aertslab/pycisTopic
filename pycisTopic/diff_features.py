@@ -53,7 +53,8 @@ class CistopicImputedFeatures:
     def subset(self,
                cells: Optional[List[str]] = None,
                features: Optional[List[str]] = None,
-               copy: Optional[bool] = False):
+               copy: Optional[bool] = False,
+               split_pattern: Optional[str] = '___'):
         """
         Subset cells and/or regions from :class:`CistopicImputedFeatures`.
 
@@ -65,6 +66,8 @@ class CistopicImputedFeatures:
             A list containing the names of the features to keep.
         copy: bool, optional
             Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
+        split_pattern: str
+			Pattern to split cell barcode from sample id. Default: ___
 
         Return
         ------
@@ -81,7 +84,7 @@ class CistopicImputedFeatures:
             except BaseException:
                 try:
                     cells_index = get_position_index(
-                        cells, prepare_tag_cells(self.cell_names))
+                        cells, prepare_tag_cells(self.cell_names, split_pattern))
                 except BaseException:
                     log.error(
                         'None of the given cells is contained in this cisTopic object!')
