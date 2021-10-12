@@ -362,7 +362,9 @@ def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
 
     log.info('Normalizing imputed data')
     if isinstance(input_mat, CistopicImputedFeatures):
-        mtx = np.log1p(normalize(input_mat.mtx, norm='l1', axis=0)* scale_factor)
+        mtx = input_mat.mtx / input_mat.mtx.sum(0)
+		mtx *= scale_factor
+		np.log1p(mtx, out=mtx)
         output = CistopicImputedFeatures(
             mtx,
             input_mat.feature_names,
