@@ -315,17 +315,13 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
     topic_region = topic_region.to_numpy().astype(np.float32)
     log.info('Imputing drop-outs')
     imputed_acc = topic_region @ cell_topic
+    imputed_acc = imputed_acc.astype(np.float32)
     if isinstance(scale_factor, int):
-        log.info('Removing small values')
-        # Set all values smaller or equal than (1 / scale_factor) to zero (to
-        # make sparse matrix more efficient).
-        np.place(imputed_acc, imputed_acc < (1 / scale_factor), [0])
-        #log.info('Converting to sparse matrix')
-        #imputed_acc = sparse.csr_matrix(imputed_acc, dtype=np.float32)
         if scale_factor != 1:
             log.info('Scaling')
             # Only multiply non-zero data of sparse matrix.
-            imputed_acc.data = imputed_acc.data * np.float32(scale_factor)
+            imputed_acc *= np.int32(scale_factor)
+            imputed_acc = imputed_acc.astype(np.int32)
             log.info('Keep non zero rows')
             keep_regions_index = non_zero_rows(imputed_acc)
             imputed_acc = imputed_acc[keep_regions_index, ]
