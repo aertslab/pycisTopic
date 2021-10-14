@@ -2,6 +2,8 @@ import logging
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import array
+from numpy import count_nonzero
 import pandas as pd
 import ray
 import scipy
@@ -67,7 +69,7 @@ class CistopicImputedFeatures:
         copy: bool, optional
             Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
         split_pattern: str
-			Pattern to split cell barcode from sample id. Default: ___
+            Pattern to split cell barcode from sample id. Default: ___
 
         Return
         ------
@@ -272,6 +274,7 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
                          selected_cells: Optional[List[str]] = None,
                          selected_regions: Optional[List[str]] = None,
                          scale_factor: Optional[int] = 10 ** 6,
+                         sparsity_thr: Optional[float] = 0.67, 
                          project: Optional[str] = 'cisTopic_Impute'):
     """
     Impute region accessibility.
@@ -286,6 +289,8 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
         A list with selected regions to impute accessibility for. Default: None
     scale_factor: int, optional
         A number to multiply the imputed values for. This is useful to convert low probabilities to 0, making the matrix more sparse. Default: 10**6.
+    sparsity_thr: float, optional
+        Minimum sparsity ratio in matrix to be converted to sparse matrix. Default: 0.67.
     project: str, optional
             Name of the cisTopic imputation project. Default: 'cisTopic_impute.'
 
@@ -329,9 +334,15 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
             keep_regions_index = non_zero_rows(imputed_acc)
             imputed_acc = imputed_acc[keep_regions_index, ]
             region_names = subset_list(region_names, keep_regions_index)
+    sparsity = 1.0 - (count_nonzero(imputed_acc) / float(imputed_acc.size))
+    log.info('Imputed accessibility sparsity: {sparsity}')
+    if sparsity > sparsity_thr:
+        log.info('Making matrix sparse')
+        imputed_acc_obj.mtx = sparse.csr_matrix(imputed_acc_obj.mtx)
     log.info('Create CistopicImputedFeatures object')
     imputed_acc_obj = CistopicImputedFeatures(
         imputed_acc, region_names, cell_names, project)
+    
     log.info('Done!')
     return imputed_acc_obj
 
@@ -362,9 +373,9 @@ def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
 
     log.info('Normalizing imputed data')
     if isinstance(input_mat, CistopicImputedFeatures):
-        mtx = input_mat.mtx / input_mat.mtx.sum(0)
-		mtx *= scale_factor
-		np.log1p(mtx, out=mtx)
+        mtx = normalize(imputed_acc_obj.mtx, norm='l1', axis=0)
+        mtx *= scale_factor
+        mtx = np.log1p(mtx)
         output = CistopicImputedFeatures(
             mtx,
             input_mat.feature_names,
@@ -428,7 +439,6 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImpute
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger('cisTopic')
 
-    log.info('Calculating mean and variance')
     if isinstance(input_mat, pd.DataFrame):
         mat = input_mat.values
         features = input_mat.index.tolist()
@@ -439,11 +449,11 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImpute
     if sparse.issparse(mat):
         mean, var = sklearn.utils.sparsefuncs.mean_variance_axis(mat, axis=1)
     else:
+        log.info('Calculating mean')
         mean = np.mean(mat, axis=1, dtype=np.float32)
-        mean_sq = np.multiply(mat, mat).mean(axis=1, dtype=np.float32)
-        var = mean_sq - mean ** 2
+        log.info('Calculating variance')
+        var = np.var(mat, axis=1, dtype=np.float32)
     
-    var *= mat.shape[1] / (mat.shape[1] - 1)
     mean[mean == 0] = 1e-12
     dispersion = var / mean
     # Logarithmic dispersion as in Seurat
@@ -597,6 +607,9 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
     subset_imputed_features_obj = imputed_features_obj.subset(
         cells=None, features=var_features, copy=True
     )
+    # Convert to csc
+    if sparse.issparse(subset_imputed_features_obj.mtx):
+        mtx = subset_imputed_features_obj.mtx.tocsc()
     # Compute p-val and log2FC
     if n_cpu > 1:
         ray.init(num_cpus=n_cpu, **kwargs)
@@ -702,37 +715,18 @@ def markers_one(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
 
     fg_cells_index = get_position_index(barcode_group[0], samples)
     bg_cells_index = get_position_index(barcode_group[1], samples)
-    log.info('Computing p-value for ' + contrast_name)
+    log.info('Formatting data for ' + contrast_name)
     if sparse.issparse(mat):
-        wilcox_test = [
-            ranksums(mat[x, fg_cells_index].toarray()[0],
-                     y=mat[x, bg_cells_index].toarray()[0])
-            for x in range(mat.shape[0])
-        ]
+        fg_mat = mat[:,fg_cells_index].toarray()
+        bg_mat = mat[:,bg_cells_index].toarray()
     else:
-        wilcox_test = [
-            ranksums(mat[x, fg_cells_index],
-                     y=mat[x, bg_cells_index])
-            for x in range(mat.shape[0])
-        ]
+        fg_mat = mat[:,fg_cells_index]
+        bg_mat = mat[:,bg_cells_index]
 
+    log.info('Computing p-value for ' + contrast_name)
+    wilcox_test = [ranksums(fg_mat[x],y=bg_mat[x]) for x in range(mat.shape[0])]
     log.info('Computing log2FC for ' + contrast_name)
-    if sparse.issparse(mat):
-        logFC = [
-            np.log2(
-                (np.mean(mat[x, fg_cells_index].toarray()[0]) + 10 ** -12)
-                / ((np.mean(mat[x, bg_cells_index].toarray()[0]) + 10 ** -12))
-            )
-            for x in range(mat.shape[0])
-        ]
-    else:
-        logFC = [
-            np.log2(
-                (np.mean(mat[x, fg_cells_index]) + 10 ** -12)
-                / ((np.mean(mat[x, bg_cells_index]) + 10 ** -12))
-            )
-            for x in range(mat.shape[0])
-        ]
+    logFC = np.log2((np.mean(fg_mat, axis=1) + 10 ** -12) / (np.mean(bg_mat, axis=1) + 10 ** -12)).tolist()
 
     pvalue = [wilcox_test[x].pvalue for x in range(len(wilcox_test))]
     adj_pvalue = p_adjust_bh(pvalue)
