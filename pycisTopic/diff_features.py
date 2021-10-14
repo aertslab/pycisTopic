@@ -335,14 +335,13 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
             imputed_acc = imputed_acc[keep_regions_index, ]
             region_names = subset_list(region_names, keep_regions_index)
     sparsity = 1.0 - (count_nonzero(imputed_acc) / float(imputed_acc.size))
-    log.info('Imputed accessibility sparsity: {sparsity}')
-    if sparsity > sparsity_thr:
-        log.info('Making matrix sparse')
-        imputed_acc_obj.mtx = sparse.csr_matrix(imputed_acc_obj.mtx)
+    log.info(f"Imputed accessibility sparsity: {sparsity}")
     log.info('Create CistopicImputedFeatures object')
     imputed_acc_obj = CistopicImputedFeatures(
         imputed_acc, region_names, cell_names, project)
-    
+    if sparsity > sparsity_thr:
+        log.info('Making matrix sparse')
+        imputed_acc_obj.mtx = sparse.csr_matrix(imputed_acc_obj.mtx)
     log.info('Done!')
     return imputed_acc_obj
 
