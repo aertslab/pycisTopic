@@ -98,7 +98,6 @@ def gini(array):
     array = array.flatten()  # all values are treated equally, arrays must be 1d
     if np.amin(array) < 0:
         array -= np.amin(array)  # values cannot be negative
-    array += 0.000000000001  # values cannot be 0
     array = np.sort(array)  # values must be sorted
     index = np.arange(1, array.shape[0] + 1)  # index per array element
     n = array.shape[0]  # number of array elements
