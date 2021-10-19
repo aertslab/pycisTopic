@@ -6,15 +6,17 @@ import pandas as pd
 import scipy.sparse as sparse
 import sys
 from loomxpy.loomxpy import SCopeLoom
-from pyscenic import export
+from pyscenic.aucell import aucell
+from pyscenic.binarization import binarize
+from operator import attrgetter
 from pyscenic.genesig import Regulon
 from typing import Dict, List, Mapping, Optional, Sequence, Union
 
 
 def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFeatures', pd.DataFrame],
                                  cistopic_obj: 'CistopicObject',
-                                 regulons: List[Regulon],
                                  out_fname: str,
+                                 regulons: List[Regulon] = None,
                                  selected_genes: Optional[List[str]] = None,
                                  selected_cells: Optional[List[str]] = None,
                                  auc_mtx: Optional[pd.DataFrame] = None,
@@ -148,19 +150,20 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
     embeddings = {}
     for x in cistopic_obj.projections['cell'].keys():
         emb_cell_names = list(set(cistopic_obj.projections['cell'][x].index.tolist()).intersection(set(cell_names)))
-        emb_cell_names_mask = cistopic_obj.projections['cell'][x].index.isin(emb_cell_names)
-        embeddings[x] = cistopic_obj.projections['cell'][x].loc[emb_cell_names_mask]
+        if len(emb_cell_names) == len(cell_names):
+            emb_cell_names_mask = cistopic_obj.projections['cell'][x].index.isin(emb_cell_names)
+            embeddings[x] = cistopic_obj.projections['cell'][x].loc[emb_cell_names_mask]
 
     # Create minimal loom
     log.info('Creating minimal loom')
-    export.export2loom(ex_mtx=ex_mtx,
-                       regulons=regulons,
+    export_minimal_loom_gene(ex_mtx=ex_mtx,
+                       embeddings=embeddings,
                        out_fname=out_fname,
+                       regulons=regulons,
                        cell_annotations=None,
                        tree_structure=tree_structure,
                        title=title,
                        nomenclature=nomenclature,
-                       embeddings=embeddings,
                        auc_mtx=auc_mtx,
                        auc_thresholds=auc_thresholds)
 
@@ -202,6 +205,215 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
     log.info('Exporting')
     loom.export(out_fname)
 
+
+def export_minimal_loom_gene(
+    ex_mtx: pd.DataFrame, 
+    embeddings: Mapping[str, pd.DataFrame],
+    out_fname: str,
+    regulons: List[Regulon] = None,
+    cell_annotations: Optional[Mapping[str, str]] = None,
+    tree_structure: Sequence[str] = (),
+    title: Optional[str] = None,
+    nomenclature: str = "Unknown",
+    num_workers: int = cpu_count(),
+    auc_mtx = None,
+    auc_thresholds = None,
+    compress: bool = False,
+):
+    """
+    Create a loom file for a single cell experiment to be used in SCope.
+    :param ex_mtx: The expression matrix (n_cells x n_genes).
+    :param regulons: A list of Regulons.
+    :param cell_annotations: A dictionary that maps a cell ID to its corresponding cell type annotation.
+    :param out_fname: The name of the file to create.
+    :param tree_structure: A sequence of strings that defines the category tree structure. Needs to be a sequence of strings with three elements.
+    :param title: The title for this loom file. If None than the basename of the filename is used as the title.
+    :param nomenclature: The name of the genome.
+    :param num_workers: The number of cores to use for AUCell regulon enrichment.
+    :param embeddings: A dictionary that maps the name of an embedding to its representation as a pandas DataFrame with two columns: the first
+    column is the first component of the projection for each cell followed by the second. The first mapping is the default embedding (use `collections.OrderedDict` to enforce this).
+    :param compress: compress metadata (only when using SCope).
+    """
+    # Information on the general loom file format: http://linnarssonlab.org/loompy/format/index.html
+    # Information on the SCope specific alterations: https://github.com/aertslab/SCope/wiki/Data-Format
+
+    if cell_annotations is None:
+        cell_annotations = dict(zip(ex_mtx.index, ['-'] * ex_mtx.shape[0]))
+
+    # Calculate regulon enrichment per cell using AUCell.
+    if auc_mtx is None:
+        if regulons is not None:
+            auc_mtx = aucell(ex_mtx, regulons, num_workers=num_workers)  
+            auc_mtx = auc_mtx.loc[ex_mtx.index]
+
+    # Binarize matrix for AUC thresholds.
+    if auc_thresholds is None:
+        if auc_mtx is not None:
+            _, auc_thresholds = binarize(auc_mtx)
+
+    # Create an embedding based on tSNE.
+    id2name = OrderedDict()
+    embeddings_X = pd.DataFrame(index=ex_mtx.index)
+    embeddings_Y = pd.DataFrame(index=ex_mtx.index)
+    for idx, (name, df_embedding) in enumerate(embeddings.items()):
+        if len(df_embedding.columns) != 2:
+            raise Exception('The embedding should have two columns.')
+
+        embedding_id = idx - 1  # Default embedding must have id == -1 for SCope.
+        id2name[embedding_id] = name
+
+        embedding = df_embedding.copy()
+        embedding.columns = ['_X', '_Y']
+        embeddings_X = pd.merge(
+            embeddings_X,
+            embedding['_X'].to_frame().rename(columns={'_X': str(embedding_id)}),
+            left_index=True,
+            right_index=True,
+        )
+        embeddings_Y = pd.merge(
+            embeddings_Y,
+            embedding['_Y'].to_frame().rename(columns={'_Y': str(embedding_id)}),
+            left_index=True,
+            right_index=True,
+        )
+
+    # Encode genes in regulons as "binary" membership matrix.
+    if regulons is not None:
+        genes = np.array(ex_mtx.columns)
+        n_genes = len(genes)
+        n_regulons = len(regulons)
+        data = np.zeros(shape=(n_genes, n_regulons), dtype=int)
+        for idx, regulon in enumerate(regulons):
+            data[:, idx] = np.isin(genes, regulon.genes).astype(int)
+        regulon_assignment = pd.DataFrame(data=data, index=ex_mtx.columns, columns=list(map(attrgetter('name'), regulons)))
+
+    # Encode cell type clusters.
+    # The name of the column should match the identifier of the clustering.
+    name2idx = dict(map(reversed, enumerate(sorted(set(cell_annotations.values())))))
+    clusterings = (
+        pd.DataFrame(data=ex_mtx.index, index=ex_mtx.index, columns=['0'])
+        .replace(cell_annotations)
+        .replace(name2idx)
+    )
+
+    # Create meta-data structure.
+    def create_structure_array(df):
+        # Create a numpy structured array
+        return np.array([tuple(row) for row in df.values], dtype=np.dtype(list(zip(df.columns, df.dtypes))))
+
+    default_embedding = next(iter(embeddings.values())).copy()
+    default_embedding.columns = ['_X', '_Y']
+    if auc_mtx is None:
+        column_attrs = {
+            "CellID": ex_mtx.index.values.astype('str'),
+            "Embedding": create_structure_array(default_embedding),
+            "Clusterings": create_structure_array(clusterings),
+            "ClusterID": clusterings.values,
+            'Embeddings_X': create_structure_array(embeddings_X),
+            'Embeddings_Y': create_structure_array(embeddings_Y),
+        }
+    else: 
+        column_attrs = {
+            "CellID": ex_mtx.index.values.astype('str'),
+            "Embedding": create_structure_array(default_embedding),
+            "RegulonsAUC": create_structure_array(auc_mtx),
+            "Clusterings": create_structure_array(clusterings),
+            "ClusterID": clusterings.values,
+            'Embeddings_X': create_structure_array(embeddings_X),
+            'Embeddings_Y': create_structure_array(embeddings_Y),
+        }
+    if regulons is None:
+        row_attrs = {
+        "Gene": ex_mtx.columns.values.astype('str'),
+    }
+    else:
+        row_attrs = {
+            "Gene": ex_mtx.columns.values.astype('str'),
+            "Regulons": create_structure_array(regulon_assignment),
+        }
+
+    def fetch_logo(context):
+        for elem in context:
+            if elem.endswith('.png'):
+                return elem
+        return ""
+
+    if regulons is not None and auc_thresholds is not None:
+        name2logo = {reg.name: fetch_logo(reg.context) for reg in regulons}
+        regulon_thresholds = [
+            {
+                "regulon": name,
+                "defaultThresholdValue": (threshold if isinstance(threshold, float) else threshold[0]),
+                "defaultThresholdName": "gaussian_mixture_split",
+                "allThresholds": {"gaussian_mixture_split": (threshold if isinstance(threshold, float) else threshold[0])},
+                "motifData": name2logo.get(name, ""),
+            }
+            for name, threshold in auc_thresholds.iteritems()
+        ]
+
+        general_attrs = {
+            "title": os.path.splitext(os.path.basename(out_fname))[0] if title is None else title,
+            "MetaData": json.dumps(
+                {
+                    "embeddings": [{'id': identifier, 'name': name} for identifier, name in id2name.items()],
+                    "annotations": [{"name": "", "values": []}],
+                    "clusterings": [
+                        {
+                            "id": 0,
+                            "group": "celltype",
+                            "name": "Cell Type",
+                            "clusters": [{"id": idx, "description": name} for name, idx in name2idx.items()],
+                        }
+                    ],
+                    "regulonThresholds": regulon_thresholds,
+                }
+            ),
+            "Genome": nomenclature,
+        }
+    else:
+        general_attrs = {
+            "title": os.path.splitext(os.path.basename(out_fname))[0] if title is None else title,
+            "MetaData": json.dumps(
+                {
+                    "embeddings": [{'id': identifier, 'name': name} for identifier, name in id2name.items()],
+                    "annotations": [{"name": "", "values": []}],
+                    "clusterings": [
+                        {
+                            "id": 0,
+                            "group": "celltype",
+                            "name": "Cell Type",
+                            "clusters": [{"id": idx, "description": name} for name, idx in name2idx.items()],
+                        }
+                    ],
+                }
+            ),
+            "Genome": nomenclature,
+        }
+
+    # Add tree structure.
+    # All three levels need to be supplied
+    assert len(tree_structure) <= 3, ""
+    general_attrs.update(
+        ("SCopeTreeL{}".format(idx + 1), category)
+        for idx, category in enumerate(list(islice(chain(tree_structure, repeat("")), 3)))
+    )
+
+    # Compress MetaData global attribute
+    if compress:
+        general_attrs["MetaData"] = compress_encode(value=general_attrs["MetaData"])
+
+    # Create loom file for use with the SCope tool.
+    # The loom file format opted for rows as genes to facilitate growth along the column axis (i.e add more cells)
+    # PySCENIC chose a different orientation because of limitation set by the feather format: selectively reading
+    # information from disk can only be achieved via column selection. For the ranking databases this is of utmost
+    # importance.
+    lp.create(
+        filename=out_fname,
+        layers=ex_mtx.T.values,
+        row_attrs=row_attrs,
+        col_attrs=column_attrs,
+        file_attrs=general_attrs,
+    )
 
 def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImputedFeatures', pd.DataFrame],
                                         cistopic_obj: 'CistopicObject',
@@ -286,7 +498,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     # Prepare data for minimum loom file
     # Create input matrix
     cell_names = accessibility_matrix.cell_names
-    cell_topic = cistopic_obj.selected_model.cell_topic.loc[cell_names,:]
+    cell_topic = cistopic_obj.selected_model.cell_topic.loc[:,cell_names]
     ex_mtx = sparse.vstack([imputed_acc_obj.mtx, sparse.csr_matrix(cell_topic.values)], format='csr')
     feature_names = imputed_acc_obj.feature_names + cell_topic.index.tolist()
 
@@ -307,7 +519,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
 
     # Format regulons
     binarized_topic_region = {
-        x: binarized_topic_region[x][binarized_topic_region[x].index.isin(region_names)]
+        x: binarized_topic_region[x][binarized_topic_region[x].index.isin(feature_names)]
         for x in binarized_topic_region.keys()
     }
     regulon_mat = cistopic_obj.selected_model.topic_region.copy()
@@ -355,7 +567,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
 
     # Create minimal loom
     log.info('Creating minimal loom')
-    export_minimal_loom(ex_mtx = ex_mtx,
+    export_minimal_loom_region(ex_mtx = ex_mtx,
                        cell_names = cell_names,
                        feature_names = feature_names,
                        out_fname=out_fname,
@@ -410,7 +622,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     loom.export(out_fname)
     
 
-def export_minimal_loom(
+def export_minimal_loom_region(
     ex_mtx: sparse.csr_matrix,
     cell_names: List[str],
     feature_names: List[str],
@@ -422,24 +634,11 @@ def export_minimal_loom(
     nomenclature: str = "Unknown",
     num_workers: int = cpu_count(),
     embeddings: Mapping[str, pd.DataFrame] = {},
-    auc_mtx=None,
-    auc_thresholds=None,
+    auc_mtx = None,
+    auc_thresholds = None,
     compress: bool = False,
 ):
-    """
-    Create a loom file for a single cell experiment to be used in SCope.
-    :param ex_mtx: The expression matrix (n_regions x n_cells).
-    :param regulons: A binary matrix with regulons.
-    :param cell_annotations: A dictionary that maps a cell ID to its corresponding cell type annotation.
-    :param out_fname: The name of the file to create.
-    :param tree_structure: A sequence of strings that defines the category tree structure. Needs to be a sequence of strings with three elements.
-    :param title: The title for this loom file. If None than the basename of the filename is used as the title.
-    :param nomenclature: The name of the genome.
-    :param num_workers: The number of cores to use for AUCell regulon enrichment.
-    :param embeddings: A dictionary that maps the name of an embedding to its representation as a pandas DataFrame with two columns: the first
-    column is the first component of the projection for each cell followed by the second. The first mapping is the default embedding (use `collections.OrderedDict` to enforce this).
-    :param compress: compress metadata (only when using SCope).
-    """
+
     # Information on the general loom file format: http://linnarssonlab.org/loompy/format/index.html
     # Information on the SCope specific alterations: https://github.com/aertslab/SCope/wiki/Data-Format
 
