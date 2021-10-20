@@ -11,6 +11,10 @@ from pyscenic.binarization import binarize
 from operator import attrgetter
 from pyscenic.genesig import Regulon
 from typing import Dict, List, Mapping, Optional, Sequence, Union
+from multiprocessing import cpu_count
+from collections import OrderedDict
+import os
+from itertools import repeat, chain, islice
 
 
 def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFeatures', pd.DataFrame],
