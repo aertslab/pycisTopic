@@ -540,6 +540,7 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
                        adjpval_thr: Optional[float] = 0.05,
                        log2fc_thr: Optional[float] = np.log2(1.5),
                        n_cpu: Optional[int] = 1,
+                       split_pattern: Optional[str] = '___',
                        **kwargs):
     """
     Find differential imputed features.
@@ -604,7 +605,7 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
     ]
     # Subset imputed accessibility matrix
     subset_imputed_features_obj = imputed_features_obj.subset(
-        cells=None, features=var_features, copy=True
+        cells=None, features=var_features, copy=True, split_pattern=split_pattern
     )
     # Convert to csc
     if sparse.issparse(subset_imputed_features_obj.mtx):

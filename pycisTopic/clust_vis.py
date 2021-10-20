@@ -36,6 +36,7 @@ def find_clusters(cistopic_obj: 'CistopicObject',
                   rna_components: Optional[pd.DataFrame] = None,
                   use_umap_integration: Optional[bool] = False,
                   rna_weight: Optional[float] = 0.5,
+                  split_pattern:Optional[str] = '___',
                   **kwargs):
     """
     Performing leiden cell or region clustering and add results to cisTopic object's metadata.
@@ -148,7 +149,7 @@ def find_clusters(cistopic_obj: 'CistopicObject',
                 '_' +
                 str(C)]).astype(str)
         if target == 'cell':
-            cistopic_obj.add_cell_data(cluster)
+            cistopic_obj.add_cell_data(cluster, split_pattern=split_pattern)
         if target == 'region':
             cistopic_obj.add_region_data(cluster)
                 

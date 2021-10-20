@@ -15,6 +15,7 @@ from multiprocessing import cpu_count
 from collections import OrderedDict
 import os
 from itertools import repeat, chain, islice
+import loompy as lp
 
 
 def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFeatures', pd.DataFrame],
@@ -30,6 +31,7 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
                                  tree_structure: Sequence[str] = (),
                                  title: str = None,
                                  nomenclature: str = "Unknown",
+                                 split_pattern = '___',
                                  **kwargs):
     """
     Create SCope [Davie et al, 2018] compatible loom files for gene activity exploration
@@ -89,8 +91,11 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
     # Feature names
     if selected_genes is not None or selected_cells is not None:
         if not isinstance(gene_activity_matrix, pd.DataFrame):
-            gene_activity_matrix = gene_activity_matrix.subset(
-                cells=selected_cells, features=selected_genes, copy=True)
+            if selected_genes is not None:
+                selected_genes = list(set(selected_genes).intersection(accessibility_matrix.feature_names))
+            else:
+                gene_activity_matrix = gene_activity_matrix.subset(
+                cells=selected_cells, features=selected_genes, copy=True, split_pattern=split_pattern)
         else:
             if selected_genes is not None:
                 gene_activity_matrix = gene_activity_matrix.loc[:, selected_genes]
@@ -431,6 +436,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
                                         tree_structure: Sequence[str] = (),
                                         title: str = None,
                                         nomenclature: str = "Unknown",
+                                        split_pattern: str = '___',
                                         **kwargs):
     """
     Create SCope [Davie et al, 2018] compatible loom files for accessibility data exploration
@@ -489,9 +495,11 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     # Feature names
     if selected_regions is not None or selected_cells is not None:
         if not isinstance(accessibility_matrix, pd.DataFrame):
-            selected_regions = list(set(selected_regions).intersection(accessibility_matrix.feature_names))
-            accessibility_matrix = accessibility_matrix.subset(
-                cells=selected_cells, features=selected_regions, copy=True)
+            if selected_regions is not None:
+                selected_regions = list(set(selected_regions).intersection(accessibility_matrix.feature_names))
+            else:
+                accessibility_matrix = accessibility_matrix.subset(
+                cells=selected_cells, features=selected_regions, copy=True, split_pattern=split_pattern)
         else:
             if selected_regions is not None:
                 selected_regions = list(set(selected_regions).intersection(accessibility_matrix.columns))
@@ -503,8 +511,8 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     # Create input matrix
     cell_names = accessibility_matrix.cell_names
     cell_topic = cistopic_obj.selected_model.cell_topic.loc[:,cell_names]
-    ex_mtx = sparse.vstack([imputed_acc_obj.mtx, sparse.csr_matrix(cell_topic.values)], format='csr')
-    feature_names = imputed_acc_obj.feature_names + cell_topic.index.tolist()
+    ex_mtx = sparse.vstack([accessibility_matrix.mtx, sparse.csr_matrix(cell_topic.values)], format='csr')
+    feature_names = accessibility_matrix.feature_names + cell_topic.index.tolist()
 
     # Extract cell data information and region names
     cell_data = cistopic_obj.cell_data.loc[cell_names]
@@ -530,7 +538,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
     for col_idx in regulon_mat:
         thr = regulon_mat.loc[binarized_topic_region[col_idx][-1:].index, col_idx].values[0]
         regulon_mat.loc[:,col_idx] = np.where(regulon_mat.loc[:,col_idx].values > thr, 1,0)
-    regulon_mat = regulon_mat.loc[imputed_acc_obj.feature_names,:]
+    regulon_mat = regulon_mat.loc[accessibility_matrix.feature_names,:]
     extra = pd.DataFrame(0, index=regulon_mat.columns, columns=regulon_mat.columns)
     regulon_mat = pd.concat([regulon_mat, extra], axis=0)
     # Cell annotations and metrics
@@ -617,7 +625,7 @@ def export_region_accessibility_to_loom(accessibility_matrix: Union['CistopicImp
         # Keeep regions in data
         for y in cluster_markers:
             cluster_markers[y] = {
-                x: cluster_markers[y][x][cluster_markers[y][x].index.isin(region_names)]
+                x: cluster_markers[y][x][cluster_markers[y][x].index.isin(feature_names)]
                 for x in cluster_markers[y].keys()
             }
         add_markers(loom, cluster_markers)
