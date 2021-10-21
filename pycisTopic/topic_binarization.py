@@ -15,7 +15,7 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
                     method: Optional[str] = 'otsu',
                     smooth_topics: Optional[bool] = False,
                     ntop: Optional[int] = 2000,
-                    predifined_thr: Optional[Dict[str, float]] = {},
+                    predefined_thr: Optional[Dict[str, float]] = {},
                     nbins: Optional[int] = 100,
                     plot: Optional[bool] = False,
                     figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
@@ -100,8 +100,8 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
     for i in range(topic_dist.shape[1]):
         l = np.asarray(topic_dist.iloc[:, i])
         l_norm = (l - np.min(l)) / np.ptp(l)
-        if 'Topic' + str(i + 1) in (list(predifined_thr.keys())):
-            thr = predifined_thr['Topic' + str(i + 1)]
+        if 'Topic' + str(i + 1) in (list(predefined_thr.keys())):
+            thr = predefined_thr['Topic' + str(i + 1)]
         elif method == 'otsu':
             thr = threshold_otsu(l_norm, nbins=nbins)
         elif method == 'yen':
