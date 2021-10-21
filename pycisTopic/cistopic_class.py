@@ -82,9 +82,9 @@ class CistopicObject:
         ---------
         cell_data: pd.DataFrame
             A data frame containing metadata information, with cell names as indexes. If cells are missing from the metadata, values will be filled with Nan.
-		split_pattern: str
-			Pattern to split cell barcode from sample id. Default: ___
-			
+        split_pattern: str
+            Pattern to split cell barcode from sample id. Default: ___
+            
         Return
         ------
         CistopicObject
@@ -175,9 +175,9 @@ class CistopicObject:
             A list containing the names of the regions to keep.
         copy: bool, optional
             Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned
-		split_pattern: str
-			Pattern to split cell barcode from sample id. Default: ___
-			
+        split_pattern: str
+            Pattern to split cell barcode from sample id. Default: ___
+            
         Return
         ------
         CistopicObject
@@ -267,9 +267,9 @@ class CistopicObject:
         project: str, optional
             Name of the cisTopic project.
         copy: bool, optional
-            Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned		
+            Whether changes should be done on the input :class:`CistopicObject` or a new object should be returned        
         split_pattern: str
-			Pattern to split cell barcode from sample id. Default: ___
+            Pattern to split cell barcode from sample id. Default: ___
         Return
         ------
         CistopicObject
@@ -482,7 +482,7 @@ def create_cistopic_object(fragment_matrix: Union[pd.DataFrame, sparse.csr_matri
     tag_cells: bool, optional
         Whether to add the project name as suffix to the cell names. Default: True
     split_pattern: str
-		Pattern to split cell barcode from sample id. Default: ___
+        Pattern to split cell barcode from sample id. Default: ___
 
     Return
     ------
@@ -622,7 +622,7 @@ def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
     project: str, optional
         Name of the cisTopic project. Default: 'cisTopic'
     split_pattern: str
-		Pattern to split cell barcode from sample id. Default: ___
+        Pattern to split cell barcode from sample id. Default: ___
 
     Return
     ------
@@ -656,7 +656,8 @@ def create_cistopic_object_from_matrix_file(fragment_matrix_file: str,
                                           min_cell=min_cell,
                                           is_acc=is_acc,
                                           path_to_fragments=path_to_fragments,
-                                          project=project)
+                                          project=project,
+                                          split_pattern = split_pattern)
 
     if sample_id is not None:
         if (isinstance(path_to_fragments, dict)):
@@ -713,8 +714,8 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
     fragments_df: pd.DataFrame or pr.PyRanges, optional
         A PyRanges or DataFrame containing chromosome, start, end and assigned barcode for each read, corresponding to the data in path_to_fragments.
     split_pattern: str
-		Pattern to split cell barcode from sample id. Default: ___
-		
+        Pattern to split cell barcode from sample id. Default: ___
+        
     Return
     ------
     CistopicObject
@@ -802,7 +803,8 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
             is_acc=is_acc,
             path_to_fragments={
             project: path_to_fragments},
-            project=project)
+            project=project,
+            split_pattern=split_pattern)
     except (ValueError, MemoryError):
         log.info(
             'Data is too big, making partitions. This is a reported error in Pandas versions > 0.21 (https://github.com/pandas-dev/pandas/issues/26314)')
@@ -820,7 +822,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
                                 project: path_to_fragments},
                                 project=str(i),
                                 project_all=project) for i in range(partition)]
-        cistopic_obj = merge(cistopic_obj_list, project=project)
+        cistopic_obj = merge(cistopic_obj_list, project=project, split_pattern=split_pattern)
         cistopic_obj.project = project
         cistopic_obj.path_to_fragments = {
             project: path_to_fragments}
