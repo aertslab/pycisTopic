@@ -772,13 +772,13 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
         log.info('valid_bc provided, selecting barcodes!')
         fragments = fragments[fragments.Name.isin(set(valid_bc))]
     if metrics is None:
-        log.info('Counting total number of fragments (Total_nr_frag)')
+        log.info('Counting number of unique fragments (Unique_nr_frag)')
         fragments_per_barcode = cl.Counter(fragments.Name.to_list())
         fragments_per_barcode = [fragments_per_barcode[x]
                                  for x in set(fragments.Name.to_list())]
         FPB_DF = pd.DataFrame(fragments_per_barcode)
         FPB_DF.index = set(fragments.Name.to_list())
-        FPB_DF.columns = ['Total_nr_frag']
+        FPB_DF.columns = ['Unique_nr_frag']
     # Count fragments in regions
     log.info('Counting fragments in regions')
     fragments_in_regions = regions.join(fragments, nb_cpu=n_cpu)
