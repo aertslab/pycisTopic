@@ -365,7 +365,17 @@ def region_weights(imputed_acc_object,
                                          'Distance_upstream',
                                          'Distance_downstream']]
     else:
-        extended_annot = extend_pyranges(pr_annot, upstream[1], downstream[1])
+        pr_annot_nodup = pr_annot[['Chromosome',
+                                   'Start',
+                                   'End',
+                                   'Strand',
+                                   'Gene',
+                                   'Gene_width',
+                                   'Gene_size_weight']].drop_duplicate_positions().copy()
+        pr_annot_nodup = pr.PyRanges(
+                pr_annot_nodup.df.drop_duplicates(
+                    subset="Gene", keep="first"))
+        extended_annot = extend_pyranges(pr_annot_nodup, upstream[1], downstream[1])
         extended_annot = extended_annot[[
             'Chromosome', 'Start', 'End', 'Strand', 'Gene', 'Gene_width', 'Gene_size_weight']]
     # Format search space
