@@ -13,7 +13,7 @@ from .cistopic_class import *
 def binarize_topics(cistopic_obj: 'CistopicObject',
                     target: Optional[str] = 'region',
                     method: Optional[str] = 'otsu',
-                    smooth_topics: Optional[bool] = False,
+                    smooth_topics: Optional[bool] = True,
                     ntop: Optional[int] = 2000,
                     predefined_thr: Optional[Dict[str, float]] = {},
                     nbins: Optional[int] = 100,
