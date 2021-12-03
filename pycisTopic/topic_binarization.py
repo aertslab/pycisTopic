@@ -83,7 +83,7 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
         topic_dist = cistopic_obj.selected_model.cell_topic.T
 
     if smooth_topics:
-        topic_dist = smooth_topics(topic_dist)
+        topic_dist = smooth_topics_f(topic_dist)
 
     binarized_topics = {}
     pdf = None
@@ -160,7 +160,7 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
     return binarized_topics
 
 
-def smooth_topics(topic_region):
+def smooth_topics_f(topic_region):
     """
     Smooth topic-region distributions.
 
@@ -194,7 +194,7 @@ def norm(x):
     ---------
     numpy.array
     """
-    return x * (np.log(x + 1e-05) - np.sum(np.log(x + 1e-05)) / len(x))
+    return x * (np.log(x + 1e-100) - np.sum(np.log(x + 1e-100)) / len(x))
 
 
 def threshold_yen(array: np.array,
