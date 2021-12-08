@@ -822,7 +822,7 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
                                 project: path_to_fragments},
                                 project=str(i),
                                 project_all=project) for i in range(partition)]
-        cistopic_obj = merge(cistopic_obj_list, project=project, split_pattern=split_pattern)
+        cistopic_obj = merge(cistopic_obj_list, project=project)
         cistopic_obj.project = project
         cistopic_obj.path_to_fragments = {
             project: path_to_fragments}
