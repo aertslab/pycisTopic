@@ -437,7 +437,7 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 
     if num_columns > 1:
-        num_rows = np.ceil(len(variables) / num_columns)
+        num_rows = int(np.ceil(len(variables) / num_columns))
         if figsize == (6.4, 4.8):
             figsize = (6.4 * num_columns, 4.8 * num_rows)
         i = 1
@@ -634,7 +634,7 @@ def plot_topic(cistopic_obj: 'CistopicObject',
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 
     if num_columns > 1:
-        num_rows = np.ceil(len(topic) / num_columns)
+        num_rows = int(np.ceil(len(topic) / num_columns))
         if figsize == (6.4, 4.8):
             figsize = (6.4 * num_columns, 4.8 * num_rows)
         i = 1
@@ -730,7 +730,7 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 
     if num_columns > 1:
-        num_rows = np.ceil(len(features) / num_columns)
+        num_rows = int(np.ceil(len(features) / num_columns))
         if figsize == (6.4, 4.8):
             figsize = (6.4 * num_columns, 4.8 * num_rows)
         i = 1
