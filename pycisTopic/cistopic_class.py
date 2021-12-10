@@ -821,8 +821,9 @@ def create_cistopic_object_from_fragments(path_to_fragments: str,
                                 path_to_fragments={
                                 project: path_to_fragments},
                                 project=str(i),
-                                project_all=project) for i in range(partition)]
-        cistopic_obj = merge(cistopic_obj_list, project=project)
+                                project_all=project,
+                                split_pattern=split_pattern) for i in range(partition)]
+        cistopic_obj = merge(cistopic_obj_list, project=project, split_pattern=split_pattern)
         cistopic_obj.project = project
         cistopic_obj.path_to_fragments = {
             project: path_to_fragments}
@@ -842,7 +843,8 @@ def create_cistopic_object_chunk(df,
                                 is_acc,
                                 path_to_fragments,
                                 project,
-                                project_all):
+                                project_all,
+                                split_pattern):
     df = df.groupby(["Name", "regionID"], sort=False, observed=True).size().unstack(
             level="Name", fill_value=0).astype(np.int32).rename_axis(None)
     cistopic_obj = create_cistopic_object(
@@ -854,14 +856,16 @@ def create_cistopic_object_chunk(df,
             path_to_fragments={
             project: path_to_fragments},
             project=project,
-            tag_cells = False)
+            tag_cells = False,
+            split_pattern=split_pattern)
     cistopic_obj.cell_data['sample_id'] = [project_all] * len(cistopic_obj.cell_names)
     return cistopic_obj
 
 
 def merge(cistopic_obj_list: List['CistopicObject'],
           is_acc: Optional[int] = 1,
-          project: Optional[str] = 'cisTopic_merge'):
+          project: Optional[str] = 'cisTopic_merge',
+          split_pattern: Optional[str] = '___'):
     """
     Merge a list of :class:`CistopicObject` to the input :class:`CistopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`CistopicObject` are derived from the cells it contains.
 
@@ -881,5 +885,5 @@ def merge(cistopic_obj_list: List['CistopicObject'],
     """
 
     merged_cistopic_obj = cistopic_obj_list[0].merge(
-        cistopic_obj_list[1:], is_acc=is_acc, project=project, copy=True)
+        cistopic_obj_list[1:], is_acc=is_acc, project=project, copy=True, split_pattern = split_pattern)
     return merged_cistopic_obj
