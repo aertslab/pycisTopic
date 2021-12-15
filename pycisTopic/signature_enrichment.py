@@ -105,7 +105,7 @@ def gene_set_to_signature(gene_set: List,
     ---------
         A GeneSignature object to use with AUCell
     """
-    weights = np.ones(len(query_in_target))
+    weights = np.ones(len(gene_set))
     signature = GeneSignature(
                     name = name,
                     gene2weight = dict(zip(gene_set, weights)))
