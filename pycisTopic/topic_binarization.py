@@ -91,7 +91,7 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 
     if num_columns > 1:
-        num_rows = np.ceil(topic_dist.shape[1] / num_columns)
+        num_rows = int(np.ceil(topic_dist.shape[1] / num_columns))
         if figsize == (6.4, 4.8):
             figsize = (6.4 * num_columns, 4.8 * num_rows)
 
