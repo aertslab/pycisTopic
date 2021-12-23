@@ -796,7 +796,7 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
                        remove_nan: Optional[bool] = True,
                        scale: Optional[bool] = False,
                        cluster_topics: Optional[bool] = False,
-                       color_dict: Optional[Dict[str, Dict[str, str]]] = {},
+                       color_dictionary: Optional[Dict[str, Dict[str, str]]] = {},
                        seed: Optional[int] = 555,
                        legend_loc_x: Optional[float] = 1.2,
                        legend_loc_y: Optional[float] = -0.5,
@@ -890,7 +890,7 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
                 ))
                 color = [mcolors.to_rgb(x) for x in color]
                 color_dict[var] = dict(zip(categories, color))
-            col_colors[var] = var_data.map(color_dict[var])
+            col_colors[var] = var_data.map(color_dict)
         col_colors = pd.concat([col_colors[var]
                                 for var in variables], axis=1, sort=False)
 
@@ -908,11 +908,11 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
         g.ax_row_dendrogram.set_visible(False)
 
         pos = legend_loc_y
-        for key in color_dict:
+        for key in color_dictionary:
             patchList = []
-            for subkey in color_dict[key]:
+            for subkey in color_dictionary[key]:
                 data_key = mpatches.Patch(
-                    color=color_dict[key][subkey], label=subkey)
+                    color=color_dictionary[key][subkey], label=subkey)
                 patchList.append(data_key)
             legend = plt.legend(
                 handles=patchList,
