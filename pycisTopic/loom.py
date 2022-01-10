@@ -16,6 +16,7 @@ from collections import OrderedDict
 import os
 from itertools import repeat, chain, islice
 import loompy as lp
+from sklearn.feature_extraction.text import CountVectorizer
 
 
 def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFeatures', pd.DataFrame],
@@ -32,6 +33,7 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
                                  title: str = None,
                                  nomenclature: str = "Unknown",
                                  split_pattern = '___',
+                                 num_workers : int = 1, 
                                  **kwargs):
     """
     Create SCope [Davie et al, 2018] compatible loom files for gene activity exploration
@@ -151,8 +153,9 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
                 metrics.append(cell_data[var].astype('float64'))
                 cell_data[var] = cell_data[var].astype('float64')
             except BaseException:
-                annotations.append(cell_data[var].astype('str'))
-                cell_data[var] = cell_data[var].astype('str')
+                if len(set(cell_data[var])) < 255:
+                    annotations.append(cell_data[var].astype('str'))
+                    cell_data[var] = cell_data[var].astype('str')
     metrics = pd.concat(metrics, axis=1).fillna(0)
     annotations = pd.concat(annotations, axis=1)
     # Embeddings. Cell embeddings in this case
@@ -174,7 +177,8 @@ def export_gene_activity_to_loom(gene_activity_matrix: Union['CistopicImputedFea
                        title=title,
                        nomenclature=nomenclature,
                        auc_mtx=auc_mtx,
-                       auc_thresholds=auc_thresholds)
+                       auc_thresholds=auc_thresholds,
+                       num_workers = num_workers)
 
     # Add annotations
     log.info('Adding annotations')
@@ -258,7 +262,7 @@ def export_minimal_loom_gene(
     # Binarize matrix for AUC thresholds.
     if auc_thresholds is None:
         if auc_mtx is not None:
-            _, auc_thresholds = binarize(auc_mtx)
+            _, auc_thresholds = binarize(auc_mtx, num_workers=num_workers)
 
     # Create an embedding based on tSNE.
     id2name = OrderedDict()
@@ -285,16 +289,15 @@ def export_minimal_loom_gene(
             left_index=True,
             right_index=True,
         )
-
+    embeddings_X = embeddings_X.loc[ex_mtx.index]
+    embeddings_Y = embeddings_Y.loc[ex_mtx.index]
     # Encode genes in regulons as "binary" membership matrix.
     if regulons is not None:
-        genes = np.array(ex_mtx.columns)
-        n_genes = len(genes)
-        n_regulons = len(regulons)
-        data = np.zeros(shape=(n_genes, n_regulons), dtype=int)
-        for idx, regulon in enumerate(regulons):
-            data[:, idx] = np.isin(genes, regulon.genes).astype(int)
-        regulon_assignment = pd.DataFrame(data=data, index=ex_mtx.columns, columns=list(map(attrgetter('name'), regulons)))
+        regulons_x = {regulons[x].name : ' '.join(list(regulons[x].genes)) for x in range(len(regulons))}
+        cv = CountVectorizer(lowercase=False)
+        regulon_assignment = cv.fit_transform(regulons_x.values())
+        regulon_assignment = pd.DataFrame(regulon_assignment.todense(), columns=cv.get_feature_names(), index=regulons_x.keys())
+        regulon_assignment = regulon_assignment.reindex(columns=ex_mtx.columns, fill_value=0).T
 
     # Encode cell type clusters.
     # The name of the column should match the identifier of the clustering.
@@ -310,8 +313,7 @@ def export_minimal_loom_gene(
         # Create a numpy structured array
         return np.array([tuple(row) for row in df.values], dtype=np.dtype(list(zip(df.columns, df.dtypes))))
 
-    default_embedding = next(iter(embeddings.values())).copy()
-    default_embedding.columns = ['_X', '_Y']
+    default_embedding = pd.DataFrame([embeddings_X.iloc[:,0], embeddings_Y.iloc[:,0]], columns=ex_mtx.index, index=['_X', '_Y']).T
     if auc_mtx is None:
         column_attrs = {
             "CellID": ex_mtx.index.values.astype('str'),
