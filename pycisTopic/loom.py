@@ -829,17 +829,15 @@ def add_clusterings(loom: SCopeLoom,
 
     attrs_metadata = {}
     attrs_metadata["clusterings"] = []
+    clusterings = pd.DataFrame(index=cluster_data.index.tolist())
     j = 0
 
     for cluster_name in cluster_data.columns:
-
-        clusterings = pd.DataFrame(index=cluster_data.index.tolist())
-
         clustering_id = j
         clustering_algorithm = cluster_name
 
         clustering_resolution = cluster_name
-        cluster_marker_method = cluster_name
+        cluster_marker_method = 'Wilcoxon'
 
         num_clusters = len(np.unique(cluster_data[cluster_name]))
         cluster_2_number = {
@@ -878,20 +876,20 @@ def add_clusterings(loom: SCopeLoom,
 
         j += 1
 
-        # Update column attribute Dict
-        clusterings.columns = [str(clustering_id)]
-        col_attrs_clusterings = {
-            # Pick the first one as default clustering (this is purely
-            # arbitrary)
-            "ClusterID": clusterings[str(clustering_id)].values,
-            "Clusterings": df_to_named_matrix(clusterings)
-        }
+    # Update column attribute Dict
+    col_attrs_clusterings = {
+        # Pick the first one as default clustering (this is purely
+        # arbitrary)
+        "ClusterID": clusterings["0"].values,
+        "Clusterings": df_to_named_matrix(clusterings)
+    }
 
     col_attrs = {**col_attrs, **col_attrs_clusterings}
     loom.col_attrs = col_attrs
     loom.global_attrs["MetaData"].update(
         {'clusterings': attrs_metadata["clusterings"]}
     )
+
 
 
 def add_markers(loom: SCopeLoom,
