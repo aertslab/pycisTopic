@@ -99,7 +99,7 @@ def find_clusters(cistopic_obj: 'CistopicObject',
         data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics]]
     if selected_features is not None:
         data_mat = data_mat[selected_features]
-        data_names = selected_cells
+        data_names = selected_features
 
     if scale:
         data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
