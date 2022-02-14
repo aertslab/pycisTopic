@@ -422,7 +422,9 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             optimize_interval: Optional[int] = 0,
             iterations: Optional[int] = 150,
             topic_threshold: Optional[float] = 0.0,
-            random_seed: Optional[int] = 555):
+            random_seed: Optional[int] = 555,
+            reuse_corpus: Optional[bool] = False
+            ):
 
         logger = logging.getLogger('LDAMalletWrapper')
         self.mallet_path = mallet_path
@@ -448,7 +450,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         self.iterations = iterations
         self.random_seed = random_seed
         if corpus is not None:
-            self.train(corpus)
+            self.train(corpus, reuse_corpus)
 
     def corpus2mallet(self, corpus, file_like):
         """
@@ -509,7 +511,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         )
         check_output(args=cmd, shell=True)
 
-    def train(self, corpus):
+    def train(self, corpus, reuse_corpus):
         """
         Train Mallet LDA.
 
@@ -517,9 +519,11 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         ----------
         corpus : iterable of iterable of (int, int)
             Corpus in BoW format
+        reuse_corpus: bool, optional
+            Whether to reuse the mallet corpus in the tmp directory. Default: False
         """
         logger = logging.getLogger('LDAMalletWrapper')
-        if os.path.isfile(self.fcorpusmallet()) is False:
+        if os.path.isfile(self.fcorpusmallet()) is False or reuse_corpus is False:
             self.convert_input(corpus, infer=False)
         else:
             logger.info("MALLET corpus already exists, training model")
@@ -674,7 +678,8 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
                           eta_by_topic: Optional[bool] = False,
                           top_topics_coh: Optional[int] = 5,
                           tmp_path: Optional[str] = None,
-                          save_path: Optional[str] = None):
+                          save_path: Optional[str] = None,
+                          reuse_corpus: Optional[bool] = False):
     """
     Run Latent Dirichlet Allocation per model as implemented in Mallet (McCallum, 2002).
 
@@ -706,7 +711,8 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
         Path to a temporary folder for Mallet. Default: None.
     save_path: str, optional
         Path to save models as independent files as they are completed. This is recommended for large data sets. Default: None.
-
+    reuse_corpus: bool, optional
+        Whether to reuse the mallet corpus in the tmp directory. Default: False
     Return
     ------
     list of :class:`CistopicLDAModel`
@@ -750,7 +756,8 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
             eta_by_topic=eta_by_topic,
             top_topics_coh=top_topics_coh,
             tmp_path=tmp_path,
-            save_path=save_path
+            save_path=save_path,
+            reuse_corpus=reuse_corpus
         )
         for n_topic in n_topics
     ]
@@ -773,7 +780,8 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
                          eta_by_topic: Optional[bool] = False,
                          top_topics_coh: Optional[int] = 5,
                          tmp_path: Optional[str] = None,
-                         save_path: Optional[str] = None):
+                         save_path: Optional[str] = None,
+                         reuse_corpus: Optional[bool] = False):
     """
     Run Latent Dirichlet Allocation in a model as implemented in Mallet (McCallum, 2002).
 
@@ -809,7 +817,8 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
         Path to a temporary folder for Mallet. Default: None.
     save_path: str, optional
         Path to save models as independent files as they are completed. This is recommended for large data sets. Default: None.
-
+    reuse_corpus: bool, optional
+        Whether to reuse the mallet corpus in the tmp directory. Default: False
     Return
     ------
     CistopicLDAModel
@@ -844,7 +853,8 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
         eta=eta,
         n_cpu=n_cpu,
         tmp_dir=tmp_path,
-        random_seed=random_state)
+        random_seed=random_state,
+        reuse_corpus=reuse_corpus)
 
     # Get distributions
     topic_word = model.get_topics()
