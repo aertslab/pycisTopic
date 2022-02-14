@@ -92,38 +92,40 @@ class CistopicObject:
         """
 
         flag = False
-        if len(set(self.cell_names) & set(
-                cell_data.index)) < len(self.cell_names):
-            check_cell_names = prepare_tag_cells(self.cell_names, split_pattern)
+        obj_cell_data = self.cell_data.copy()
+        obj_cell_names = self.cell_names.copy()
+        if len(set(obj_cell_names) & set(
+                cell_data.index)) < len(obj_cell_names):
+            check_cell_names = prepare_tag_cells(obj_cell_names, split_pattern)
             if len(set(check_cell_names) & set(cell_data.index)) < len(
-                    set(self.cell_names) & set(cell_data.index)):
+                    set(obj_cell_names) & set(cell_data.index)):
                 print(
                     "Warning: Some cells in this CistopicObject are not present in this cell_data. Values will be "
                     "filled with Nan\n"
                 )
             else:
                 flag = True
-        if len(set(self.cell_data.columns) & set(cell_data.columns)) > 0:
+        if len(set(obj_cell_data.columns) & set(cell_data.columns)) > 0:
             print(
                 f"Columns {list(set(self.cell_data.columns.values) & set(cell_data.columns.values))} will be overwritten")
-            self.cell_data = self.cell_data.loc[:, list(
-                set(self.cell_data.columns).difference(set(cell_data.columns)))]
+            obj_cell_data = obj_cell_data.loc[:, list(
+                set(obj_cell_data.columns).difference(set(cell_data.columns)))]
         if not flag:
             cell_data = cell_data.loc[list(
-                set(self.cell_names) & set(cell_data.index)), ]
+                set(obj_cell_names) & set(cell_data.index)), ]
             new_cell_data = pd.concat(
-                [self.cell_data, cell_data], axis=1, sort=False)
+                [obj_cell_data, cell_data], axis=1, sort=False)
         elif flag:
-            self.cell_data.index = prepare_tag_cells(self.cell_names, split_pattern)
+            obj_cell_data.index = prepare_tag_cells(obj_cell_names, split_pattern)
             cell_data = cell_data.loc[list(
-                set(self.cell_data.index.tolist()) & set(cell_data.index)), ]
+                set(obj_cell_data.index.tolist()) & set(cell_data.index)), ]
             new_cell_data = pd.concat(
-                [self.cell_data, cell_data], axis=1, sort=False)
+                [obj_cell_data, cell_data], axis=1, sort=False)
             new_cell_data = new_cell_data.loc[prepare_tag_cells(
-                self.cell_names, split_pattern)]
+                obj_cell_names, split_pattern)]
             new_cell_data.index = self.cell_names
 
-        self.cell_data = new_cell_data.loc[self.cell_names]
+        self.cell_data = new_cell_data.loc[obj_cell_names]
 
     def add_region_data(self,
                         region_data: pd.DataFrame):
@@ -140,23 +142,25 @@ class CistopicObject:
         CistopicObject
             The input :class:`CistopicObject` with :attr:`region_data` updated.
         """
-        if len(set(self.region_names) & set(
-                region_data.index)) < len(self.region_names):
+        obj_region_names = self.region_names.copy()
+        obj_region_data = self.region_data.copy()
+        if len(set(obj_region_names) & set(
+                region_data.index)) < len(obj_region_names):
             print(
                 "Warning: Some regions in this CistopicObject are not present in this region_data. Values will be "
                 "filled with Nan\n"
             )
-        if len(set(self.region_data.columns.values) &
+        if len(set(obj_region_data.columns.values) &
                set(region_data.columns.values)) > 0:
             print(
                 f"Columns {list(set(self.region_data.columns.values) & set(region_data.columns.values))} will be overwritten")
-            self.region_data = self.region_data.loc[:, list(set(
-                self.region_data.columns.values).difference(set(region_data.columns.values)))]
+            obj_region_data = obj_region_data.loc[:, list(set(
+                obj_region_data.columns.values).difference(set(region_data.columns.values)))]
         region_data = region_data.loc[list(
-            set(self.region_names) & set(region_data.index)), ]
+            set(obj_region_names) & set(region_data.index)), ]
         new_region_data = pd.concat(
-            [self.region_data, region_data], axis=1, sort=False)
-        self.region_data = new_region_data.loc[self.region_names]
+            [obj_region_data, region_data], axis=1, sort=False)
+        self.region_data = new_region_data.loc[obj_region_names]
 
     def subset(self,
                cells: Optional[List[str]] = None,
