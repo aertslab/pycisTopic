@@ -879,7 +879,6 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
     col_colors = {}
     if variables is not None:
         for var in variables:
-            color_dict={}
             var_data = cell_data.loc[:, var].sort_values()
             categories = set(var_data)
             try:
@@ -890,7 +889,7 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
                     lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF), range(len(categories))
                 ))
                 color = [mcolors.to_rgb(x) for x in color]
-                color_dict[var] = dict(zip(categories, color))
+                color_dict = dict(zip(categories, color))
             col_colors[var] = var_data.map(color_dict)
         col_colors = pd.concat([col_colors[var]
                                 for var in variables], axis=1, sort=False)
