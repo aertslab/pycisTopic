@@ -879,6 +879,7 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
     col_colors = {}
     if variables is not None:
         for var in variables:
+            color_dict={}
             var_data = cell_data.loc[:, var].sort_values()
             categories = set(var_data)
             try:
