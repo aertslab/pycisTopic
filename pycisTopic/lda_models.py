@@ -15,6 +15,7 @@ import tmtoolkit
 import warnings
 import xml.etree.ElementTree as et
 import zipfile
+import time
 from gensim import utils, matutils, corpora
 from gensim.models import basemodel
 from gensim.models.ldamodel import LdaModel
@@ -23,8 +24,8 @@ from itertools import chain
 from scipy import sparse
 from typing import List, Iterable, Optional, Tuple, Union
 
-from .cistopic_class import *
-from .utils import *
+from pycisTopic.cistopic_class import *
+from pycisTopic.utils import *
 
 
 class CistopicLDAModel:
@@ -259,7 +260,9 @@ def run_cgs_model(binary_matrix: sparse.csr_matrix,
 
     # Running model
     log.info(f"Running model with {n_topics} topics")
+    start_time = time.time()
     model.fit(binary_matrix)
+    end_time = time.time()-start_time
 
     # Model evaluation
     arun_2010 = tmtoolkit.topicmod.evaluate.metric_arun_2010(
@@ -349,7 +352,8 @@ def run_cgs_model(binary_matrix: sparse.csr_matrix,
                                alpha_by_topic,
                                eta,
                                eta_by_topic,
-                               top_topics_coh
+                               top_topics_coh,
+                               end_time
                                ],
                               index=['package',
                                      'n_topics',
@@ -359,7 +363,8 @@ def run_cgs_model(binary_matrix: sparse.csr_matrix,
                                      'alpha_by_topic',
                                      'eta',
                                      'eta_by_topic',
-                                     'top_topics_coh'],
+                                     'top_topics_coh',
+                                     'time'],
                               columns=['Parameter']
                               )
     # Create object
@@ -544,6 +549,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
                      self.finferencer(),
                      self.topic_threshold,
                      str(self.random_seed))
+        start = time.time()
         logger.info("Training MALLET LDA with %s", cmd)
         cmd = cmd.split()
         try:
@@ -552,6 +558,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             raise RuntimeError("command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
         self.word_topics = self.load_word_topics()
         self.wordtopics = self.word_topics
+        self.time = time.time()-start
 
     def load_word_topics(self):
         """
@@ -842,6 +849,7 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
         eta = eta / n_topics
 
     # Running model
+    start = time.time()
     log.info(f"Running model with {n_topics} topics")
     model = LDAMallet(
         path_to_mallet_binary,
@@ -855,6 +863,7 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
         tmp_dir=tmp_path,
         random_seed=random_state,
         reuse_corpus=reuse_corpus)
+    end_time = time.time()-start
 
     # Get distributions
     topic_word = model.get_topics()
@@ -950,7 +959,9 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
                                alpha,
                                alpha_by_topic,
                                eta,
-                               top_topics_coh
+                               top_topics_coh,
+                               end_time,
+                               model.time
                                ],
                               index=['package',
                                      'n_topics',
@@ -959,7 +970,9 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
                                      'alpha',
                                      'alpha_by_topic',
                                      'eta',
-                                     'top_topics_coh'],
+                                     'top_topics_coh',
+                                     'full_time',
+                                     'model_time'],
                               columns=['Parameter'])
     # Create object
     model = CistopicLDAModel(
