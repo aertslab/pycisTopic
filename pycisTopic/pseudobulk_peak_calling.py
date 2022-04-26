@@ -50,9 +50,9 @@ def export_pseudobulk(input_data: Union['CistopicObject',
     chromsizes: pd.DataFrame or pr.PyRanges
             A data frame or :class:`pr.PyRanges` containing size of each chromosome, containing 'Chromosome', 'Start' and 'End' columns.
     bed_path: str
-            Path to folder where the fragments bed files per group will be saved.
+            Path to folder where the fragments bed files per group will be saved. If None, files will not be generated.
     bigwig_path: str
-            Path to folder where the bigwig files per group will be saved.
+            Path to folder where the bigwig files per group will be saved. If None, files will not be generated.
     path_to_fragments: str or dict, optional
             A dictionary of character strings, with sample name as names indicating the path to the fragments file/s from which pseudobulk profiles have to
             be created. If a :class:`CistopicObject` is provided as input it will be ignored, but if a cell metadata :class:`pd.DataFrame` is provided it
