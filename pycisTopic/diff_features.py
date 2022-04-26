@@ -198,7 +198,7 @@ class CistopicImputedFeatures:
                     mtx_diff_2 = np.hstack([np.zeros(
                         (len(diff_features_2), mtx.shape[1])), mtx_to_add[diff_index_fm_2, ]])
                     mtx = np.vstack(
-                        [mtx_common, mtx_diff_1, mtx_diff_2], format='csr')
+                        [mtx_common, mtx_diff_1, mtx_diff_2])
 
                 feature_names = common_features + diff_features_1 + diff_features_2
             else:
