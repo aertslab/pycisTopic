@@ -113,7 +113,7 @@ def export_pseudobulk(input_data: Union['CistopicObject',
             fragments_df.Start = np.int32(fragments_df.Start)
             fragments_df.End = np.int32(fragments_df.End)
             if 'Score' in fragments_df:
-            	fragments_df.Score = np.int32(fragments_df.Score)
+                fragments_df.Score = np.int32(fragments_df.Score)
             if 'barcode' in cell_data:
                 fragments_df = fragments_df.loc[fragments_df['Name'].isin(
                     cell_data['barcode'].tolist())]
@@ -135,11 +135,27 @@ def export_pseudobulk(input_data: Union['CistopicObject',
     if isinstance(chromsizes, pd.DataFrame):
         chromsizes = chromsizes.loc[:, ['Chromosome', 'Start', 'End']]
         chromsizes = pr.PyRanges(chromsizes)
-    # Check that output paths exist
-    if not os.path.exists(bed_path):
-        os.makedirs(bed_path)
-    if not os.path.exists(bigwig_path):
-        os.makedirs(bigwig_path)
+    # Check that output dir exist and generate output paths
+    if isinstance(bed_path, str):
+        if not os.path.exists(bed_path):
+            os.makedirs(bed_path)
+        bed_paths = {
+        group: os.path.join(
+            bed_path,
+            str(group) +
+            '.bed.gz') for group in groups}
+    else:
+        bed_paths = {}
+    if isinstance(bigwig_path, str):
+        if not os.path.exists(bigwig_path):
+                os.makedirs(bigwig_path)
+        bw_paths = {
+        group: os.path.join(
+            bigwig_path,
+            str(group) +
+            '.bw') for group in groups}
+    else:
+        bw_paths = {}
     # Create pseudobulks
     if n_cpu > 1:
         ray.init(num_cpus=n_cpu, **kwargs)
@@ -170,16 +186,7 @@ def export_pseudobulk(input_data: Union['CistopicObject',
                     normalize_bigwig,
                     remove_duplicates,
                     split_pattern) for group in groups]
-    bw_paths = {
-        group: os.path.join(
-            bigwig_path,
-            str(group) +
-            '.bw') for group in groups}
-    bed_paths = {
-        group: os.path.join(
-            bed_path,
-            str(group) +
-            '.bed.gz') for group in groups}
+
     return bw_paths, bed_paths
 
 
@@ -256,9 +263,8 @@ def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
     gc.collect()
 
     group_pr = pr.PyRanges(group_fragments)
-    bigwig_path_group = os.path.join(bigwig_path, str(group) + '.bw')
-    bed_path_group = os.path.join(bed_path, str(group) + '.bed.gz')
     if isinstance(bigwig_path, str):
+        bigwig_path_group = os.path.join(bigwig_path, str(group) + '.bw')
         if remove_duplicates:
             group_pr.to_bigwig(
                 path=bigwig_path_group,
@@ -271,6 +277,7 @@ def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
                 rpm=normalize_bigwig,
                 value_col='Score')
     if isinstance(bed_path, str):
+        bed_path_group = os.path.join(bed_path, str(group) + '.bed.gz')
         group_pr.to_bed(
             path=bed_path_group,
             keep=True,
