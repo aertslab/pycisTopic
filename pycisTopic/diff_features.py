@@ -1,19 +1,18 @@
 import logging
+import sys
+from typing import List, Optional, Union
+
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy import array
-from numpy import count_nonzero
 import pandas as pd
 import ray
 import scipy
 import scipy.sparse as sparse
 import sklearn
-from sklearn.preprocessing import normalize
-import sys
+from numpy import array, count_nonzero
 from scipy.stats import ranksums
-from typing import List
-from typing import Optional, Union
+from sklearn.preprocessing import normalize
 
 from .cistopic_class import *
 from .utils import *
@@ -38,11 +37,13 @@ class CistopicImputedFeatures:
         Name of the cisTopic imputation project.
     """
 
-    def __init__(self,
-                 imputed_acc: sparse.csr_matrix,
-                 feature_names: List[str],
-                 cell_names: List[str],
-                 project: str):
+    def __init__(
+        self,
+        imputed_acc: sparse.csr_matrix,
+        feature_names: List[str],
+        cell_names: List[str],
+        project: str,
+    ):
         self.mtx = imputed_acc
         self.feature_names = feature_names
         self.cell_names = cell_names
@@ -52,11 +53,13 @@ class CistopicImputedFeatures:
         descr = f"CistopicImputedFeatures from project {self.project} with nCells × nFeatures = {len(self.cell_names)} × {len(self.feature_names)}"
         return descr
 
-    def subset(self,
-               cells: Optional[List[str]] = None,
-               features: Optional[List[str]] = None,
-               copy: Optional[bool] = False,
-               split_pattern: Optional[str] = '___'):
+    def subset(
+        self,
+        cells: Optional[List[str]] = None,
+        features: Optional[List[str]] = None,
+        copy: Optional[bool] = False,
+        split_pattern: Optional[str] = "___",
+    ):
         """
         Subset cells and/or regions from :class:`CistopicImputedFeatures`.
 
@@ -86,10 +89,12 @@ class CistopicImputedFeatures:
             except BaseException:
                 try:
                     cells_index = get_position_index(
-                        cells, prepare_tag_cells(self.cell_names, split_pattern))
+                        cells, prepare_tag_cells(self.cell_names, split_pattern)
+                    )
                 except BaseException:
                     log.error(
-                        'None of the given cells is contained in this cisTopic object!')
+                        "None of the given cells is contained in this cisTopic object!"
+                    )
             mtx = mtx[:, cells_index]
             cell_names = subset_list(cell_names, cells_index)
 
@@ -103,17 +108,18 @@ class CistopicImputedFeatures:
         feature_names = subset_list(feature_names, features_index)
 
         if copy is True:
-            return CistopicImputedFeatures(
-                mtx, feature_names, cell_names, self.project)
+            return CistopicImputedFeatures(mtx, feature_names, cell_names, self.project)
         else:
             self.mtx = mtx
             self.cell_names = cell_names
             self.feature_names = feature_names
 
-    def merge(self,
-              cistopic_imputed_features_list: List['CistopicImputedFeatures'],
-              project: Optional[str] = 'cisTopic_impute_merge',
-              copy: Optional[bool] = False):
+    def merge(
+        self,
+        cistopic_imputed_features_list: List["CistopicImputedFeatures"],
+        project: Optional[str] = "cisTopic_impute_merge",
+        copy: Optional[bool] = False,
+    ):
         """
         Merge a list of :class:`CistopicImputedFeatures` to the input :class:`CistopicImputedFeatures`. Reference coordinates (for regions) must be the same between the objects.
 
@@ -132,17 +138,15 @@ class CistopicImputedFeatures:
         """
         # Create cisTopic logger
         level = logging.INFO
-        log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
         handlers = [logging.StreamHandler(stream=sys.stdout)]
         logging.basicConfig(level=level, format=log_format, handlers=handlers)
-        log = logging.getLogger('cisTopic')
+        log = logging.getLogger("cisTopic")
 
         cistopic_imputed_features_list.insert(0, self)
         mtx_list = [x.mtx for x in cistopic_imputed_features_list]
-        feature_names_list = [
-            x.feature_names for x in cistopic_imputed_features_list]
-        cell_names_list = [
-            x.cell_names for x in cistopic_imputed_features_list]
+        feature_names_list = [x.feature_names for x in cistopic_imputed_features_list]
+        cell_names_list = [x.cell_names for x in cistopic_imputed_features_list]
 
         mtx = mtx_list[0]
         feature_names = feature_names_list[0]
@@ -154,51 +158,90 @@ class CistopicImputedFeatures:
             cell_names_to_add = cell_names_list[i]
             cell_names = cell_names + cell_names_to_add
 
-            common_features = list(
-                set(feature_names) & set(feature_names_to_add))
-            diff_features = list(
-                set(feature_names) ^ set(feature_names_to_add))
+            common_features = list(set(feature_names) & set(feature_names_to_add))
+            diff_features = list(set(feature_names) ^ set(feature_names_to_add))
 
-            common_index_fm = get_position_index(
-                common_features, feature_names)
+            common_index_fm = get_position_index(common_features, feature_names)
             common_index_fm_to_add = get_position_index(
-                common_features, feature_names_to_add)
+                common_features, feature_names_to_add
+            )
             if sparse.issparse(mtx):
                 mtx_common = sparse.hstack(
-                    [mtx[common_index_fm, ], mtx_to_add[common_index_fm_to_add, ]], format='csr')
+                    [
+                        mtx[
+                            common_index_fm,
+                        ],
+                        mtx_to_add[
+                            common_index_fm_to_add,
+                        ],
+                    ],
+                    format="csr",
+                )
             else:
                 mtx_common = np.hstack(
-                    [mtx[common_index_fm, ], mtx_to_add[common_index_fm_to_add, ]])
+                    [
+                        mtx[
+                            common_index_fm,
+                        ],
+                        mtx_to_add[
+                            common_index_fm_to_add,
+                        ],
+                    ]
+                )
             if len(diff_features) > 0:
                 diff_features_1 = list(
-                    np.setdiff1d(
-                        feature_names,
-                        feature_names_to_add))
-                diff_index_fm_1 = get_position_index(
-                    diff_features_1, feature_names)
+                    np.setdiff1d(feature_names, feature_names_to_add)
+                )
+                diff_index_fm_1 = get_position_index(diff_features_1, feature_names)
                 if sparse.issparse(mtx):
-                    mtx_diff_1 = sparse.hstack([mtx[diff_index_fm_1, ], np.zeros(
-                        (len(diff_features_1), mtx_to_add.shape[1]))], format='csr')
+                    mtx_diff_1 = sparse.hstack(
+                        [
+                            mtx[
+                                diff_index_fm_1,
+                            ],
+                            np.zeros((len(diff_features_1), mtx_to_add.shape[1])),
+                        ],
+                        format="csr",
+                    )
                 else:
-                    mtx_diff_1 = np.hstack([mtx[diff_index_fm_1, ], np.zeros(
-                        (len(diff_features_1), mtx_to_add.shape[1]))])
+                    mtx_diff_1 = np.hstack(
+                        [
+                            mtx[
+                                diff_index_fm_1,
+                            ],
+                            np.zeros((len(diff_features_1), mtx_to_add.shape[1])),
+                        ]
+                    )
 
                 diff_features_2 = list(
-                    np.setdiff1d(
-                        feature_names_to_add,
-                        feature_names))
+                    np.setdiff1d(feature_names_to_add, feature_names)
+                )
                 diff_index_fm_2 = get_position_index(
-                    diff_features_2, feature_names_to_add)
+                    diff_features_2, feature_names_to_add
+                )
                 if sparse.issparse(mtx):
-                    mtx_diff_2 = sparse.hstack([np.zeros(
-                        (len(diff_features_2), mtx.shape[1])), mtx_to_add[diff_index_fm_2, ]], format='csr')
+                    mtx_diff_2 = sparse.hstack(
+                        [
+                            np.zeros((len(diff_features_2), mtx.shape[1])),
+                            mtx_to_add[
+                                diff_index_fm_2,
+                            ],
+                        ],
+                        format="csr",
+                    )
                     mtx = sparse.vstack(
-                        [mtx_common, mtx_diff_1, mtx_diff_2], format='csr')
+                        [mtx_common, mtx_diff_1, mtx_diff_2], format="csr"
+                    )
                 else:
-                    mtx_diff_2 = np.hstack([np.zeros(
-                        (len(diff_features_2), mtx.shape[1])), mtx_to_add[diff_index_fm_2, ]])
-                    mtx = np.vstack(
-                        [mtx_common, mtx_diff_1, mtx_diff_2])
+                    mtx_diff_2 = np.hstack(
+                        [
+                            np.zeros((len(diff_features_2), mtx.shape[1])),
+                            mtx_to_add[
+                                diff_index_fm_2,
+                            ],
+                        ]
+                    )
+                    mtx = np.vstack([mtx_common, mtx_diff_1, mtx_diff_2])
 
                 feature_names = common_features + diff_features_1 + diff_features_2
             else:
@@ -206,14 +249,13 @@ class CistopicImputedFeatures:
                 feature_names = common_features
 
         if copy is True:
-            return CistopicImputedFeatures(
-                mtx, feature_names, cell_names, project)
+            return CistopicImputedFeatures(mtx, feature_names, cell_names, project)
         else:
             self.mtx = mtx
             self.cell_names = cell_names
             self.feature_names = feature_names
             self.project = project
-            
+
     def make_rankings(self, seed=123):
         """
         A function to generate rankings per cell based on the imputed accessibility scores per region.
@@ -230,31 +272,38 @@ class CistopicImputedFeatures:
         # Initialize random number generator, for handling ties
         rng = np.random.default_rng(seed=seed)
 
-           # Function to make rankings per array
+        # Function to make rankings per array
         def rank_scores_and_assign_random_ranking_in_range_for_ties(
-                scores_with_ties_for_motif_or_track_numpy: np.ndarray
+            scores_with_ties_for_motif_or_track_numpy: np.ndarray,
         ) -> np.ndarray:
-            # 
+            #
             # Create random permutation so tied scores will have a different ranking each time.
             random_permutations_to_break_ties_numpy = rng.permutation(
                 scores_with_ties_for_motif_or_track_numpy.shape[0]
             )
-            ranking_with_broken_ties_for_motif_or_track_numpy = random_permutations_to_break_ties_numpy[
-                (-scores_with_ties_for_motif_or_track_numpy)[random_permutations_to_break_ties_numpy].argsort()
-            ].argsort().astype(imputed_acc_obj_ranking_db_dtype)
+            ranking_with_broken_ties_for_motif_or_track_numpy = (
+                random_permutations_to_break_ties_numpy[
+                    (-scores_with_ties_for_motif_or_track_numpy)[
+                        random_permutations_to_break_ties_numpy
+                    ].argsort()
+                ]
+                .argsort()
+                .astype(imputed_acc_obj_ranking_db_dtype)
+            )
 
             return ranking_with_broken_ties_for_motif_or_track_numpy
 
         # Create zeroed imputed object rankings database.
         imputed_acc_ranking = CistopicImputedFeatures(
-                np.zeros((len(self.feature_names), len(self.cell_names))), 
-                self.feature_names,
-                self.cell_names, 
-                self.project)
+            np.zeros((len(self.feature_names), len(self.cell_names))),
+            self.feature_names,
+            self.cell_names,
+            self.project,
+        )
 
         # Get dtype of the scores
-        imputed_acc_obj_ranking_db_dtype = 'uint32'
-        
+        imputed_acc_obj_ranking_db_dtype = "uint32"
+
         # Convert to csc
         if sparse.issparse(self.mtx):
             mtx = self.mtx.tocsc()
@@ -263,19 +312,23 @@ class CistopicImputedFeatures:
 
         # Rank all scores per motif/track and assign a random ranking in range for regions/genes with the same score.
         for col_idx in range(len(imputed_acc_ranking.cell_names)):
-                imputed_acc_ranking.mtx[:,col_idx] = rank_scores_and_assign_random_ranking_in_range_for_ties(
-                    mtx[:,col_idx].toarray().flatten()
-                )
+            imputed_acc_ranking.mtx[
+                :, col_idx
+            ] = rank_scores_and_assign_random_ranking_in_range_for_ties(
+                mtx[:, col_idx].toarray().flatten()
+            )
 
         return imputed_acc_ranking
 
 
-def impute_accessibility(cistopic_obj: 'CistopicObject',
-                         selected_cells: Optional[List[str]] = None,
-                         selected_regions: Optional[List[str]] = None,
-                         scale_factor: Optional[int] = 10 ** 6,
-                         sparsity_thr: Optional[float] = 0.67, 
-                         project: Optional[str] = 'cisTopic_Impute'):
+def impute_accessibility(
+    cistopic_obj: "CistopicObject",
+    selected_cells: Optional[List[str]] = None,
+    selected_regions: Optional[List[str]] = None,
+    scale_factor: Optional[int] = 10**6,
+    sparsity_thr: Optional[float] = 0.67,
+    project: Optional[str] = "cisTopic_Impute",
+):
     """
     Impute region accessibility.
 
@@ -301,10 +354,10 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
 
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     model = cistopic_obj.selected_model
     cell_names = cistopic_obj.cell_names
@@ -321,33 +374,38 @@ def impute_accessibility(cistopic_obj: 'CistopicObject',
     # multiplying them uses 4 times less memory than with np.float64
     cell_topic = cell_topic.to_numpy().astype(np.float32)
     topic_region = topic_region.to_numpy().astype(np.float32)
-    log.info('Imputing drop-outs')
+    log.info("Imputing drop-outs")
     imputed_acc = topic_region @ cell_topic
     imputed_acc = imputed_acc.astype(np.float32)
     if isinstance(scale_factor, int):
         if scale_factor != 1:
-            log.info('Scaling')
+            log.info("Scaling")
             # Only multiply non-zero data of sparse matrix.
             imputed_acc *= np.int32(scale_factor)
             imputed_acc = imputed_acc.astype(np.int32)
-            log.info('Keep non zero rows')
+            log.info("Keep non zero rows")
             keep_regions_index = non_zero_rows(imputed_acc)
-            imputed_acc = imputed_acc[keep_regions_index, ]
+            imputed_acc = imputed_acc[
+                keep_regions_index,
+            ]
             region_names = subset_list(region_names, keep_regions_index)
     sparsity = 1.0 - (count_nonzero(imputed_acc) / float(imputed_acc.size))
     log.info(f"Imputed accessibility sparsity: {sparsity}")
-    log.info('Create CistopicImputedFeatures object')
+    log.info("Create CistopicImputedFeatures object")
     imputed_acc_obj = CistopicImputedFeatures(
-        imputed_acc, region_names, cell_names, project)
+        imputed_acc, region_names, cell_names, project
+    )
     if sparsity > sparsity_thr:
-        log.info('Making matrix sparse')
+        log.info("Making matrix sparse")
         imputed_acc_obj.mtx = sparse.csr_matrix(imputed_acc_obj.mtx)
-    log.info('Done!')
+    log.info("Done!")
     return imputed_acc_obj
 
 
-def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
-                     scale_factor: Optional[int] = 10 ** 4):
+def normalize_scores(
+    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
+    scale_factor: Optional[int] = 10**4,
+):
     """
     Log-normalize imputation data. Feature counts for each cell are divided by the total counts for that cell and multiplied by the scale_factor.
 
@@ -365,43 +423,39 @@ def normalize_scores(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
-    log.info('Normalizing imputed data')
+    log.info("Normalizing imputed data")
     if isinstance(input_mat, CistopicImputedFeatures):
-        mtx = normalize(input_mat.mtx, norm='l1', axis=0)
+        mtx = normalize(input_mat.mtx, norm="l1", axis=0)
         mtx *= scale_factor
         mtx = np.log1p(mtx)
         output = CistopicImputedFeatures(
-            mtx,
-            input_mat.feature_names,
-            input_mat.cell_names,
-            input_mat.project)
+            mtx, input_mat.feature_names, input_mat.cell_names, input_mat.project
+        )
     elif isinstance(input_mat, pd.DataFrame):
-        output = np.log1p(
-            input_mat.values /
-            input_mat.values.sum(0) *
-            scale_factor)
+        output = np.log1p(input_mat.values / input_mat.values.sum(0) * scale_factor)
         output = pd.DataFrame(
-            output,
-            index=input_mat.index.tolist(),
-            columns=input_mat.columns)
-    log.info('Done!')
+            output, index=input_mat.index.tolist(), columns=input_mat.columns
+        )
+    log.info("Done!")
     return output
 
 
-def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
-                                  min_disp: Optional[float] = 0.05,
-                                  min_mean: Optional[float] = 0.0125,
-                                  max_disp: Optional[float] = np.inf,
-                                  max_mean: Optional[float] = 3,
-                                  n_bins: Optional[int] = 20,
-                                  n_top_features: Optional[int] = None,
-                                  plot: Optional[bool] = True,
-                                  save: Optional[str] = None):
+def find_highly_variable_features(
+    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
+    min_disp: Optional[float] = 0.05,
+    min_mean: Optional[float] = 0.0125,
+    max_disp: Optional[float] = np.inf,
+    max_mean: Optional[float] = 3,
+    n_bins: Optional[int] = 20,
+    n_top_features: Optional[int] = None,
+    plot: Optional[bool] = True,
+    save: Optional[str] = None,
+):
     """
     Find highly variable features.
 
@@ -433,10 +487,10 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImpute
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     if isinstance(input_mat, pd.DataFrame):
         mat = input_mat.values
@@ -448,100 +502,99 @@ def find_highly_variable_features(input_mat: Union[pd.DataFrame, 'CistopicImpute
     if sparse.issparse(mat):
         mean, var = sklearn.utils.sparsefuncs.mean_variance_axis(mat, axis=1)
     else:
-        log.info('Calculating mean')
+        log.info("Calculating mean")
         mean = np.mean(mat, axis=1, dtype=np.float32)
-        log.info('Calculating variance')
+        log.info("Calculating variance")
         var = np.var(mat, axis=1, dtype=np.float32)
-    
+
     mean[mean == 0] = 1e-12
     dispersion = var / mean
     # Logarithmic dispersion as in Seurat
     dispersion[dispersion == 0] = np.nan
     dispersion = np.log(dispersion)
     df = pd.DataFrame()
-    df['means'] = mean
-    df['dispersions'] = dispersion
-    df['mean_bin'] = pd.cut(df['means'], bins=n_bins)
-    disp_grouped = df.groupby('mean_bin')['dispersions']
+    df["means"] = mean
+    df["dispersions"] = dispersion
+    df["mean_bin"] = pd.cut(df["means"], bins=n_bins)
+    disp_grouped = df.groupby("mean_bin")["dispersions"]
     disp_mean_bin = disp_grouped.mean()
     disp_std_bin = disp_grouped.std(ddof=1)
     # Retrieve those regions that have nan std, these are the ones where
     # only a single gene fell in the bin and implicitly set them to have
     # a normalized dispersion of 1
     one_feature_per_bin = disp_std_bin.isnull()
-    feature_indices = np.where(
-        one_feature_per_bin[df['mean_bin'].values])[0].tolist()
+    feature_indices = np.where(one_feature_per_bin[df["mean_bin"].values])[0].tolist()
 
     if len(feature_indices) > 0:
         log.debug(
-            f'Feature indices {feature_indices} fell into a single bin: their '
-            'normalized dispersion was set to 1.\n    '
-            'Decreasing `n_bins` will likely avoid this effect.'
+            f"Feature indices {feature_indices} fell into a single bin: their "
+            "normalized dispersion was set to 1.\n    "
+            "Decreasing `n_bins` will likely avoid this effect."
         )
 
-    disp_std_bin[one_feature_per_bin.values] = disp_mean_bin[one_feature_per_bin.values].values
+    disp_std_bin[one_feature_per_bin.values] = disp_mean_bin[
+        one_feature_per_bin.values
+    ].values
     disp_mean_bin[one_feature_per_bin.values] = 0
     # Normalize
-    df['dispersions_norm'] = (
-            (
-                    df['dispersions'].values  # use values here as index differs
-                    - disp_mean_bin[df['mean_bin'].values].values
-            ) / disp_std_bin[df['mean_bin'].values].values
-    )
+    df["dispersions_norm"] = (
+        df["dispersions"].values  # use values here as index differs
+        - disp_mean_bin[df["mean_bin"].values].values
+    ) / disp_std_bin[df["mean_bin"].values].values
 
-    dispersion_norm = df['dispersions_norm'].values.astype('float32')
+    dispersion_norm = df["dispersions_norm"].values.astype("float32")
 
     if n_top_features is not None:
         dispersion_norm = dispersion_norm[~np.isnan(dispersion_norm)]
         dispersion_norm[::-1].sort()
         disp_cut_off = dispersion_norm[n_top_features - 1]
-        feature_subset = np.nan_to_num(
-            df['dispersions_norm'].values) >= disp_cut_off
+        feature_subset = np.nan_to_num(df["dispersions_norm"].values) >= disp_cut_off
         log.debug(
-            f'the {n_top_features} top features correspond to a '
-            f'normalized dispersion cutoff of {disp_cut_off}'
+            f"the {n_top_features} top features correspond to a "
+            f"normalized dispersion cutoff of {disp_cut_off}"
         )
     else:
         dispersion_norm[np.isnan(dispersion_norm)] = 0  # similar to Seurat
-        feature_subset = np.logical_and.reduce((
-            mean > min_mean, mean < max_mean,
-            dispersion_norm > min_disp,
-            dispersion_norm < max_disp,
-        ))
+        feature_subset = np.logical_and.reduce(
+            (
+                mean > min_mean,
+                mean < max_mean,
+                dispersion_norm > min_disp,
+                dispersion_norm < max_disp,
+            )
+        )
 
-    df['highly_variable'] = feature_subset
-    var_features = [features[i]
-                    for i in df[df.highly_variable].index.to_list()]
+    df["highly_variable"] = feature_subset
+    var_features = [features[i] for i in df[df.highly_variable].index.to_list()]
 
     fig = plt.figure()
     if plot:
-        matplotlib.rcParams['agg.path.chunksize'] = 10000
+        matplotlib.rcParams["agg.path.chunksize"] = 10000
         plt.scatter(
-            df['means'],
-            df['dispersions_norm'],
-            c=feature_subset,
-            s=10,
-            alpha=0.1)
-        plt.xlabel('Mean measurement of features')
-        plt.ylabel('Normalized dispersion of the features')
+            df["means"], df["dispersions_norm"], c=feature_subset, s=10, alpha=0.1
+        )
+        plt.xlabel("Mean measurement of features")
+        plt.ylabel("Normalized dispersion of the features")
         if save is not None:
             fig.savefig(save)
         plt.show()
 
-    log.info('Done!')
+    log.info("Done!")
     return var_features
 
 
-def find_diff_features(cistopic_obj: 'CistopicObject',
-                       imputed_features_obj: 'CistopicImputedFeatures',
-                       variable: str,
-                       var_features: Optional[List[str]] = None,
-                       contrasts: Optional[List[List[str]]] = None,
-                       adjpval_thr: Optional[float] = 0.05,
-                       log2fc_thr: Optional[float] = np.log2(1.5),
-                       n_cpu: Optional[int] = 1,
-                       split_pattern: Optional[str] = '___',
-                       **kwargs):
+def find_diff_features(
+    cistopic_obj: "CistopicObject",
+    imputed_features_obj: "CistopicImputedFeatures",
+    variable: str,
+    var_features: Optional[List[str]] = None,
+    contrasts: Optional[List[List[str]]] = None,
+    adjpval_thr: Optional[float] = 0.05,
+    log2fc_thr: Optional[float] = np.log2(1.5),
+    n_cpu: Optional[int] = 1,
+    split_pattern: Optional[str] = "___",
+    **kwargs,
+):
     """
     Find differential imputed features.
 
@@ -575,32 +628,34 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
-    selected_cells = list(set(cistopic_obj.cell_data.index.tolist()) & set(
-        imputed_features_obj.cell_names))
+    selected_cells = list(
+        set(cistopic_obj.cell_data.index.tolist())
+        & set(imputed_features_obj.cell_names)
+    )
     group_var = cistopic_obj.cell_data.loc[selected_cells, variable].dropna()
     if contrasts is None:
         levels = sorted(list(set(group_var.tolist())))
         contrasts = [
-            [[x], levels[:levels.index(x)] + levels[levels.index(x) + 1:]] for x in levels]
+            [[x], levels[: levels.index(x)] + levels[levels.index(x) + 1 :]]
+            for x in levels
+        ]
         contrasts_names = levels
     else:
         contrasts_names = [
-            '_'.join(
-                contrasts[i][0]) +
-            '_VS_' +
-            '_'.join(
-                contrasts[i][1])
+            "_".join(contrasts[i][0]) + "_VS_" + "_".join(contrasts[i][1])
             for i in range(len(contrasts))
         ]
     # Get barcodes in each class per contrats
     barcode_groups = [
-        [group_var[group_var.isin(contrasts[x][0])].index.tolist(),
-         group_var[group_var.isin(contrasts[x][1])].index.tolist()]
+        [
+            group_var[group_var.isin(contrasts[x][0])].index.tolist(),
+            group_var[group_var.isin(contrasts[x][1])].index.tolist(),
+        ]
         for x in range(len(contrasts))
     ]
     # Subset imputed accessibility matrix
@@ -620,29 +675,37 @@ def find_diff_features(cistopic_obj: 'CistopicObject',
                     barcode_groups[i],
                     contrasts_names[i],
                     adjpval_thr=adjpval_thr,
-                    log2fc_thr=log2fc_thr)
-                for i in range(len(contrasts))])
+                    log2fc_thr=log2fc_thr,
+                )
+                for i in range(len(contrasts))
+            ]
+        )
         ray.shutdown()
     else:
         markers_list = [
-                markers_one(
-                    subset_imputed_features_obj,
-                    barcode_groups[i],
-                    contrasts_names[i],
-                    adjpval_thr=adjpval_thr,
-                    log2fc_thr=log2fc_thr)
-                for i in range(len(contrasts))]
-    markers_dict = {contrasts_names[i]: markers_list[i]
-                    for i in range(len(markers_list))}
+            markers_one(
+                subset_imputed_features_obj,
+                barcode_groups[i],
+                contrasts_names[i],
+                adjpval_thr=adjpval_thr,
+                log2fc_thr=log2fc_thr,
+            )
+            for i in range(len(contrasts))
+        ]
+    markers_dict = {
+        contrasts_names[i]: markers_list[i] for i in range(len(markers_list))
+    }
     return markers_dict
 
 
 @ray.remote
-def markers_ray(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
-                barcode_group: List[List[str]],
-                contrast_name: str,
-                adjpval_thr: Optional[float] = 0.05,
-                log2fc_thr: Optional[float] = 1):
+def markers_ray(
+    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
+    barcode_group: List[List[str]],
+    contrast_name: str,
+    adjpval_thr: Optional[float] = 0.05,
+    log2fc_thr: Optional[float] = 1,
+):
     """
     Find differential imputed features.
 
@@ -664,18 +727,16 @@ def markers_ray(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
     List
         `class::pd.DataFrame` with the selected features and logFC and adjusted p-values.
     """
-    return markers_one(
-                    input_mat,
-                    barcode_group,
-                    contrast_name,
-                    adjpval_thr,
-                    log2fc_thr)
+    return markers_one(input_mat, barcode_group, contrast_name, adjpval_thr, log2fc_thr)
 
-def markers_one(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
-                barcode_group: List[List[str]],
-                contrast_name: str,
-                adjpval_thr: Optional[float] = 0.05,
-                log2fc_thr: Optional[float] = 1):
+
+def markers_one(
+    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
+    barcode_group: List[List[str]],
+    contrast_name: str,
+    adjpval_thr: Optional[float] = 0.05,
+    log2fc_thr: Optional[float] = 1,
+):
     """
     Find differential imputed features.
 
@@ -699,10 +760,10 @@ def markers_one(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     if isinstance(input_mat, pd.DataFrame):
         mat = input_mat.values
@@ -715,33 +776,37 @@ def markers_one(input_mat: Union[pd.DataFrame, 'CistopicImputedFeatures'],
 
     fg_cells_index = get_position_index(barcode_group[0], samples)
     bg_cells_index = get_position_index(barcode_group[1], samples)
-    log.info('Formatting data for ' + contrast_name)
+    log.info("Formatting data for " + contrast_name)
     if sparse.issparse(mat):
-        fg_mat = mat[:,fg_cells_index].toarray()
-        bg_mat = mat[:,bg_cells_index].toarray()
+        fg_mat = mat[:, fg_cells_index].toarray()
+        bg_mat = mat[:, bg_cells_index].toarray()
     else:
-        fg_mat = mat[:,fg_cells_index]
-        bg_mat = mat[:,bg_cells_index]
+        fg_mat = mat[:, fg_cells_index]
+        bg_mat = mat[:, bg_cells_index]
 
-    log.info('Computing p-value for ' + contrast_name)
-    wilcox_test = [ranksums(fg_mat[x],y=bg_mat[x]) for x in range(mat.shape[0])]
-    log.info('Computing log2FC for ' + contrast_name)
-    logFC = np.log2((np.mean(fg_mat, axis=1) + 10 ** -12) / (np.mean(bg_mat, axis=1) + 10 ** -12)).tolist()
+    log.info("Computing p-value for " + contrast_name)
+    wilcox_test = [ranksums(fg_mat[x], y=bg_mat[x]) for x in range(mat.shape[0])]
+    log.info("Computing log2FC for " + contrast_name)
+    logFC = np.log2(
+        (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
+    ).tolist()
 
     pvalue = [wilcox_test[x].pvalue for x in range(len(wilcox_test))]
     adj_pvalue = p_adjust_bh(pvalue)
     name = [contrast_name] * len(adj_pvalue)
     markers_dataframe = pd.DataFrame(
         [logFC, adj_pvalue, name],
-        index=['Log2FC', 'Adjusted_pval', 'Contrast'],
-        columns=features
+        index=["Log2FC", "Adjusted_pval", "Contrast"],
+        columns=features,
     ).transpose()
-    markers_dataframe = markers_dataframe.loc[markers_dataframe['Adjusted_pval'] <= adjpval_thr]
-    markers_dataframe = markers_dataframe.loc[markers_dataframe['Log2FC'] >= log2fc_thr]
+    markers_dataframe = markers_dataframe.loc[
+        markers_dataframe["Adjusted_pval"] <= adjpval_thr
+    ]
+    markers_dataframe = markers_dataframe.loc[markers_dataframe["Log2FC"] >= log2fc_thr]
     markers_dataframe = markers_dataframe.sort_values(
-        ['Log2FC', 'Adjusted_pval'], ascending=[False, True]
+        ["Log2FC", "Adjusted_pval"], ascending=[False, True]
     )
-    log.info(contrast_name + ' done!')
+    log.info(contrast_name + " done!")
     return markers_dataframe
 
 
