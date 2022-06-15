@@ -1,3 +1,6 @@
+from itertools import compress
+from typing import Dict, Optional, Tuple, Union
+
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.patheffects as PathEffects
@@ -5,15 +8,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from adjustText import adjust_text
-from itertools import compress
 from statsmodels.stats import proportion
-from typing import Dict, Optional, Tuple, Union
 
 from .cistopic_class import *
 
 
-def compute_topic_metrics(cistopic_obj: 'CistopicObject',
-                          return_metrics: Optional[bool] = True):
+def compute_topic_metrics(
+    cistopic_obj: "CistopicObject", return_metrics: Optional[bool] = True
+):
     """
     Compute topic quality control metrics.
 
@@ -38,42 +40,55 @@ def compute_topic_metrics(cistopic_obj: 'CistopicObject',
 
     """
     model = cistopic_obj.selected_model
-    topic_coh = model.coherence['Mimno_2011']
-    topic_ass = model.topic_ass.drop('Topic', axis=1)
-    marginal_dist = model.marg_topic['Marg_Topic']
-    gini_values = pd.DataFrame([gini_coefficient(
-        model.cell_topic.iloc[i].to_numpy()) for i in range(model.cell_topic.shape[0])])
-    topic_qc_metrics = pd.concat(
-        [np.log10(topic_ass['Assignments']), topic_ass, topic_coh, marginal_dist, gini_values],
-        axis=1
+    topic_coh = model.coherence["Mimno_2011"]
+    topic_ass = model.topic_ass.drop("Topic", axis=1)
+    marginal_dist = model.marg_topic["Marg_Topic"]
+    gini_values = pd.DataFrame(
+        [
+            gini_coefficient(model.cell_topic.iloc[i].to_numpy())
+            for i in range(model.cell_topic.shape[0])
+        ]
     )
-    topic_qc_metrics.columns = ['Log10_Assignments'] + topic_ass.columns.tolist() + [
-        'Coherence', 'Marginal_topic_dist', 'Gini_index']
+    topic_qc_metrics = pd.concat(
+        [
+            np.log10(topic_ass["Assignments"]),
+            topic_ass,
+            topic_coh,
+            marginal_dist,
+            gini_values,
+        ],
+        axis=1,
+    )
+    topic_qc_metrics.columns = (
+        ["Log10_Assignments"]
+        + topic_ass.columns.tolist()
+        + ["Coherence", "Marginal_topic_dist", "Gini_index"]
+    )
     topic_qc_metrics.index = [
-        'Topic' +
-        str(i)
-        for i in range(1, model.cell_topic.shape[0] + 1)
+        "Topic" + str(i) for i in range(1, model.cell_topic.shape[0] + 1)
     ]
     cistopic_obj.selected_model.topic_qc_metrics = topic_qc_metrics
     if return_metrics is True:
         return topic_qc_metrics
 
 
-def plot_topic_qc(topic_qc_metrics: Union[pd.DataFrame, 'CistopicObject'],
-                  var_x: str,
-                  var_y: str,
-                  min_x: Optional[int] = None,
-                  max_x: Optional[int] = None,
-                  min_y: Optional[int] = None,
-                  max_y: Optional[int] = None,
-                  var_color: Optional[str] = None,
-                  cmap: Optional[str] = 'viridis',
-                  dot_size: Optional[int] = 10,
-                  text_size: Optional[int] = 10,
-                  plot: Optional[bool] = False,
-                  save: Optional[str] = None,
-                  return_topics: Optional[bool] = False,
-                  return_fig: Optional[bool] = False):
+def plot_topic_qc(
+    topic_qc_metrics: Union[pd.DataFrame, "CistopicObject"],
+    var_x: str,
+    var_y: str,
+    min_x: Optional[int] = None,
+    max_x: Optional[int] = None,
+    min_y: Optional[int] = None,
+    max_y: Optional[int] = None,
+    var_color: Optional[str] = None,
+    cmap: Optional[str] = "viridis",
+    dot_size: Optional[int] = 10,
+    text_size: Optional[int] = 10,
+    plot: Optional[bool] = False,
+    save: Optional[str] = None,
+    return_topics: Optional[bool] = False,
+    return_fig: Optional[bool] = False,
+):
     """
     Plotting topic qc metrics and filtering.
 
@@ -121,7 +136,8 @@ def plot_topic_qc(topic_qc_metrics: Union[pd.DataFrame, 'CistopicObject'],
             topic_qc_metrics = cistopic_obj.selected_model.topic_qc_metrics
         except BaseException:
             log.error(
-                'This cisTopic object does not include topic qc metrics. Please run compute_topic_metrics() first.')
+                "This cisTopic object does not include topic qc metrics. Please run compute_topic_metrics() first."
+            )
 
     # Plot xy
     fig = plt.figure()
@@ -131,12 +147,10 @@ def plot_topic_qc(topic_qc_metrics: Union[pd.DataFrame, 'CistopicObject'],
             topic_qc_metrics[var_y],
             c=topic_qc_metrics[var_color],
             cmap=cmap,
-            s=dot_size)
+            s=dot_size,
+        )
     else:
-        plt.scatter(
-            topic_qc_metrics[var_x],
-            topic_qc_metrics[var_y],
-            s=dot_size)
+        plt.scatter(topic_qc_metrics[var_x], topic_qc_metrics[var_y], s=dot_size)
 
     # Topics
     n = topic_qc_metrics.index.tolist()
@@ -151,36 +165,35 @@ def plot_topic_qc(topic_qc_metrics: Union[pd.DataFrame, 'CistopicObject'],
                 topic_qc_metrics[var_x][i],
                 topic_qc_metrics[var_y][i],
                 i + 1,
-                horizontalalignment='center',
-                verticalalignment='center',
+                horizontalalignment="center",
+                verticalalignment="center",
                 size=text_size,
-                weight='bold',
-                path_effects=[
-                    PathEffects.withStroke(
-                        linewidth=3,
-                        foreground='w')]))
-    adjust_text(texts, arrowprops=dict(arrowstyle='-', color='gray', alpha=.5))
+                weight="bold",
+                path_effects=[PathEffects.withStroke(linewidth=3, foreground="w")],
+            )
+        )
+    adjust_text(texts, arrowprops=dict(arrowstyle="-", color="gray", alpha=0.5))
 
     # Add limits
     x = topic_qc_metrics[var_x]
     y = topic_qc_metrics[var_y]
     if min_x is not None:
-        plt.axvline(x=min_x, color='skyblue', linestyle='--')
+        plt.axvline(x=min_x, color="skyblue", linestyle="--")
         n = list(compress(n, x > min_x))
         y = y[list(x > min_x)]
         x = x[list(x > min_x)]
     if max_x is not None:
-        plt.axvline(x=max_x, color='tomato', linestyle='--')
+        plt.axvline(x=max_x, color="tomato", linestyle="--")
         n = list(compress(n, x < max_x))
         y = y[list(x < max_x)]
         x = x[list(x < max_x)]
     if min_y is not None:
-        plt.axhline(y=min_y, color='skyblue', linestyle='--')
+        plt.axhline(y=min_y, color="skyblue", linestyle="--")
         n = list(compress(n, y > min_y))
         x = x[list(y > min_y)]
         y = y[list(y > min_y)]
     if max_y is not None:
-        plt.axhline(y=max_y, color='tomato', linestyle='--')
+        plt.axhline(y=max_y, color="tomato", linestyle="--")
         n = list(compress(n, y < max_y))
         x = x[list(y < max_y)]
         y = y[list(y < max_y)]
@@ -195,7 +208,7 @@ def plot_topic_qc(topic_qc_metrics: Union[pd.DataFrame, 'CistopicObject'],
     plt.tight_layout()
 
     if save is not None:
-        fig.savefig(save, bbox_inches='tight')
+        fig.savefig(save, bbox_inches="tight")
 
     if plot is not False:
         plt.show()
@@ -212,11 +225,13 @@ def plot_topic_qc(topic_qc_metrics: Union[pd.DataFrame, 'CistopicObject'],
             return fig
 
 
-def topic_annotation(cistopic_obj: 'CistopicObject',
-                     annot_var: str,
-                     binarized_cell_topic: Optional[Dict[str, pd.DataFrame]] = None,
-                     general_topic_thr: Optional[float] = 0.2,
-                     **kwargs):
+def topic_annotation(
+    cistopic_obj: "CistopicObject",
+    annot_var: str,
+    binarized_cell_topic: Optional[Dict[str, pd.DataFrame]] = None,
+    general_topic_thr: Optional[float] = 0.2,
+    **kwargs
+):
     """
     Automatic annotation of topics.
 
@@ -246,8 +261,7 @@ def topic_annotation(cistopic_obj: 'CistopicObject',
     cell_topic = model.cell_topic
     annot = cistopic_obj.cell_data[annot_var]
     if binarized_cell_topic is None:
-        binarized_cell_topic = binarize_topics(
-            cistopic_obj, target='cell', **kwargs)
+        binarized_cell_topic = binarize_topics(cistopic_obj, target="cell", **kwargs)
 
     topic_annot_dict = {topic: [] for topic in cell_topic.index.tolist()}
     group_size_dict = {topic: [] for topic in cell_topic.index.tolist()}
@@ -257,27 +271,39 @@ def topic_annotation(cistopic_obj: 'CistopicObject',
         for topic in cell_topic.index.tolist():
             count = len(
                 list(
-                    set(cells_in_group) & set(
-                        binarized_cell_topic[topic].index.tolist())))
+                    set(cells_in_group)
+                    & set(binarized_cell_topic[topic].index.tolist())
+                )
+            )
             value = binarized_cell_topic[topic].shape[0] / cell_topic.shape[1]
             stat, pval = proportion.proportions_ztest(
-                count, nobs, value=value, alternative='larger')
+                count, nobs, value=value, alternative="larger"
+            )
             if pval < 0.05:
                 topic_annot_dict[topic].append(group)
                 group_size_dict[topic].append(nobs)
 
     topic_annot_dict = {
-        x: ', '.join(
-            topic_annot_dict[x]) for x in topic_annot_dict.keys()}
-    topic_annot = pd.DataFrame([list(topic_annot_dict.values()),
-                                [binarized_cell_topic[topic].shape[0] / cell_topic.shape[1]
-                                 for topic in cell_topic.index.tolist()],
-                                [sum(group_size_dict[topic]) / cell_topic.shape[1]
-                                 for topic in cell_topic.index.tolist()]],
-                               index=[annot_var, 'Ratio_cells_in_topic', 'Ratio_group_in_population']).T
+        x: ", ".join(topic_annot_dict[x]) for x in topic_annot_dict.keys()
+    }
+    topic_annot = pd.DataFrame(
+        [
+            list(topic_annot_dict.values()),
+            [
+                binarized_cell_topic[topic].shape[0] / cell_topic.shape[1]
+                for topic in cell_topic.index.tolist()
+            ],
+            [
+                sum(group_size_dict[topic]) / cell_topic.shape[1]
+                for topic in cell_topic.index.tolist()
+            ],
+        ],
+        index=[annot_var, "Ratio_cells_in_topic", "Ratio_group_in_population"],
+    ).T
     topic_annot.index = list(topic_annot_dict.keys())
-    topic_annot['is_general'] = (topic_annot['Ratio_cells_in_topic'] - topic_annot['Ratio_group_in_population']
-                                 ) > general_topic_thr
+    topic_annot["is_general"] = (
+        topic_annot["Ratio_cells_in_topic"] - topic_annot["Ratio_group_in_population"]
+    ) > general_topic_thr
     return topic_annot
 
 
