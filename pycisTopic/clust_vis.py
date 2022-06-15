@@ -1,7 +1,11 @@
+import logging
+import random
+import sys
+from typing import Dict, List, Optional, Tuple, Union
+
 import harmonypy as hm
 import igraph as ig
 import leidenalg as la
-import logging
 import matplotlib.backends.backend_pdf
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
@@ -9,35 +13,33 @@ import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import pandas as pd
-import random
 import seaborn as sns
 import sklearn
-import sys
 import umap
 from adjustText import adjust_text
-from sklearn.neighbors import kneighbors_graph
-from typing import Dict, List, Tuple
-from typing import Optional, Union
 from igraph import intersection
+from sklearn.neighbors import kneighbors_graph
 
 from .cistopic_class import *
 
 
-def find_clusters(cistopic_obj: 'CistopicObject',
-                  target: Optional[str] = 'cell',
-                  k: Optional[int] = 10,
-                  res: Optional[List[float]] = [0.6],
-                  seed: Optional[int] = 555,
-                  scale: Optional[bool] = False,
-                  prefix: Optional[str] = '',
-                  selected_topics: Optional[List[int]] = None,
-                  selected_features: Optional[List[str]] = None,
-                  harmony: Optional[bool] = False,
-                  rna_components: Optional[pd.DataFrame] = None,
-                  use_umap_integration: Optional[bool] = False,
-                  rna_weight: Optional[float] = 0.5,
-                  split_pattern:Optional[str] = '___',
-                  **kwargs):
+def find_clusters(
+    cistopic_obj: "CistopicObject",
+    target: Optional[str] = "cell",
+    k: Optional[int] = 10,
+    res: Optional[List[float]] = [0.6],
+    seed: Optional[int] = 555,
+    scale: Optional[bool] = False,
+    prefix: Optional[str] = "",
+    selected_topics: Optional[List[int]] = None,
+    selected_features: Optional[List[str]] = None,
+    harmony: Optional[bool] = False,
+    rna_components: Optional[pd.DataFrame] = None,
+    use_umap_integration: Optional[bool] = False,
+    rna_weight: Optional[float] = 0.5,
+    split_pattern: Optional[str] = "___",
+    **kwargs,
+):
     """
     Performing leiden cell or region clustering and add results to cisTopic object's metadata.
 
@@ -65,7 +67,7 @@ def find_clusters(cistopic_obj: 'CistopicObject',
     harmony: bool, optional
             If target is 'cell', whether to use harmony processed topic contributions. Default: False.
     rna_components: pd.DataFrame, optional
-            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna) 
+            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna)
             will be considered for clustering.
     use_umap_integration: bool, optional
             Whether to use a weighted UMAP representation for the clustering or directly integrating the two graphs. Default: True
@@ -75,42 +77,47 @@ def find_clusters(cistopic_obj: 'CistopicObject',
 
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     log.info(f"Finding neighbours")
     model = cistopic_obj.selected_model
 
-    if target == 'cell':
-        if (harmony):
+    if target == "cell":
+        if harmony:
             data_mat = model.cell_topic_harmony
         else:
             data_mat = model.cell_topic
 
         data_names = cistopic_obj.cell_names
 
-    if target == 'region':
+    if target == "region":
         data_mat = model.topic_region.T
         data_names = cistopic_obj.region_names
 
     if selected_topics is not None:
-        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics]]
+        data_mat = data_mat.loc[["Topic" + str(x) for x in selected_topics]]
     if selected_features is not None:
         data_mat = data_mat[selected_features]
         data_names = selected_features
 
     if scale:
-        data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
-            data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
+        data_mat = pd.DataFrame(
+            sklearn.preprocessing.StandardScaler().fit_transform(data_mat),
+            index=data_mat.index.to_list(),
+            columns=data_mat.columns,
+        )
     data_mat = data_mat.T
-    
+
     if rna_components is not None:
         atac_topics, rna_components, data_names = input_check(data_mat, rna_components)
     if use_umap_integration == True:
-        intersect, data_mat = weighted_integration(atac_topics, rna_components, data_names, rna_weight)
-    
+        intersect, data_mat = weighted_integration(
+            atac_topics, rna_components, data_names, rna_weight
+        )
+
     if rna_components is None or use_umap_integration == True:
         A = kneighbors_graph(data_mat, k)
         sources, targets = A.nonzero()
@@ -131,40 +138,36 @@ def find_clusters(cistopic_obj: 'CistopicObject',
         G2.add_vertices(A.shape[0])
         edges = list(zip(sources, targets))
         G2.add_edges(edges)
-        G = intersection([G1,G2], keep_all_vertices=False)
+        G = intersection([G1, G2], keep_all_vertices=False)
         log.info(f"Finding clusters")
-    for C in res :
+    for C in res:
         partition = la.find_partition(
-            G,
-            la.RBConfigurationVertexPartition,
-            resolution_parameter=C,
-            seed=seed)
+            G, la.RBConfigurationVertexPartition, resolution_parameter=C, seed=seed
+        )
         cluster = pd.DataFrame(
             partition.membership,
             index=data_names,
-            columns=[
-                prefix +
-                'leiden_' +
-                str(k) +
-                '_' +
-                str(C)]).astype(str)
-        if target == 'cell':
+            columns=[prefix + "leiden_" + str(k) + "_" + str(C)],
+        ).astype(str)
+        if target == "cell":
             cistopic_obj.add_cell_data(cluster, split_pattern=split_pattern)
-        if target == 'region':
+        if target == "region":
             cistopic_obj.add_region_data(cluster)
-                
 
-def run_umap(cistopic_obj: 'CistopicObject',
-             target: Optional[str] = 'cell',
-             scale: Optional[bool] = False,
-             reduction_name: Optional[str] = 'UMAP',
-             random_state: Optional[int] = 555,
-             selected_topics: Optional[List[int]] = None,
-             selected_features: Optional[List[str]] = None,
-             harmony: Optional[bool] = False,
-             rna_components: Optional[pd.DataFrame] = None,
-             rna_weight: Optional[float] = 0.5,
-             **kwargs):
+
+def run_umap(
+    cistopic_obj: "CistopicObject",
+    target: Optional[str] = "cell",
+    scale: Optional[bool] = False,
+    reduction_name: Optional[str] = "UMAP",
+    random_state: Optional[int] = 555,
+    selected_topics: Optional[List[int]] = None,
+    selected_features: Optional[List[str]] = None,
+    harmony: Optional[bool] = False,
+    rna_components: Optional[pd.DataFrame] = None,
+    rna_weight: Optional[float] = 0.5,
+    **kwargs,
+):
     """
     Run UMAP and add it to the dimensionality reduction dictionary.
 
@@ -188,7 +191,7 @@ def run_umap(cistopic_obj: 'CistopicObject',
     harmony: bool, optional
             If target is 'cell', whether to use harmony processed topic contributions. Default: False.
     rna_components: pd.DataFrame, optional
-            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna) 
+            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna)
             will be considered for clustering.
     rna_weight: float, optional
             Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
@@ -198,34 +201,37 @@ def run_umap(cistopic_obj: 'CistopicObject',
 
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     model = cistopic_obj.selected_model
 
-    if target == 'cell':
-        if (harmony):
+    if target == "cell":
+        if harmony:
             data_mat = model.cell_topic_harmony
         else:
             data_mat = model.cell_topic
 
         data_names = cistopic_obj.cell_names
 
-    if target == 'region':
+    if target == "region":
         data_mat = model.topic_region.T
         data_names = cistopic_obj.region_names
 
     if selected_topics is not None:
-        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics]]
+        data_mat = data_mat.loc[["Topic" + str(x) for x in selected_topics]]
     if selected_features is not None:
         data_mat = data_mat[selected_features]
         data_names = selected_features
 
     if scale:
-        data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
-            data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
+        data_mat = pd.DataFrame(
+            sklearn.preprocessing.StandardScaler().fit_transform(data_mat),
+            index=data_mat.index.to_list(),
+            columns=data_mat.columns,
+        )
 
     data_mat = data_mat.T
 
@@ -235,31 +241,30 @@ def run_umap(cistopic_obj: 'CistopicObject',
         embedding = reducer.fit_transform(data_mat)
     else:
         atac_topics, rna_components, data_names = input_check(data_mat, rna_components)
-        intersect, embedding = weighted_integration(atac_topics, rna_components, data_names, rna_weight, **kwargs)
-    dr = pd.DataFrame(
-        embedding,
-        index=data_names,
-        columns=[
-            'UMAP_1',
-            'UMAP_2'])
-    if target == 'cell':
-        cistopic_obj.projections['cell'][reduction_name] = dr
-    if target == 'region':
-        cistopic_obj.projections['region'][reduction_name] = dr
+        intersect, embedding = weighted_integration(
+            atac_topics, rna_components, data_names, rna_weight, **kwargs
+        )
+    dr = pd.DataFrame(embedding, index=data_names, columns=["UMAP_1", "UMAP_2"])
+    if target == "cell":
+        cistopic_obj.projections["cell"][reduction_name] = dr
+    if target == "region":
+        cistopic_obj.projections["region"][reduction_name] = dr
 
 
-def run_tsne(cistopic_obj: 'CistopicObject',
-             target: Optional[str] = 'cell',
-             scale: Optional[bool] = False,
-             reduction_name: Optional[str] = 'tSNE',
-             random_state: Optional[int] = 555,
-             perplexity: Optional[int] = 30,
-             selected_topics: Optional[List[int]] = None,
-             selected_features: Optional[List[str]] = None,
-             harmony: Optional[bool] = False,
-             rna_components: Optional[pd.DataFrame] = None,
-             rna_weight: Optional[float] = 0.5,
-             **kwargs):
+def run_tsne(
+    cistopic_obj: "CistopicObject",
+    target: Optional[str] = "cell",
+    scale: Optional[bool] = False,
+    reduction_name: Optional[str] = "tSNE",
+    random_state: Optional[int] = 555,
+    perplexity: Optional[int] = 30,
+    selected_topics: Optional[List[int]] = None,
+    selected_features: Optional[List[str]] = None,
+    harmony: Optional[bool] = False,
+    rna_components: Optional[pd.DataFrame] = None,
+    rna_weight: Optional[float] = 0.5,
+    **kwargs,
+):
     """
     Run tSNE and add it to the dimensionality reduction dictionary. If FItSNE is installed it will be used, otherwise sklearn TSNE implementation will be used.
 
@@ -285,7 +290,7 @@ def run_tsne(cistopic_obj: 'CistopicObject',
     harmony: bool, optional
             If target is 'cell', whether to use harmony processed topic contributions. Default: False
     rna_components: pd.DataFrame, optional
-            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna) 
+            A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna)
             will be considered for clustering.
     rna_weight: float, optional
             Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
@@ -298,84 +303,88 @@ def run_tsne(cistopic_obj: 'CistopicObject',
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     model = cistopic_obj.selected_model
 
-    if target == 'cell':
-        if (harmony):
+    if target == "cell":
+        if harmony:
             data_mat = model.cell_topic_harmony
         else:
             data_mat = model.cell_topic
 
         data_names = cistopic_obj.cell_names
 
-    if target == 'region':
+    if target == "region":
         data_mat = model.topic_region.T
         data_names = cistopic_obj.region_names
 
     if selected_topics is not None:
-        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics]]
+        data_mat = data_mat.loc[["Topic" + str(x) for x in selected_topics]]
     if selected_features is not None:
         data_mat = data_mat[selected_features]
         data_names = selected_features
 
     if scale:
-        data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
-            data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
+        data_mat = pd.DataFrame(
+            sklearn.preprocessing.StandardScaler().fit_transform(data_mat),
+            index=data_mat.index.to_list(),
+            columns=data_mat.columns,
+        )
 
     data_mat = data_mat.T
-    
+
     if rna_components is not None:
         atac_topics, rna_components, data_names = input_check(data_mat, rna_components)
-        intersect, data_mat = weighted_integration(atac_topics, rna_components, data_names, rna_weight)
-        
+        intersect, data_mat = weighted_integration(
+            atac_topics, rna_components, data_names, rna_weight
+        )
+
     try:
         import fitsne
+
         log.info(f"Running FItSNE")
         embedding = fitsne.FItSNE(
-            np.ascontiguousarray(
-                data_mat.to_numpy()),
+            np.ascontiguousarray(data_mat.to_numpy()),
             rand_seed=random_state,
-            perplexity=perplexity, **kwargs)
+            perplexity=perplexity,
+            **kwargs,
+        )
     except BaseException:
         log.info(f"Running TSNE")
         embedding = sklearn.manifold.TSNE(
-            n_components=2, random_state=random_state).fit_transform(
-            data_mat.to_numpy(), **kwargs)
-    dr = pd.DataFrame(
-        embedding,
-        index=data_names,
-        columns=[
-            'tSNE_1',
-            'tSNE_2'])
+            n_components=2, random_state=random_state
+        ).fit_transform(data_mat.to_numpy(), **kwargs)
+    dr = pd.DataFrame(embedding, index=data_names, columns=["tSNE_1", "tSNE_2"])
 
-    if target == 'cell':
-        cistopic_obj.projections['cell'][reduction_name] = dr
-    if target == 'region':
-        cistopic_obj.projections['region'][reduction_name] = dr
+    if target == "cell":
+        cistopic_obj.projections["cell"][reduction_name] = dr
+    if target == "region":
+        cistopic_obj.projections["region"][reduction_name] = dr
 
 
-def plot_metadata(cistopic_obj: 'CistopicObject',
-                  reduction_name: str,
-                  variables: List[str],
-                  target: Optional[str] = 'cell',
-                  remove_nan: Optional[bool] = True,
-                  show_label: Optional[bool] = True,
-                  show_legend: Optional[bool] = False,
-                  cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis,
-                  dot_size: Optional[int] = 10,
-                  text_size: Optional[int] = 10,
-                  alpha: Optional[Union[float, int]] = 1,
-                  seed: Optional[int] = 555,
-                  color_dictionary: Optional[Dict[str, str]] = {},
-                  figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-                  num_columns: Optional[int] = 1,
-                  selected_features: Optional[List[str]] = None,
-                  save: Optional[str] = None):
+def plot_metadata(
+    cistopic_obj: "CistopicObject",
+    reduction_name: str,
+    variables: List[str],
+    target: Optional[str] = "cell",
+    remove_nan: Optional[bool] = True,
+    show_label: Optional[bool] = True,
+    show_legend: Optional[bool] = False,
+    cmap: Optional[Union[str, "matplotlib.cm"]] = cm.viridis,
+    dot_size: Optional[int] = 10,
+    text_size: Optional[int] = 10,
+    alpha: Optional[Union[float, int]] = 1,
+    seed: Optional[int] = 555,
+    color_dictionary: Optional[Dict[str, str]] = {},
+    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
+    num_columns: Optional[int] = 1,
+    selected_features: Optional[List[str]] = None,
+    save: Optional[str] = None,
+):
     """
     Plot categorical and continuous metadata into dimensionality reduction.
 
@@ -420,9 +429,9 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
     save: str, optional
             Path to save plot. Default: None.
     """
-    if target == 'cell':
+    if target == "cell":
         data_mat = cistopic_obj.cell_data
-    if target == 'region':
+    if target == "region":
         data_mat = cistopic_obj.region_data
 
     embedding = cistopic_obj.projections[target][reduction_name]
@@ -449,24 +458,33 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
         if isinstance(var_data[0], str):
             if (remove_nan) & (data_mat[var].isnull().sum() > 0):
                 var_data = data_mat.copy().loc[:, var].dropna().to_list()
-                emb_nan = embedding.loc[data_mat.copy(
-                ).loc[:, var].dropna().index.tolist()]
+                emb_nan = embedding.loc[
+                    data_mat.copy().loc[:, var].dropna().index.tolist()
+                ]
                 label_pd = pd.concat(
-                    [emb_nan, data_mat.loc[:, [var]].dropna()], axis=1, sort=False)
+                    [emb_nan, data_mat.loc[:, [var]].dropna()], axis=1, sort=False
+                )
             else:
-                var_data = data_mat.copy().astype(
-                    str).fillna('NA').loc[:, var].to_list()
-                label_pd = pd.concat([embedding, data_mat.astype(
-                    str).fillna('NA').loc[:, [var]]], axis=1, sort=False)
+                var_data = (
+                    data_mat.copy().astype(str).fillna("NA").loc[:, var].to_list()
+                )
+                label_pd = pd.concat(
+                    [embedding, data_mat.astype(str).fillna("NA").loc[:, [var]]],
+                    axis=1,
+                    sort=False,
+                )
 
             categories = set(var_data)
             try:
                 color_dict = color_dictionary[var]
             except BaseException:
                 random.seed(seed)
-                color = list(map(
-                    lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF), range(len(categories))
-                ))
+                color = list(
+                    map(
+                        lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),
+                        range(len(categories)),
+                    )
+                )
                 color_dict = dict(zip(categories, color))
 
             if num_columns > 1:
@@ -474,19 +492,33 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
                 i = i + 1
 
             if (remove_nan) & (data_mat[var].isnull().sum() > 0):
-                plt.scatter(emb_nan.iloc[:, 0], emb_nan.iloc[:, 1], c=data_mat.loc[:, var].dropna(
-                ).apply(lambda x: color_dict[x]), s=dot_size, alpha=alpha)
+                plt.scatter(
+                    emb_nan.iloc[:, 0],
+                    emb_nan.iloc[:, 1],
+                    c=data_mat.loc[:, var].dropna().apply(lambda x: color_dict[x]),
+                    s=dot_size,
+                    alpha=alpha,
+                )
                 plt.xlabel(emb_nan.columns[0])
                 plt.ylabel(emb_nan.columns[1])
             else:
-                plt.scatter(embedding.iloc[:, 0], embedding.iloc[:, 1], c=data_mat.astype(str).fillna(
-                    'NA').loc[:, var].apply(lambda x: color_dict[x]), s=dot_size, alpha=alpha)
+                plt.scatter(
+                    embedding.iloc[:, 0],
+                    embedding.iloc[:, 1],
+                    c=data_mat.astype(str)
+                    .fillna("NA")
+                    .loc[:, var]
+                    .apply(lambda x: color_dict[x]),
+                    s=dot_size,
+                    alpha=alpha,
+                )
                 plt.xlabel(embedding.columns[0])
                 plt.ylabel(embedding.columns[1])
 
             if show_label:
                 label_pos = label_pd.groupby(var).agg(
-                    {label_pd.columns[0]: np.mean, label_pd.columns[1]: np.mean})
+                    {label_pd.columns[0]: np.mean, label_pd.columns[1]: np.mean}
+                )
                 texts = []
                 for label in label_pos.index.tolist():
                     texts.append(
@@ -494,15 +526,16 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
                             label_pos.loc[label][0],
                             label_pos.loc[label][1],
                             label,
-                            horizontalalignment='center',
-                            verticalalignment='center',
+                            horizontalalignment="center",
+                            verticalalignment="center",
                             size=text_size,
-                            weight='bold',
+                            weight="bold",
                             color=color_dict[label],
                             path_effects=[
-                                PathEffects.withStroke(
-                                    linewidth=3,
-                                    foreground='w')]))
+                                PathEffects.withStroke(linewidth=3, foreground="w")
+                            ],
+                        )
+                    )
                 adjust_text(texts)
 
             plt.title(var)
@@ -512,12 +545,12 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
                 patchList.append(data_key)
             if show_legend:
                 plt.legend(
-                    handles=patchList, bbox_to_anchor=(
-                        1.04, 1), loc="upper left")
+                    handles=patchList, bbox_to_anchor=(1.04, 1), loc="upper left"
+                )
 
             if num_columns == 1:
                 if save is not None:
-                    pdf.savefig(fig, bbox_inches='tight')
+                    pdf.savefig(fig, bbox_inches="tight")
                 plt.show()
         else:
             var_data = data_mat.copy().loc[:, var].to_list()
@@ -525,45 +558,53 @@ def plot_metadata(cistopic_obj: 'CistopicObject',
             if num_columns > 1:
                 plt.subplot(num_rows, num_columns, i)
                 i = i + 1
-            plt.scatter(embedding.iloc[o, 0], embedding.iloc[o, 1], c=subset_list(
-                var_data, o), cmap=cmap, s=dot_size, alpha=alpha)
+            plt.scatter(
+                embedding.iloc[o, 0],
+                embedding.iloc[o, 1],
+                c=subset_list(var_data, o),
+                cmap=cmap,
+                s=dot_size,
+                alpha=alpha,
+            )
             plt.xlabel(embedding.columns[0])
             plt.ylabel(embedding.columns[1])
             plt.title(var)
             # setup the colorbar
             normalize = mcolors.Normalize(
-                vmin=np.array(var_data).min(),
-                vmax=np.array(var_data).max())
+                vmin=np.array(var_data).min(), vmax=np.array(var_data).max()
+            )
             scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=cmap)
             scalarmappaple.set_array(var_data)
             plt.colorbar(scalarmappaple)
             if num_columns == 1:
                 if save is not None:
-                    pdf.savefig(fig, bbox_inches='tight')
+                    pdf.savefig(fig, bbox_inches="tight")
                 plt.show()
 
     if num_columns > 1:
         plt.tight_layout()
         if save is not None:
-            fig.savefig(save, bbox_inches='tight')
+            fig.savefig(save, bbox_inches="tight")
         plt.show()
     if (save is not None) & (num_columns == 1):
         pdf = pdf.close()
 
 
-def plot_topic(cistopic_obj: 'CistopicObject',
-               reduction_name: str,
-               target: Optional[str] = 'cell',
-               cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis,
-               dot_size: Optional[int] = 10,
-               alpha: Optional[Union[float, int]] = 1,
-               scale: Optional[bool] = False,
-               selected_topics: Optional[List[int]] = None,
-               selected_features: Optional[List[str]] = None,
-               harmony: Optional[bool] = False,
-               figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-               num_columns: Optional[int] = 1,
-               save: Optional[str] = None):
+def plot_topic(
+    cistopic_obj: "CistopicObject",
+    reduction_name: str,
+    target: Optional[str] = "cell",
+    cmap: Optional[Union[str, "matplotlib.cm"]] = cm.viridis,
+    dot_size: Optional[int] = 10,
+    alpha: Optional[Union[float, int]] = 1,
+    scale: Optional[bool] = False,
+    selected_topics: Optional[List[int]] = None,
+    selected_features: Optional[List[str]] = None,
+    harmony: Optional[bool] = False,
+    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
+    num_columns: Optional[int] = 1,
+    save: Optional[str] = None,
+):
     """
     Plot topic distributions into dimensionality reduction.
 
@@ -602,13 +643,13 @@ def plot_topic(cistopic_obj: 'CistopicObject',
     embedding = cistopic_obj.projections[target][reduction_name]
     model = cistopic_obj.selected_model
 
-    if target == 'cell':
+    if target == "cell":
         if harmony:
             data_mat = model.cell_topic_harmony
-            prefix = 'harmony_'
+            prefix = "harmony_"
         else:
             data_mat = model.cell_topic
-    elif target == 'region':
+    elif target == "region":
         data_mat = model.topic_region.T
 
     if selected_features is not None:
@@ -618,17 +659,22 @@ def plot_topic(cistopic_obj: 'CistopicObject',
     data_mat = data_mat.loc[:, embedding.index.to_list()]
 
     if selected_topics is not None:
-        data_mat = data_mat.loc[['Topic' + str(x) for x in selected_topics], ]
+        data_mat = data_mat.loc[
+            ["Topic" + str(x) for x in selected_topics],
+        ]
 
     if scale:
-        data_mat = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
-            data_mat), index=data_mat.index.to_list(), columns=data_mat.columns)
+        data_mat = pd.DataFrame(
+            sklearn.preprocessing.StandardScaler().fit_transform(data_mat),
+            index=data_mat.index.to_list(),
+            columns=data_mat.columns,
+        )
     data_mat = data_mat.T
 
     if selected_topics is None:
         topic = data_mat.columns.to_list()
     else:
-        topic = ['Topic' + str(t) for t in selected_topics]
+        topic = ["Topic" + str(t) for t in selected_topics]
 
     if (save is not None) & (num_columns == 1):
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
@@ -650,16 +696,29 @@ def plot_topic(cistopic_obj: 'CistopicObject',
             plt.subplot(num_rows, num_columns, i)
             i = i + 1
         if not scale:
-            plt.scatter(embedding_plot.iloc[o, 0], embedding_plot.iloc[o, 1], c=subset_list(
-                var_data, o), cmap=cmap, s=dot_size, alpha=alpha, vmin=0, vmax=max(var_data))
-            normalize = mcolors.Normalize(
-                vmin=0, vmax=np.array(var_data).max())
+            plt.scatter(
+                embedding_plot.iloc[o, 0],
+                embedding_plot.iloc[o, 1],
+                c=subset_list(var_data, o),
+                cmap=cmap,
+                s=dot_size,
+                alpha=alpha,
+                vmin=0,
+                vmax=max(var_data),
+            )
+            normalize = mcolors.Normalize(vmin=0, vmax=np.array(var_data).max())
         else:
-            plt.scatter(embedding_plot.iloc[o, 0], embedding_plot.iloc[o, 1], c=subset_list(
-                var_data, o), cmap=cmap, s=dot_size, alpha=alpha)
+            plt.scatter(
+                embedding_plot.iloc[o, 0],
+                embedding_plot.iloc[o, 1],
+                c=subset_list(var_data, o),
+                cmap=cmap,
+                s=dot_size,
+                alpha=alpha,
+            )
             normalize = mcolors.Normalize(
-                vmin=np.array(var_data).min(),
-                vmax=np.array(var_data).max())
+                vmin=np.array(var_data).min(), vmax=np.array(var_data).max()
+            )
         plt.xlabel(embedding_plot.columns[0])
         plt.ylabel(embedding_plot.columns[1])
         plt.title(var)
@@ -669,31 +728,33 @@ def plot_topic(cistopic_obj: 'CistopicObject',
         plt.colorbar(scalarmappaple)
         if num_columns == 1:
             if save is not None:
-                pdf.savefig(fig, bbox_inches='tight')
+                pdf.savefig(fig, bbox_inches="tight")
             plt.show()
 
     if num_columns > 1:
         plt.tight_layout()
         if save is not None:
-            fig.savefig(save, bbox_inches='tight')
+            fig.savefig(save, bbox_inches="tight")
         plt.show()
 
     if (save is not None) & (num_columns == 1):
         pdf.close()
 
 
-def plot_imputed_features(cistopic_obj: 'CistopicObject',
-                          reduction_name: str,
-                          imputed_data: 'cisTopicImputedFeatures',
-                          features: List[str],
-                          scale: Optional[bool] = False,
-                          cmap: Optional[Union[str, 'matplotlib.cm']] = cm.viridis,
-                          dot_size: Optional[int] = 10,
-                          alpha: Optional[Union[float, int]] = 1,
-                          selected_cells: Optional[List[str]] = None,
-                          figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-                          num_columns: Optional[int] = 1,
-                          save: Optional[str] = None):
+def plot_imputed_features(
+    cistopic_obj: "CistopicObject",
+    reduction_name: str,
+    imputed_data: "cisTopicImputedFeatures",
+    features: List[str],
+    scale: Optional[bool] = False,
+    cmap: Optional[Union[str, "matplotlib.cm"]] = cm.viridis,
+    dot_size: Optional[int] = 10,
+    alpha: Optional[Union[float, int]] = 1,
+    selected_cells: Optional[List[str]] = None,
+    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
+    num_columns: Optional[int] = 1,
+    save: Optional[str] = None,
+):
     """
     Plot imputed features into dimensionality reduction.
 
@@ -738,25 +799,27 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
     fig = plt.figure(figsize=figsize)
 
     for feature in features:
-        embedding = cistopic_obj.projections['cell'][reduction_name]
+        embedding = cistopic_obj.projections["cell"][reduction_name]
         if selected_cells is not None:
             embedding = embedding.loc[selected_cells]
-        feature_data = imputed_data.subset(cells=embedding.index.tolist(), features=[feature], copy=True).mtx
+        feature_data = imputed_data.subset(
+            cells=embedding.index.tolist(), features=[feature], copy=True
+        ).mtx
         if scale:
             try:
                 feature_data = sklearn.preprocessing.scale(
-                    feature_data.todense(), axis=1)
+                    feature_data.todense(), axis=1
+                )
             except BaseException:
-                feature_data = sklearn.preprocessing.scale(
-                    feature_data, axis=1)
+                feature_data = sklearn.preprocessing.scale(feature_data, axis=1)
         if isinstance(feature_data, sparse.csr_matrix):
             color_data = pd.DataFrame(
-                feature_data.transpose().todense(),
-                index=embedding.index.tolist())
+                feature_data.transpose().todense(), index=embedding.index.tolist()
+            )
         else:
             color_data = pd.DataFrame(
-                feature_data.transpose(),
-                index=embedding.index.tolist())
+                feature_data.transpose(), index=embedding.index.tolist()
+            )
         color_data = color_data.sort_values(by=0)
         embedding = embedding.loc[color_data.index.tolist()]
         var_data = color_data.iloc[:, 0].to_list()
@@ -764,48 +827,55 @@ def plot_imputed_features(cistopic_obj: 'CistopicObject',
         if num_columns > 1:
             plt.subplot(num_rows, num_columns, i)
             i = i + 1
-        plt.scatter(embedding.iloc[:, 0], embedding.iloc[:, 1], c=subset_list(
-            var_data, o), s=dot_size, alpha=alpha)
+        plt.scatter(
+            embedding.iloc[:, 0],
+            embedding.iloc[:, 1],
+            c=subset_list(var_data, o),
+            s=dot_size,
+            alpha=alpha,
+        )
         plt.xlabel(embedding.columns[0])
         plt.ylabel(embedding.columns[1])
         plt.title(feature)
         # setup the colorbar
         normalize = mcolors.Normalize(
-            vmin=np.array(color_data).min(),
-            vmax=np.array(color_data).max())
+            vmin=np.array(color_data).min(), vmax=np.array(color_data).max()
+        )
         scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=cmap)
         scalarmappaple.set_array(color_data)
         plt.colorbar(scalarmappaple)
         if num_columns == 1:
             if save is not None:
-                pdf.savefig(fig, bbox_inches='tight')
+                pdf.savefig(fig, bbox_inches="tight")
             plt.show()
 
     if num_columns > 1:
         plt.tight_layout()
         if save is not None:
-            fig.savefig(save, bbox_inches='tight')
+            fig.savefig(save, bbox_inches="tight")
         plt.show()
 
     if (save is not None) & (num_columns == 1):
         pdf = pdf.close()
 
 
-def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
-                       variables: Optional[List[str]] = None,
-                       remove_nan: Optional[bool] = True,
-                       scale: Optional[bool] = False,
-                       cluster_topics: Optional[bool] = False,
-                       color_dictionary: Optional[Dict[str, Dict[str, str]]] = {},
-                       seed: Optional[int] = 555,
-                       legend_loc_x: Optional[float] = 1.2,
-                       legend_loc_y: Optional[float] = -0.5,
-                       legend_dist_y: Optional[float] = -1,
-                       figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-                       selected_topics: Optional[List[int]] = None,
-                       selected_cells: Optional[List[str]] = None,
-                       harmony: Optional[bool] = False,
-                       save: Optional[str] = None):
+def cell_topic_heatmap(
+    cistopic_obj: "CistopicObject",
+    variables: Optional[List[str]] = None,
+    remove_nan: Optional[bool] = True,
+    scale: Optional[bool] = False,
+    cluster_topics: Optional[bool] = False,
+    color_dictionary: Optional[Dict[str, Dict[str, str]]] = {},
+    seed: Optional[int] = 555,
+    legend_loc_x: Optional[float] = 1.2,
+    legend_loc_y: Optional[float] = -0.5,
+    legend_dist_y: Optional[float] = -1,
+    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
+    selected_topics: Optional[List[int]] = None,
+    selected_cells: Optional[List[str]] = None,
+    harmony: Optional[bool] = False,
+    save: Optional[str] = None,
+):
     """
     Plot heatmap with cell-topic distributions.
 
@@ -854,14 +924,19 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
     cell_data = cistopic_obj.cell_data
 
     if selected_topics is not None:
-        cell_topic = cell_topic.loc[['Topic' + str(x) for x in selected_topics], ]
+        cell_topic = cell_topic.loc[
+            ["Topic" + str(x) for x in selected_topics],
+        ]
     if selected_cells is not None:
         cell_topic = cell_topic.loc[:, selected_cells]
         cell_data = cell_data.loc[selected_cells]
 
     if scale:
-        cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
-            cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
+        cell_topic = pd.DataFrame(
+            sklearn.preprocessing.StandardScaler().fit_transform(cell_topic),
+            index=cell_topic.index.to_list(),
+            columns=cell_topic.columns,
+        )
 
     if (remove_nan) & (sum(cell_data[variables].isnull().sum()) > 0):
         cell_data = cell_data[variables].dropna()
@@ -885,22 +960,28 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
                 color_dict = color_dictionary[var]
             except BaseException:
                 random.seed(seed)
-                color = list(map(
-                    lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF), range(len(categories))
-                ))
+                color = list(
+                    map(
+                        lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),
+                        range(len(categories)),
+                    )
+                )
                 color = [mcolors.to_rgb(x) for x in color]
                 color_dict = dict(zip(categories, color))
             col_colors[var] = var_data.map(color_dict)
-        col_colors = pd.concat([col_colors[var]
-                                for var in variables], axis=1, sort=False)
+        col_colors = pd.concat(
+            [col_colors[var] for var in variables], axis=1, sort=False
+        )
 
-        g = sns.clustermap(cell_topic,
-                           row_cluster=cluster_topics,
-                           col_cluster=False,
-                           col_colors=col_colors,
-                           cmap=cm.viridis,
-                           xticklabels=False,
-                           figsize=figsize)
+        g = sns.clustermap(
+            cell_topic,
+            row_cluster=cluster_topics,
+            col_cluster=False,
+            col_colors=col_colors,
+            cmap=cm.viridis,
+            xticklabels=False,
+            figsize=figsize,
+        )
 
         cbar = g.cax
         cbar.set_position([legend_loc_x, 0.55, 0.05, 0.2])
@@ -912,35 +993,39 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
             patchList = []
             for subkey in color_dictionary[key]:
                 data_key = mpatches.Patch(
-                    color=color_dictionary[key][subkey], label=subkey)
+                    color=color_dictionary[key][subkey], label=subkey
+                )
                 patchList.append(data_key)
             legend = plt.legend(
                 handles=patchList,
-                bbox_to_anchor=(
-                    legend_loc_x,
-                    pos),
+                bbox_to_anchor=(legend_loc_x, pos),
                 loc="center",
-                title=key)
+                title=key,
+            )
             ax = plt.gca().add_artist(legend)
             pos += legend_dist_y
     else:
-        g = sns.clustermap(cell_topic,
-                           row_cluster=cluster_topics,
-                           col_cluster=True,
-                           cmap=cm.viridis,
-                           xticklabels=False,
-                           figsize=figsize)
+        g = sns.clustermap(
+            cell_topic,
+            row_cluster=cluster_topics,
+            col_cluster=True,
+            cmap=cm.viridis,
+            xticklabels=False,
+            figsize=figsize,
+        )
 
     if save is not None:
-        g.savefig(save, bbox_inches='tight')
+        g.savefig(save, bbox_inches="tight")
     plt.show()
 
 
-def harmony(cistopic_obj: 'CistopicObject',
-            vars_use: List[str],
-            scale: Optional[bool] = True,
-            random_state: Optional[int] = 555,
-            **kwargs):
+def harmony(
+    cistopic_obj: "CistopicObject",
+    vars_use: List[str],
+    scale: Optional[bool] = True,
+    random_state: Optional[int] = 555,
+    **kwargs,
+):
     """
     Apply harmony batch effect correction (Korsunsky et al, 2019) over cell-topic distribution
 
@@ -965,24 +1050,25 @@ def harmony(cistopic_obj: 'CistopicObject',
     model = cistopic_obj.selected_model
     cell_topic = model.cell_topic
     if scale:
-        cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
-            cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
+        cell_topic = pd.DataFrame(
+            sklearn.preprocessing.StandardScaler().fit_transform(cell_topic),
+            index=cell_topic.index.to_list(),
+            columns=cell_topic.columns,
+        )
     cell_topic = cell_topic.transpose().to_numpy()
     ho = hm.run_harmony(
-        cell_topic,
-        cell_data,
-        vars_use,
-        random_state=random_state,
-        **kwargs)
+        cell_topic, cell_data, vars_use, random_state=random_state, **kwargs
+    )
     cell_topic_harmony = pd.DataFrame(
         ho.Z_corr,
         index=model.cell_topic.index.to_list(),
-        columns=model.cell_topic.columns)
+        columns=model.cell_topic.columns,
+    )
     cistopic_obj.selected_model.cell_topic_harmony = cell_topic_harmony
-    
+
+
 # Helper functions for integration
-def input_check(atac_topics: pd.DataFrame,
-               rna_pca: pd.DataFrame):
+def input_check(atac_topics: pd.DataFrame, rna_pca: pd.DataFrame):
     """
     A function to select cells present in both the RNA and the ATAC layers
     """
@@ -994,31 +1080,43 @@ def input_check(atac_topics: pd.DataFrame,
     atac_topics = atac_topics.loc[common_cells]
     rna_pca = rna_pca.loc[common_cells]
     return atac_topics, rna_pca, common_cells
-    
-def weighted_integration(atac_topics: pd.DataFrame,
-                 rna_pca: pd.DataFrame,
-                 common_cells: List[str],
-                 weight = 0.5,
-                 **kwargs):
+
+
+def weighted_integration(
+    atac_topics: pd.DataFrame,
+    rna_pca: pd.DataFrame,
+    common_cells: List[str],
+    weight=0.5,
+    **kwargs,
+):
     """
     A function for weighted integration via UMAP
     """
     # Fit
     fit1 = umap.UMAP(random_state=123, **kwargs).fit(atac_topics)
     fit2 = umap.UMAP(random_state=123, **kwargs).fit(rna_pca)
-    # Intersection 
-    intersection = umap.umap_.general_simplicial_set_intersection(fit1.graph_, 
-                                                               fit2.graph_, 
-                                                               weight = weight)
+    # Intersection
+    intersection = umap.umap_.general_simplicial_set_intersection(
+        fit1.graph_, fit2.graph_, weight=weight
+    )
     # Embedding
     intersection = umap.umap_.reset_local_connectivity(intersection)
-    weighted_comp = umap.umap_.simplicial_set_embedding(fit1._raw_data, intersection, 
-                                                fit1.n_components, 
-                                                fit1.learning_rate, 
-                                                fit1._a, fit1._b, 
-                                                fit1.repulsion_strength, 
-                                                fit1.negative_sample_rate, 
-                                                1000, 'random', np.random.RandomState(123), 
-                                                fit1.metric, 
-                                                fit1._metric_kwds, False, {}, False)
+    weighted_comp = umap.umap_.simplicial_set_embedding(
+        fit1._raw_data,
+        intersection,
+        fit1.n_components,
+        fit1.learning_rate,
+        fit1._a,
+        fit1._b,
+        fit1.repulsion_strength,
+        fit1.negative_sample_rate,
+        1000,
+        "random",
+        np.random.RandomState(123),
+        fit1.metric,
+        fit1._metric_kwds,
+        False,
+        {},
+        False,
+    )
     return intersection, weighted_comp[0]
