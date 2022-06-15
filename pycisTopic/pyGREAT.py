@@ -1,36 +1,40 @@
-from bs4 import BeautifulSoup
 import os
-import pandas as pd
-import pyranges as pr
 import random
-import ray
-import requests
 import sys
 import tempfile
 from typing import Dict
 
+import pandas as pd
+import pyranges as pr
+import ray
+import requests
+from bs4 import BeautifulSoup
+
 from .utils import coord_to_region_names, region_names_to_coordinates
 
 # Set stderr to null when using ray.init to avoid ray printing Broken pipe million times
-_stderr = sys.stderr                                                         
-null = open(os.devnull,'wb') 
+_stderr = sys.stderr
+null = open(os.devnull, "wb")
 
-def pyGREAT(region_sets: Dict[str,pr.PyRanges],
-           species: str,
-           rule: str = 'basalPlusExt',
-           span: float = 1000.0,
-           upstream: float = 5.0,
-           downstream: float = 1.0,
-           two_distance: float = 1000.0,
-           one_distance: float = 1000.0,
-           include_curated_reg_doms: int = 1,
-           bg_choice: str = 'wholeGenome',
-           tmp_dir: str = None,
-           n_cpu: int = 1,
-           **kwargs):
+
+def pyGREAT(
+    region_sets: Dict[str, pr.PyRanges],
+    species: str,
+    rule: str = "basalPlusExt",
+    span: float = 1000.0,
+    upstream: float = 5.0,
+    downstream: float = 1.0,
+    two_distance: float = 1000.0,
+    one_distance: float = 1000.0,
+    include_curated_reg_doms: int = 1,
+    bg_choice: str = "wholeGenome",
+    tmp_dir: str = None,
+    n_cpu: int = 1,
+    **kwargs
+):
     """
     Running GREAT (McLean et al., 2010) on a dictionary of pyranges. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/
-    
+
     Parameters
     ----------
     region_sets: Dict
@@ -59,62 +63,80 @@ def pyGREAT(region_sets: Dict[str,pr.PyRanges],
         Number of cores to use. Default: 1
     ***kwargs
         Other parameters to pass to ray.init
-    
+
     Return
     ------
     Dictionary with pyGREAT results
-    
+
     References
     ----------
-    McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of 
+    McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of
     cis-regulatory regions. Nature biotechnology, 28(5), 495-501.
     """
     if n_cpu > 1:
         ray.init(num_cpus=n_cpu, **kwargs)
         sys.stderr = null
-        pyGREAT_dict = ray.get([pyGREAT_oneset_ray.remote(region_sets[key],
-                                species,
-                                rule,
-                                span,
-                                upstream,
-                                downstream,
-                                two_distance,
-                                one_distance,
-                                include_curated_reg_doms,
-                                bg_choice,
-                                tmp_dir) for key in region_sets.keys()])
+        pyGREAT_dict = ray.get(
+            [
+                pyGREAT_oneset_ray.remote(
+                    region_sets[key],
+                    species,
+                    rule,
+                    span,
+                    upstream,
+                    downstream,
+                    two_distance,
+                    one_distance,
+                    include_curated_reg_doms,
+                    bg_choice,
+                    tmp_dir,
+                )
+                for key in region_sets.keys()
+            ]
+        )
         ray.shutdown()
         sys.stderr = sys.__stderr__
-        pyGREAT_dict = {key: pyGREAT_result for key, pyGREAT_result in zip(list(region_sets.keys()), pyGREAT_dict)}
+        pyGREAT_dict = {
+            key: pyGREAT_result
+            for key, pyGREAT_result in zip(list(region_sets.keys()), pyGREAT_dict)
+        }
     else:
-        pyGREAT_dict = {key: pyGREAT_oneset(region_sets[key],
-                                species,
-                                rule,
-                                span,
-                                upstream,
-                                downstream,
-                                two_distance,
-                                one_distance,
-                                include_curated_reg_doms,
-                                bg_choice,
-                                tmp_dir) for key in region_sets.keys()}
+        pyGREAT_dict = {
+            key: pyGREAT_oneset(
+                region_sets[key],
+                species,
+                rule,
+                span,
+                upstream,
+                downstream,
+                two_distance,
+                one_distance,
+                include_curated_reg_doms,
+                bg_choice,
+                tmp_dir,
+            )
+            for key in region_sets.keys()
+        }
     return pyGREAT_dict
 
+
 @ray.remote
-def pyGREAT_oneset_ray(region_set: pr.PyRanges,
-           species: str,
-           rule: str = 'basalPlusExt',
-           span: float = 1000.0,
-           upstream: float = 5.0,
-           downstream: float = 1.0,
-           two_distance: float = 1000.0,
-           one_distance: float = 1000.0,
-           include_curated_reg_doms: int = 1,
-           bg_choice: str = 'wholeGenome',
-           tmp_dir: str = None):
+def pyGREAT_oneset_ray(
+    region_set: pr.PyRanges,
+    species: str,
+    rule: str = "basalPlusExt",
+    span: float = 1000.0,
+    upstream: float = 5.0,
+    downstream: float = 1.0,
+    two_distance: float = 1000.0,
+    one_distance: float = 1000.0,
+    include_curated_reg_doms: int = 1,
+    bg_choice: str = "wholeGenome",
+    tmp_dir: str = None,
+):
     """
     Running GREAT (McLean et al., 2010) on a set of pyranges. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/
-    
+
     Parameters
     ----------
     region_sets: Dict
@@ -139,42 +161,47 @@ def pyGREAT_oneset_ray(region_set: pr.PyRanges,
         A path to the background file or a string. Default: 'wholeGenome'
     tmp_dir: str
         Temporary directory to save region sets as bed files for GREAT. Default: None
-    
+
     Return
     ------
     Dictionary with pyGREAT results
-        
+
     References
     ----------
-    McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of 
+    McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of
     cis-regulatory regions. Nature biotechnology, 28(5), 495-501.
     """
-    return pyGREAT_oneset(region_set,
-                                species,
-                                rule,
-                                span,
-                                upstream,
-                                downstream,
-                                two_distance,
-                                one_distance,
-                                include_curated_reg_doms,
-                                bg_choice,
-                                tmp_dir)
+    return pyGREAT_oneset(
+        region_set,
+        species,
+        rule,
+        span,
+        upstream,
+        downstream,
+        two_distance,
+        one_distance,
+        include_curated_reg_doms,
+        bg_choice,
+        tmp_dir,
+    )
 
-def pyGREAT_oneset(region_set: pr.PyRanges,
-           species: str,
-           rule: str = 'basalPlusExt',
-           span: float = 1000.0,
-           upstream: float = 5.0,
-           downstream: float = 1.0,
-           two_distance: float = 1000.0,
-           one_distance: float = 1000.0,
-           include_curated_reg_doms: int = 1,
-           bg_choice: str = 'wholeGenome',
-           tmp_dir: str = None):
+
+def pyGREAT_oneset(
+    region_set: pr.PyRanges,
+    species: str,
+    rule: str = "basalPlusExt",
+    span: float = 1000.0,
+    upstream: float = 5.0,
+    downstream: float = 1.0,
+    two_distance: float = 1000.0,
+    one_distance: float = 1000.0,
+    include_curated_reg_doms: int = 1,
+    bg_choice: str = "wholeGenome",
+    tmp_dir: str = None,
+):
     """
     Running GREAT (McLean et al., 2010) on a pyranges object. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/
-    
+
     Parameters
     ----------
     region_sets: Dict
@@ -203,78 +230,89 @@ def pyGREAT_oneset(region_set: pr.PyRanges,
         Number of cores to use. Default: 1
     ***kwargs
         Other parameters to pass to ray.init
-        
+
     Return
     ------
     Dictionary with pyGREAT results
-        
+
     References
     ----------
-    McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of 
+    McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of
     cis-regulatory regions. Nature biotechnology, 28(5), 495-501.
     """
 
     # Params
     region_set.Name = coord_to_region_names(region_set)
     if tmp_dir is None:
-        tmp_dir = os.path.join(tempfile.gettempdir()) + '/'
-    random_label = hex(random.randint(0, 0xffffff))[2:] + '_'
-    bed_file = os.path.join(tmp_dir, random_label + 'great.bed')
-    region_set.df.to_csv(bed_file, sep='\t', index=False, header=False)
+        tmp_dir = os.path.join(tempfile.gettempdir()) + "/"
+    random_label = hex(random.randint(0, 0xFFFFFF))[2:] + "_"
+    bed_file = os.path.join(tmp_dir, random_label + "great.bed")
+    region_set.df.to_csv(bed_file, sep="\t", index=False, header=False)
 
     # GREAT job
-    url = 'http://great.stanford.edu/public/cgi-bin/greatWeb.php'
-    params = {'species': species, 
-          'rule': rule,
-          'span': span,
-          'upstream': upstream,
-          'downstream': downstream,
-          'twoDistance': two_distance,
-          'oneDistance': one_distance,
-          'includeCuratedRegDoms': include_curated_reg_doms,
-          'bgChoice': bg_choice,
-          'fgChoice': 'file',
-        }
+    url = "http://great.stanford.edu/public/cgi-bin/greatWeb.php"
+    params = {
+        "species": species,
+        "rule": rule,
+        "span": span,
+        "upstream": upstream,
+        "downstream": downstream,
+        "twoDistance": two_distance,
+        "oneDistance": one_distance,
+        "includeCuratedRegDoms": include_curated_reg_doms,
+        "bgChoice": bg_choice,
+        "fgChoice": "file",
+    }
 
-    files = {'fgFile': open(bed_file, 'r')}
+    files = {"fgFile": open(bed_file, "r")}
     # Launch job
     r = requests.post(url, data=params, files=files)
     # Get results
     if r.status_code:
-        soup = BeautifulSoup(r.text, 'lxml')
-        jobId = soup.find('div', attrs={'class': 'job_desc_info'}).text
+        soup = BeautifulSoup(r.text, "lxml")
+        jobId = soup.find("div", attrs={"class": "job_desc_info"}).text
 
-        downloadUrl = 'http://great.stanford.edu/public/cgi-bin/downloadAllTSV.php'
+        downloadUrl = "http://great.stanford.edu/public/cgi-bin/downloadAllTSV.php"
 
-        params = { 'outputDir': '/scratch/great/tmp/results/'+ jobId + '.d/', 
-              'outputPath': '/tmp/results/' + jobId + '.d/',
-              'species': species,   
-              'ontoName': '',
-              'ontoList': 'GOMolecularFunction@1-Inf,GOBiologicalProcess@1-Inf,GOCellularComponent@1-Inf,MGIPhenotype@1-Inf,HumanPhenotypeOntology@1-Inf',
-        
-            }
+        params = {
+            "outputDir": "/scratch/great/tmp/results/" + jobId + ".d/",
+            "outputPath": "/tmp/results/" + jobId + ".d/",
+            "species": species,
+            "ontoName": "",
+            "ontoList": "GOMolecularFunction@1-Inf,GOBiologicalProcess@1-Inf,GOCellularComponent@1-Inf,MGIPhenotype@1-Inf,HumanPhenotypeOntology@1-Inf",
+        }
 
         r2 = requests.post(downloadUrl, data=params)
-        results = r2.text.split('\n')
-        results = [x.split('\t') for x in results[3:]]
+        results = r2.text.split("\n")
+        results = [x.split("\t") for x in results[3:]]
         pd_results = pd.DataFrame(results)
-        pd_results = pd_results.rename(columns=pd_results.iloc[0]).drop(pd_results.index[0])
-        pd_results.rename(columns = {'# Ontology': 'Ontology'}, inplace = True)
-        pd_results = pd_results[~pd_results.iloc[:,0].str.contains("#")]
-        pd_results = pd_results[~pd_results.iloc[:,0].str.contains("Ensembl Genes")]
-        pd_results = pd_results[~pd_results.iloc[:,0].isin([""])]
-        ontologies = set(pd_results.iloc[:,0])
-        pygreat_dict = {key: pd_results[pd_results.iloc[:,0].isin([key])].reset_index().drop("index",axis=1) for key in ontologies}
+        pd_results = pd_results.rename(columns=pd_results.iloc[0]).drop(
+            pd_results.index[0]
+        )
+        pd_results.rename(columns={"# Ontology": "Ontology"}, inplace=True)
+        pd_results = pd_results[~pd_results.iloc[:, 0].str.contains("#")]
+        pd_results = pd_results[~pd_results.iloc[:, 0].str.contains("Ensembl Genes")]
+        pd_results = pd_results[~pd_results.iloc[:, 0].isin([""])]
+        ontologies = set(pd_results.iloc[:, 0])
+        pygreat_dict = {
+            key: pd_results[pd_results.iloc[:, 0].isin([key])]
+            .reset_index()
+            .drop("index", axis=1)
+            for key in ontologies
+        }
         os.remove(bed_file)
         return pygreat_dict
-    
-def get_region_signature(pyGREAT_results: Dict[str, pd.DataFrame],
-                        region_set_key: str,
-                        ontology: str,
-                        term: str):
+
+
+def get_region_signature(
+    pyGREAT_results: Dict[str, pd.DataFrame],
+    region_set_key: str,
+    ontology: str,
+    term: str,
+):
     """
     Retriving GO region signature from GREAT results
-    
+
     Parameters
     ----------
     pyGREAT_results: Dict
@@ -285,12 +323,14 @@ def get_region_signature(pyGREAT_results: Dict[str, pd.DataFrame],
         Ontology to query
     term: str
         Term to retrive regions from
-        
+
     Return
     ------
     Signature as pyranges
-    
+
     """
     data = pyGREAT_results[region_set_key][ontology]
-    regions = list(set(data.loc[data.iloc[:,2].isin([term]),'Regions'].tolist()[0].split(',')))
+    regions = list(
+        set(data.loc[data.iloc[:, 2].isin([term]), "Regions"].tolist()[0].split(","))
+    )
     return pr.PyRanges(region_names_to_coordinates(regions))

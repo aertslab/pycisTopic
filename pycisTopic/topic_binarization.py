@@ -1,26 +1,28 @@
 import logging
+import sys
+from typing import Dict, Optional, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pyscenic import binarization
-import sys
-
-from typing import Dict, Optional, Tuple
 
 from .cistopic_class import *
 
 
-def binarize_topics(cistopic_obj: 'CistopicObject',
-                    target: Optional[str] = 'region',
-                    method: Optional[str] = 'otsu',
-                    smooth_topics: Optional[bool] = True,
-                    ntop: Optional[int] = 2000,
-                    predefined_thr: Optional[Dict[str, float]] = {},
-                    nbins: Optional[int] = 100,
-                    plot: Optional[bool] = False,
-                    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-                    num_columns: Optional[int] = 1,
-                    save: Optional[str] = None):
+def binarize_topics(
+    cistopic_obj: "CistopicObject",
+    target: Optional[str] = "region",
+    method: Optional[str] = "otsu",
+    smooth_topics: Optional[bool] = True,
+    ntop: Optional[int] = 2000,
+    predefined_thr: Optional[Dict[str, float]] = {},
+    nbins: Optional[int] = 100,
+    plot: Optional[bool] = False,
+    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
+    num_columns: Optional[int] = 1,
+    save: Optional[str] = None,
+):
     """
     Binarize topic distributions.
 
@@ -72,14 +74,14 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
-    if target == 'region':
+    if target == "region":
         topic_dist = cistopic_obj.selected_model.topic_region
-    elif target == 'cell':
+    elif target == "cell":
         topic_dist = cistopic_obj.selected_model.cell_topic.T
 
     if smooth_topics:
@@ -100,55 +102,67 @@ def binarize_topics(cistopic_obj: 'CistopicObject',
     for i in range(topic_dist.shape[1]):
         l = np.asarray(topic_dist.iloc[:, i])
         l_norm = (l - np.min(l)) / np.ptp(l)
-        if 'Topic' + str(i + 1) in (list(predefined_thr.keys())):
-            thr = predefined_thr['Topic' + str(i + 1)]
-        elif method == 'otsu':
+        if "Topic" + str(i + 1) in (list(predefined_thr.keys())):
+            thr = predefined_thr["Topic" + str(i + 1)]
+        elif method == "otsu":
             thr = threshold_otsu(l_norm, nbins=nbins)
-        elif method == 'yen':
+        elif method == "yen":
             thr = threshold_yen(l_norm, nbins=nbins)
-        elif method == 'li':
-            thresholds = np.arange(
-                np.min(l_norm) + 0.01, np.max(l_norm) - 0.01, 0.01)
-            entropies = [cross_entropy(l_norm, t, nbins=nbins)
-                         for t in thresholds]
+        elif method == "li":
+            thresholds = np.arange(np.min(l_norm) + 0.01, np.max(l_norm) - 0.01, 0.01)
+            entropies = [cross_entropy(l_norm, t, nbins=nbins) for t in thresholds]
             thr = thresholds[np.argmin(entropies)]
-        elif method == 'aucell':
+        elif method == "aucell":
             df, thr = binarization.binarize(pd.DataFrame(l_norm))
             thr = float(thr)
-        elif method == 'ntop':
+        elif method == "ntop":
             data = pd.DataFrame(l_norm).sort_values(0, ascending=False)
-            thr = float(data.iloc[ntop, ])
+            thr = float(
+                data.iloc[
+                    ntop,
+                ]
+            )
         else:
             log.info(
-                'Binarization method not found. Please choose: "otsu", "yen", "li" or "ntop".')
+                'Binarization method not found. Please choose: "otsu", "yen", "li" or "ntop".'
+            )
 
         if plot:
             if num_columns > 1:
                 plt.subplot(num_rows, num_columns, j)
                 j = j + 1
             plt.hist(l_norm, bins=nbins)
-            plt.axvline(thr, color='tomato', linestyle='--')
-            plt.xlabel('Standardized probability Topic ' + str(i + 1) +
-                       '\n' + 'Selected:' + str(sum(l_norm > thr)), fontsize=10)
+            plt.axvline(thr, color="tomato", linestyle="--")
+            plt.xlabel(
+                "Standardized probability Topic "
+                + str(i + 1)
+                + "\n"
+                + "Selected:"
+                + str(sum(l_norm > thr)),
+                fontsize=10,
+            )
             if num_columns == 1:
                 if save is not None:
-                    pdf.savefig(fig, bbox_inches='tight')
+                    pdf.savefig(fig, bbox_inches="tight")
                 if plot:
                     plt.show()
-        binarized_topics['Topic' + str(i + 1)] = pd.DataFrame(
-            topic_dist.iloc[l_norm > thr, i]).sort_values('Topic' + str(i + 1), ascending=False)
+        binarized_topics["Topic" + str(i + 1)] = pd.DataFrame(
+            topic_dist.iloc[l_norm > thr, i]
+        ).sort_values("Topic" + str(i + 1), ascending=False)
 
-    if target == 'region':
-        cistopic_obj.selected_model.topic_ass['Regions_in_binarized_topic'] = [
-            binarized_topics[x].shape[0] for x in binarized_topics.keys()]
-    elif target == 'cell':
-        cistopic_obj.selected_model.topic_ass['Cells_in_binarized_topic'] = [
-            binarized_topics[x].shape[0] for x in binarized_topics.keys()]
+    if target == "region":
+        cistopic_obj.selected_model.topic_ass["Regions_in_binarized_topic"] = [
+            binarized_topics[x].shape[0] for x in binarized_topics.keys()
+        ]
+    elif target == "cell":
+        cistopic_obj.selected_model.topic_ass["Cells_in_binarized_topic"] = [
+            binarized_topics[x].shape[0] for x in binarized_topics.keys()
+        ]
 
     if num_columns > 1:
         plt.tight_layout()
         if save is not None:
-            fig.savefig(save, bbox_inches='tight')
+            fig.savefig(save, bbox_inches="tight")
         if plot:
             plt.show()
         else:
@@ -175,9 +189,8 @@ def smooth_topics_f(topic_region):
     """
     topic_region_np = np.apply_along_axis(norm, 1, topic_region.values)
     topic_region = pd.DataFrame(
-        topic_region_np,
-        index=topic_region.index.tolist(),
-        columns=topic_region.columns)
+        topic_region_np, index=topic_region.index.tolist(), columns=topic_region.columns
+    )
     return topic_region
 
 
@@ -197,8 +210,7 @@ def norm(x):
     return x * (np.log(x + 1e-100) - np.sum(np.log(x + 1e-100)) / len(x))
 
 
-def threshold_yen(array: np.array,
-                  nbins: Optional[int] = 100):
+def threshold_yen(array: np.array, nbins: Optional[int] = 100):
     """
     Apply Yen threshold on topic-region distributions [Yen et al., 1995].
 
@@ -223,13 +235,12 @@ def threshold_yen(array: np.array,
     # Calculate probability mass function
     pmf = hist.astype(np.float32) / hist.sum()
     P1 = np.cumsum(pmf)  # Cumulative normalized histogram
-    P1_sq = np.cumsum(pmf ** 2)
+    P1_sq = np.cumsum(pmf**2)
     # Get cumsum calculated from end of squared array
     P2_sq = np.cumsum(pmf[::-1] ** 2)[::-1]
     # P2_sq indexes is shifted +1. I assume, with P1[:-1] it's help avoid
     # '-inf' in crit. ImageJ Yen implementation replaces those values by zero.
-    crit = np.log(((P1_sq[:-1] * P2_sq[1:]) ** -1) *
-                  (P1[:-1] * (1.0 - P1[:-1])) ** 2)
+    crit = np.log(((P1_sq[:-1] * P2_sq[1:]) ** -1) * (P1[:-1] * (1.0 - P1[:-1])) ** 2)
     return bin_centers[crit.argmax()]
 
 
@@ -323,5 +334,5 @@ def histogram(array, nbins=100):
     """
     array = array.ravel().flatten()
     hist, bin_edges = np.histogram(array, bins=nbins, range=None)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     return hist, bin_centers

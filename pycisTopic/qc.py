@@ -1,6 +1,9 @@
 import collections as cl
 import gc
 import logging
+import sys
+from typing import Dict, List, Optional, Tuple, Union
+
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,30 +11,34 @@ import pandas as pd
 import pyranges as pr
 import ray
 import seaborn as sns
-import sys
 from scipy.stats import gaussian_kde, norm
-from typing import Dict, List, Optional, Tuple, Union
 
 from .cistopic_class import *
-from .utils import multiplot_from_generator, collapse_duplicates, read_fragments_from_file
+from .utils import (
+    collapse_duplicates,
+    multiplot_from_generator,
+    read_fragments_from_file,
+)
 
 pd.options.mode.chained_assignment = None
 dtype = pd.SparseDtype(int, fill_value=0)
 plt.ioff()
 
 
-def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
-                      valid_bc: Optional[List[str]] = None,
-                      n_cpu: Optional[int] = 1,
-                      n_frag: Optional[int] = None,
-                      n_bc: Optional[int] = None,
-                      remove_duplicates: Optional[bool] = True,
-                      plot: Optional[bool] = True,
-                      color: Optional[List[str]] = None,
-                      plot_data: Optional[pd.DataFrame] = None,
-                      save: Optional[str] = None,
-                      return_plot_data: Optional[bool] = False,
-                      return_bc: Optional[bool] = False):
+def barcode_rank_plot(
+    fragments: Union[str, pd.DataFrame],
+    valid_bc: Optional[List[str]] = None,
+    n_cpu: Optional[int] = 1,
+    n_frag: Optional[int] = None,
+    n_bc: Optional[int] = None,
+    remove_duplicates: Optional[bool] = True,
+    plot: Optional[bool] = True,
+    color: Optional[List[str]] = None,
+    plot_data: Optional[pd.DataFrame] = None,
+    save: Optional[str] = None,
+    return_plot_data: Optional[bool] = False,
+    return_bc: Optional[bool] = False,
+):
     """
     Generate a barcode rank plot and marks the selected barcodes
 
@@ -73,19 +80,19 @@ def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     if isinstance(plot_data, pd.DataFrame):
-        log.info('Using precomputed plot data')
+        log.info("Using precomputed plot data")
         FPB_DF = plot_data
     else:
         if isinstance(fragments, str):
             fragments = read_fragments_from_file(fragments).df
 
-        log.info('Counting fragments')
+        log.info("Counting fragments")
 
         # Group per cell barcode.
         fragments_groupby_name = fragments.groupby(["Name"], sort=False, observed=True)
@@ -94,41 +101,49 @@ def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
         FPB_DF = pd.concat(
             [
                 # Count number of fragments per barcodes.
-                fragments_groupby_name.agg(Total_nr_frag=("Score", "sum")).rename_axis(None),
+                fragments_groupby_name.agg(Total_nr_frag=("Score", "sum")).rename_axis(
+                    None
+                ),
                 # Count number of unique fragments per barcode.
-                fragments_groupby_name.size().to_frame(name='Unique_nr_frag').rename_axis(None)
+                fragments_groupby_name.size()
+                .to_frame(name="Unique_nr_frag")
+                .rename_axis(None),
             ],
-            axis=1
+            axis=1,
         )
 
     if not remove_duplicates:
-        FPB_DF = FPB_DF.sort_values(by=['Total_nr_frag'], ascending=False)
-        NF = FPB_DF['Total_nr_frag']
+        FPB_DF = FPB_DF.sort_values(by=["Total_nr_frag"], ascending=False)
+        NF = FPB_DF["Total_nr_frag"]
     else:
-        FPB_DF = FPB_DF.sort_values(by=['Unique_nr_frag'], ascending=False)
-        NF = FPB_DF['Unique_nr_frag']
+        FPB_DF = FPB_DF.sort_values(by=["Unique_nr_frag"], ascending=False)
+        NF = FPB_DF["Unique_nr_frag"]
 
-    FPB_DF['Barcode_rank'] = range(1, len(FPB_DF) + 1)
+    FPB_DF["Barcode_rank"] = range(1, len(FPB_DF) + 1)
 
-    BR = FPB_DF['Barcode_rank']
+    BR = FPB_DF["Barcode_rank"]
 
     if n_frag is None:
         if n_bc is None:
             if valid_bc is None:
-                log.error("Please provide a list of valid barcodes, the minimal number of barcodes or the minimal number of fragments per barcode to select")
+                log.error(
+                    "Please provide a list of valid barcodes, the minimal number of barcodes or the minimal number of fragments per barcode to select"
+                )
                 return
             else:
-                log.info('Marking valid barcodes contained')
+                log.info("Marking valid barcodes contained")
                 selected_bc = len(valid_bc)
         else:
-            log.info(f'Marking top {n_bc} barcodes')
+            log.info(f"Marking top {n_bc} barcodes")
             selected_bc = n_bc
     else:
         if n_bc is None:
-            log.info(f'Marking barcodes with more than {n_frag}')
+            log.info(f"Marking barcodes with more than {n_frag}")
             selected_bc = sum(NF > n_frag)
         else:
-            log.error('Either the number of cells to select or the minimal number of fragments can be specified, but not both at the same time. Please, set n_frag=None or n_bc=None.')
+            log.error(
+                "Either the number of cells to select or the minimal number of fragments can be specified, but not both at the same time. Please, set n_frag=None or n_bc=None."
+            )
             return
 
     if plot is True or save is not None:
@@ -140,8 +155,9 @@ def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
             ax.plot(sel, NF, nosel, NF)
         else:
             ax.plot(sel, NF, color[0], nosel, NF, color[1])
-        ax.legend((f'Selected BC: {selected_bc}',
-                   f'Non-selected BC: {len(BR - selected_bc)}'))
+        ax.legend(
+            (f"Selected BC: {selected_bc}", f"Non-selected BC: {len(BR - selected_bc)}")
+        )
         plt.xscale("log")
         plt.yscale("log")
         plt.xlabel("Barcode Rank", fontsize=10)
@@ -157,25 +173,32 @@ def barcode_rank_plot(fragments: Union[str, pd.DataFrame],
     output = {}
     flag = False
     if return_bc:
-        log.info('Returning plot data')
+        log.info("Returning plot data")
         output.update(
-            {'valid_bc': FPB_DF.iloc[0:selected_bc, ].index.tolist()})
+            {
+                "valid_bc": FPB_DF.iloc[
+                    0:selected_bc,
+                ].index.tolist()
+            }
+        )
         flag = True
     if return_plot_data:
-        log.info('Returning valid barcodes')
-        output.update({'valid_bc_plot_data': FPB_DF})
+        log.info("Returning valid barcodes")
+        output.update({"valid_bc_plot_data": FPB_DF})
         flag = True
     if flag:
         return output
 
 
-def duplicate_rate(fragments: Union[str, pd.DataFrame],
-                   valid_bc: Optional[List[str]] = None,
-                   plot: Optional[bool] = True,
-                   cmap: Optional[List[str]] = None,
-                   plot_data: Optional[pd.DataFrame] = None,
-                   save: Optional[str] = None,
-                   return_plot_data: Optional[bool] = False):
+def duplicate_rate(
+    fragments: Union[str, pd.DataFrame],
+    valid_bc: Optional[List[str]] = None,
+    plot: Optional[bool] = True,
+    cmap: Optional[List[str]] = None,
+    plot_data: Optional[pd.DataFrame] = None,
+    save: Optional[str] = None,
+    return_plot_data: Optional[bool] = False,
+):
     """
     Generate duplication rate plot.
 
@@ -208,36 +231,42 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
 
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     if isinstance(plot_data, pd.DataFrame):
-        log.info('Using precomputed plot data')
+        log.info("Using precomputed plot data")
         fragments_per_barcode = plot_data
     else:
         if isinstance(fragments, str):
-            log.info('Reading fragments file')
+            log.info("Reading fragments file")
             fragments = read_fragments_from_file(fragments).df
 
         if valid_bc is not None:
-            log.info('Using provided valid barcodes')
+            log.info("Using provided valid barcodes")
             fragments = fragments[fragments.Name.isin(set(valid_bc))]
 
-        FPB_dup = fragments.groupby(["Name"], observed=True, sort=False).agg(
-            {"Score": np.sum}).rename_axis(None)
-        FPB_dup.columns = ['Total_nr_frag']
-        FPB_nodup = fragments.groupby(
-            ["Name"], sort=False, observed=True).size().to_frame(
-            name='Unique_nr_frag').rename_axis(None)
+        FPB_dup = (
+            fragments.groupby(["Name"], observed=True, sort=False)
+            .agg({"Score": np.sum})
+            .rename_axis(None)
+        )
+        FPB_dup.columns = ["Total_nr_frag"]
+        FPB_nodup = (
+            fragments.groupby(["Name"], sort=False, observed=True)
+            .size()
+            .to_frame(name="Unique_nr_frag")
+            .rename_axis(None)
+        )
 
         FPB = pd.concat([FPB_dup, FPB_nodup], axis=1)
-        FPB['Dupl_nr_frag'] = FPB['Total_nr_frag'] - FPB['Unique_nr_frag']
-        FPB['Dupl_rate'] = FPB['Dupl_nr_frag'] / FPB['Total_nr_frag']
+        FPB["Dupl_nr_frag"] = FPB["Total_nr_frag"] - FPB["Unique_nr_frag"]
+        FPB["Dupl_rate"] = FPB["Dupl_nr_frag"] / FPB["Total_nr_frag"]
 
-    x = FPB['Unique_nr_frag']
-    y = FPB['Dupl_rate']
+    x = FPB["Unique_nr_frag"]
+    y = FPB["Dupl_rate"]
 
     if plot is True or save is True:
         try:
@@ -248,13 +277,13 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
             x, y, z = x[idx], y[idx], z[idx]
             plt.scatter(x, y, c=z, s=10, edgecolor=None, cmap=cmap)
         except BaseException:
-            log.info('All fragments are unique')
+            log.info("All fragments are unique")
             plt.scatter(x, y, s=10, edgecolor=None, cmap=cmap)
         plt.ylim(0, 1)
         plt.xscale("log")
         plt.xlabel("Number of (unique) fragments", fontsize=10)
         plt.ylabel("Duplication rate", fontsize=10)
-        plt.colorbar().set_label('Density')
+        plt.colorbar().set_label("Density")
 
         if save is not None:
             fig.savefig(save)
@@ -265,20 +294,22 @@ def duplicate_rate(fragments: Union[str, pd.DataFrame],
 
     output = {}
     if return_plot_data:
-        log.info('Return plot data')
-        output.update({'duplicate_rate_plot_data': FPB})
+        log.info("Return plot data")
+        output.update({"duplicate_rate_plot_data": FPB})
         return output
 
 
-def insert_size_distribution(fragments: Union[str, pd.DataFrame],
-                             valid_bc: Optional[List[str]] = None,
-                             remove_duplicates: Optional[bool] = True,
-                             plot: Optional[bool] = True,
-                             plot_data: Optional[pd.DataFrame] = None,
-                             color: Optional[str] = None,
-                             save: Optional[str] = None,
-                             return_plot_data: Optional[bool] = False,
-                             xlim: Optional[List[float]] = None):
+def insert_size_distribution(
+    fragments: Union[str, pd.DataFrame],
+    valid_bc: Optional[List[str]] = None,
+    remove_duplicates: Optional[bool] = True,
+    plot: Optional[bool] = True,
+    plot_data: Optional[pd.DataFrame] = None,
+    color: Optional[str] = None,
+    save: Optional[str] = None,
+    return_plot_data: Optional[bool] = False,
+    xlim: Optional[List[float]] = None,
+):
     """
     Plot the insert size distribution of the sample.
 
@@ -314,42 +345,48 @@ def insert_size_distribution(fragments: Union[str, pd.DataFrame],
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     if isinstance(plot_data, pd.DataFrame):
-        log.info('Using precomputed plot data')
+        log.info("Using precomputed plot data")
         FPW_DF = plot_data
     else:
         if isinstance(fragments, str):
-            log.info('Reading fragments file')
+            log.info("Reading fragments file")
             fragments = read_fragments_from_file(fragments).df
 
         if valid_bc is not None:
-            log.info('Using provided valid barcodes')
+            log.info("Using provided valid barcodes")
             fragments = fragments[fragments.Name.isin(set(valid_bc))]
 
-        log.info('Counting fragments')
-        fragments['Width'] = abs(
-            fragments['End'].values -
-            fragments['Start'].values)
+        log.info("Counting fragments")
+        fragments["Width"] = abs(fragments["End"].values - fragments["Start"].values)
         if not remove_duplicates:
-            FPW_DF = fragments.groupby(["Name"]).agg({"Score": np.sum}).rename_axis(
-                None).reset_index().rename(columns={"index": "Width", "Score": "Nr_frag"})
+            FPW_DF = (
+                fragments.groupby(["Name"])
+                .agg({"Score": np.sum})
+                .rename_axis(None)
+                .reset_index()
+                .rename(columns={"index": "Width", "Score": "Nr_frag"})
+            )
         else:
-            FPW_DF = fragments.groupby(
-                ["Width"]).size().to_frame(
-                name='Nr_frag').rename_axis(None).reset_index().rename(
-                columns={
-                    "index": "Width"})
-        FPW_DF['Ratio_frag'] = (FPW_DF['Nr_frag'].values / np.sum(FPW_DF['Nr_frag']))
-        FPW_DF = FPW_DF.sort_values(by=['Width'], ascending=False)
+            FPW_DF = (
+                fragments.groupby(["Width"])
+                .size()
+                .to_frame(name="Nr_frag")
+                .rename_axis(None)
+                .reset_index()
+                .rename(columns={"index": "Width"})
+            )
+        FPW_DF["Ratio_frag"] = FPW_DF["Nr_frag"].values / np.sum(FPW_DF["Nr_frag"])
+        FPW_DF = FPW_DF.sort_values(by=["Width"], ascending=False)
 
     if plot is True or save is not None:
-        W = FPW_DF.loc[:, 'Width']
-        pF = FPW_DF.loc[:, 'Ratio_frag']
+        W = FPW_DF.loc[:, "Width"]
+        pF = FPW_DF.loc[:, "Ratio_frag"]
         fig, ax = plt.subplots()
         ax.plot(W, pF, color=color)
         plt.xlabel("Fragment size", fontsize=10)
@@ -365,28 +402,30 @@ def insert_size_distribution(fragments: Union[str, pd.DataFrame],
 
     output = {}
     if return_plot_data:
-        log.info('Returning plot data')
-        output.update({'fragment_size_plot_data': FPW_DF})
+        log.info("Returning plot data")
+        output.update({"fragment_size_plot_data": FPW_DF})
         return output
 
 
-def profile_tss(fragments: Union[str, pd.DataFrame],
-                annotation: Union[pd.DataFrame, pr.PyRanges],
-                valid_bc: Optional[List[str]] = None,
-                plot: Optional[bool] = True,
-                plot_data: Optional[pd.DataFrame] = None,
-                n_cpu: Optional[int] = 1,
-                partition: Optional[int] = 5,
-                flank_window: Optional[int] = 1000,
-                tss_window: Optional[int] = 50,
-                minimum_signal_window: Optional[int] = 100,
-                rolling_window: Optional[int] = 10,
-                min_norm: Optional[int] = 0.2,
-                color: Optional[str] = None,
-                save: Optional[str] = None,
-                return_TSS_enrichment_per_barcode: Optional[bool] = False,
-                return_TSS_coverage_matrix_per_barcode: Optional[bool] = False,
-                return_plot_data: Optional[bool] = False):
+def profile_tss(
+    fragments: Union[str, pd.DataFrame],
+    annotation: Union[pd.DataFrame, pr.PyRanges],
+    valid_bc: Optional[List[str]] = None,
+    plot: Optional[bool] = True,
+    plot_data: Optional[pd.DataFrame] = None,
+    n_cpu: Optional[int] = 1,
+    partition: Optional[int] = 5,
+    flank_window: Optional[int] = 1000,
+    tss_window: Optional[int] = 50,
+    minimum_signal_window: Optional[int] = 100,
+    rolling_window: Optional[int] = 10,
+    min_norm: Optional[int] = 0.2,
+    color: Optional[str] = None,
+    save: Optional[str] = None,
+    return_TSS_enrichment_per_barcode: Optional[bool] = False,
+    return_TSS_coverage_matrix_per_barcode: Optional[bool] = False,
+    return_plot_data: Optional[bool] = False,
+):
     """
     Plot the Transcription Start Site (TSS) profile. It is computed as the summed accessibility signal (sample-level), or the number of cut sites per base (barcode-level), in a space around the full set of annotated TSSs and is normalized by the minimum signal in the window. This profile is helpful to assess the signal-to-noise ratio of the library, as it is well known that TSSs and the promoter regions around them have, on average, a high degree of chromatin accessibility compared to the intergenic and intronic regions of the genome.
 
@@ -452,13 +491,13 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     if isinstance(plot_data, pd.DataFrame):
-        log.info('Using plot_data. TSS enrichment per barcode will not be computed')
+        log.info("Using plot_data. TSS enrichment per barcode will not be computed")
         fig, ax = plt.subplots()
         ax.plot(plot_data.Position, plot_data.TSSEnrichment)
         plt.xlim(-space_TSS, space_TSS)
@@ -466,40 +505,51 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
         plt.ylabel("Normalized enrichment", fontsize=10)
     else:
         if isinstance(fragments, str):
-            log.info('Reading fragments file')
+            log.info("Reading fragments file")
             fragments = read_fragments_from_file(fragments)
         else:
             if isinstance(fragments, pd.DataFrame):
                 fragments = pr.PyRanges(fragments)
 
         if valid_bc is not None:
-            log.info('Using provided valid barcodes')
+            log.info("Using provided valid barcodes")
             fragments = fragments[fragments.Name.isin(set(valid_bc))]
         else:
             valid_bc = list(set(fragments.Name.tolist()))
 
-        log.info('Formatting annnotation')
+        log.info("Formatting annnotation")
         if isinstance(annotation, pr.PyRanges):
             annotation = annotation.df
-        tss_space_annotation = annotation[['Chromosome', 'Start', 'Strand']]
-        tss_space_annotation['End'] = tss_space_annotation['Start'] + flank_window
-        tss_space_annotation['Start'] = tss_space_annotation['Start'] - flank_window
-        tss_space_annotation = tss_space_annotation[[
-            "Chromosome", "Start", "End", "Strand"]]
+        tss_space_annotation = annotation[["Chromosome", "Start", "Strand"]]
+        tss_space_annotation["End"] = tss_space_annotation["Start"] + flank_window
+        tss_space_annotation["Start"] = tss_space_annotation["Start"] - flank_window
+        tss_space_annotation = tss_space_annotation[
+            ["Chromosome", "Start", "End", "Strand"]
+        ]
         tss_space_annotation = pr.PyRanges(tss_space_annotation)
 
-        log.info('Creating coverage matrix')
+        log.info("Creating coverage matrix")
         if partition > 1:
             barcode_list = np.array_split(valid_bc, partition)
-            TSS_matrix = pd.concat([get_tss_matrix(fragments[fragments.Name.isin(set(barcode_list[x]))],
-                                                   flank_window, tss_space_annotation).fillna(0)
-                                    for x in range(partition)])
+            TSS_matrix = pd.concat(
+                [
+                    get_tss_matrix(
+                        fragments[fragments.Name.isin(set(barcode_list[x]))],
+                        flank_window,
+                        tss_space_annotation,
+                    ).fillna(0)
+                    for x in range(partition)
+                ]
+            )
         else:
             TSS_matrix = get_tss_matrix(fragments, flank_window, tss_space_annotation)
-        log.info('Coverage matrix done')
+        log.info("Coverage matrix done")
         if not TSS_matrix.columns.tolist() == list(range(2 * flank_window + 1)):
-            missing_values = list(set(TSS_matrix.columns.tolist()).symmetric_difference(
-                list(range(2 * flank_window + 1))))
+            missing_values = list(
+                set(TSS_matrix.columns.tolist()).symmetric_difference(
+                    list(range(2 * flank_window + 1))
+                )
+            )
             for x in missing_values:
                 TSS_matrix[x] = 0
 
@@ -507,22 +557,30 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
 
         if rolling_window is not None:
             TSS_matrix = TSS_matrix.rolling(
-                window=rolling_window, min_periods=0, axis=1).mean()
+                window=rolling_window, min_periods=0, axis=1
+            ).mean()
 
         TSS_counts = TSS_matrix.values.sum(axis=0)
-        div = max((np.mean(TSS_counts[-minimum_signal_window:]) +
-                   np.mean(TSS_counts[0:minimum_signal_window])) / 2, min_norm)
+        div = max(
+            (
+                np.mean(TSS_counts[-minimum_signal_window:])
+                + np.mean(TSS_counts[0:minimum_signal_window])
+            )
+            / 2,
+            min_norm,
+        )
         if plot is True or save is not None:
             fig, ax = plt.subplots()
-            ax.plot(range(-flank_window - 1, flank_window),
-                    TSS_counts / div, color=color)
+            ax.plot(
+                range(-flank_window - 1, flank_window), TSS_counts / div, color=color
+            )
             plt.xlim(-flank_window, flank_window)
             plt.xlabel("Position from TSS", fontsize=10)
             plt.ylabel("Normalized enrichment", fontsize=10)
             if save is not None:
                 fig.savefig(save)
             if plot:
-                log.info('Plotting normalized sample TSS enrichment')
+                log.info("Plotting normalized sample TSS enrichment")
                 plt.show()
             else:
                 plt.close(fig)
@@ -531,43 +589,82 @@ def profile_tss(fragments: Union[str, pd.DataFrame],
     flag = False
     if return_TSS_enrichment_per_barcode:
         TSS_enrich = TSS_matrix.apply(
-            lambda x: x / max(
-                [((np.mean(x[-minimum_signal_window:]) + np.mean(x[0:minimum_signal_window])) / 2), min_norm]), axis=1)
-        TSS_enrich = pd.DataFrame(TSS_enrich.iloc[:, range(
-            flank_window - tss_window, flank_window + tss_window)].mean(axis=1))
-        TSS_enrich.columns = ['TSS_enrichment']
-        output.update({'TSS_enrichment': TSS_enrich})
+            lambda x: x
+            / max(
+                [
+                    (
+                        (
+                            np.mean(x[-minimum_signal_window:])
+                            + np.mean(x[0:minimum_signal_window])
+                        )
+                        / 2
+                    ),
+                    min_norm,
+                ]
+            ),
+            axis=1,
+        )
+        TSS_enrich = pd.DataFrame(
+            TSS_enrich.iloc[
+                :, range(flank_window - tss_window, flank_window + tss_window)
+            ].mean(axis=1)
+        )
+        TSS_enrich.columns = ["TSS_enrichment"]
+        output.update({"TSS_enrichment": TSS_enrich})
         flag = True
     if return_TSS_coverage_matrix_per_barcode:
-        log.info('Returning normalized TSS coverage matrix per barcode')
+        log.info("Returning normalized TSS coverage matrix per barcode")
         TSS_mat = TSS_matrix.apply(
-            lambda x: x / max(
-                [((np.mean(x[-minimum_signal_window:]) + np.mean(x[0:minimum_signal_window])) / 2), min_norm]), axis=1)
-        output.update({'TSS_coverage_mat': TSS_mat})
+            lambda x: x
+            / max(
+                [
+                    (
+                        (
+                            np.mean(x[-minimum_signal_window:])
+                            + np.mean(x[0:minimum_signal_window])
+                        )
+                        / 2
+                    ),
+                    min_norm,
+                ]
+            ),
+            axis=1,
+        )
+        output.update({"TSS_coverage_mat": TSS_mat})
         flag = True
     if return_plot_data:
-        log.info('Returning normalized sample TSS enrichment data')
-        output.update({'TSS_plot_data': pd.DataFrame(
-            {'Position': range(-flank_window - 1, flank_window), 'TSS_enrichment': TSS_counts / div})})
+        log.info("Returning normalized sample TSS enrichment data")
+        output.update(
+            {
+                "TSS_plot_data": pd.DataFrame(
+                    {
+                        "Position": range(-flank_window - 1, flank_window),
+                        "TSS_enrichment": TSS_counts / div,
+                    }
+                )
+            }
+        )
         flag = True
     del TSS_matrix
     if flag:
         return output
 
 
-def frip(fragments: Union[str, pd.DataFrame],
-         path_to_regions: str,
-         valid_bc: Optional[List[str]] = None,
-         path_to_blacklist: Optional[str] = None,
-         remove_duplicates: Optional[bool] = True,
-         n_bins: Optional[int] = 100,
-         color: Optional[str] = None,
-         n_cpu: Optional[int] = 1,
-         save: Optional[str] = None,
-         plot: Optional[bool] = True,
-         as_density: Optional[bool] = True,
-         plot_data: Optional[pd.DataFrame] = None,
-         return_plot_data: Optional[bool] = False):
+def frip(
+    fragments: Union[str, pd.DataFrame],
+    path_to_regions: str,
+    valid_bc: Optional[List[str]] = None,
+    path_to_blacklist: Optional[str] = None,
+    remove_duplicates: Optional[bool] = True,
+    n_bins: Optional[int] = 100,
+    color: Optional[str] = None,
+    n_cpu: Optional[int] = 1,
+    save: Optional[str] = None,
+    plot: Optional[bool] = True,
+    as_density: Optional[bool] = True,
+    plot_data: Optional[pd.DataFrame] = None,
+    return_plot_data: Optional[bool] = False,
+):
     """
     Plot the Fraction of Reads In a given set of Peaks (FRIP). This metric is useful to assess the noise in cells.
 
@@ -611,10 +708,10 @@ def frip(fragments: Union[str, pd.DataFrame],
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     path_to_fragments = None
 
@@ -622,65 +719,78 @@ def frip(fragments: Union[str, pd.DataFrame],
         FPB_FPBIR_DF = plot_data
     else:
         if isinstance(fragments, str):
-            log.info('Reading fragments file')
+            log.info("Reading fragments file")
             fragments = read_fragments_from_file(fragments)
         else:
             if isinstance(fragments, pd.DataFrame):
                 fragments = pr.PyRanges(fragments)
 
         if valid_bc is not None:
-            log.info('Using provided valid barcodes')
+            log.info("Using provided valid barcodes")
             fragments = fragments[fragments.Name.isin(set(valid_bc))]
 
         regions = pr.read_bed(path_to_regions)
-        regions = regions[['Chromosome', 'Start', 'End']].drop_duplicate_positions()
+        regions = regions[["Chromosome", "Start", "End"]].drop_duplicate_positions()
 
         if isinstance(path_to_blacklist, str):
             blacklist = pr.read_bed(path_to_blacklist)
             regions = regions.overlap(blacklist, invert=True)
 
-        log.info('Counting fragments')
-        fragments_per_barcode_dup = fragments.df.groupby(
-            ["Name"]).agg({"Score": np.sum}).rename_axis(None)
-        fragments_per_barcode_dup.columns = ['Total_nr_frag']
-        fragments_per_barcode_nodup = fragments.df.groupby(
-            ["Name"]).size().to_frame(
-            name='Unique_nr_frag').rename_axis(None)
+        log.info("Counting fragments")
+        fragments_per_barcode_dup = (
+            fragments.df.groupby(["Name"]).agg({"Score": np.sum}).rename_axis(None)
+        )
+        fragments_per_barcode_dup.columns = ["Total_nr_frag"]
+        fragments_per_barcode_nodup = (
+            fragments.df.groupby(["Name"])
+            .size()
+            .to_frame(name="Unique_nr_frag")
+            .rename_axis(None)
+        )
         FPB_DF = pd.concat(
-            [fragments_per_barcode_dup, fragments_per_barcode_nodup], axis=1)
+            [fragments_per_barcode_dup, fragments_per_barcode_nodup], axis=1
+        )
 
-        log.info('Intersecting fragments with regions')
+        log.info("Intersecting fragments with regions")
         fragments_in_regions = fragments.join(regions, nb_cpu=n_cpu)
-        fragments_in_regions = fragments_in_regions[[
-            'Chromosome', 'Start', 'End', 'Name', 'Score']].drop_duplicate_positions()
-        fragments_in_regions_dup = fragments_in_regions.df.groupby(
-            ["Name"]).agg({"Score": np.sum}).rename_axis(None)
-        fragments_in_regions_dup.columns = ['Total_nr_frag_in_regions']
-        fragments_in_regions_nodup = fragments_in_regions.df.groupby(
-            ["Name"]).size().to_frame(
-            name='Unique_nr_frag_in_regions').rename_axis(None)
+        fragments_in_regions = fragments_in_regions[
+            ["Chromosome", "Start", "End", "Name", "Score"]
+        ].drop_duplicate_positions()
+        fragments_in_regions_dup = (
+            fragments_in_regions.df.groupby(["Name"])
+            .agg({"Score": np.sum})
+            .rename_axis(None)
+        )
+        fragments_in_regions_dup.columns = ["Total_nr_frag_in_regions"]
+        fragments_in_regions_nodup = (
+            fragments_in_regions.df.groupby(["Name"])
+            .size()
+            .to_frame(name="Unique_nr_frag_in_regions")
+            .rename_axis(None)
+        )
         FPBIR_DF = pd.concat(
-            [fragments_in_regions_dup, fragments_in_regions_nodup], axis=1)
+            [fragments_in_regions_dup, fragments_in_regions_nodup], axis=1
+        )
 
         FPB_FPBIR_DF = pd.concat([FPB_DF, FPBIR_DF], axis=1, sort=False)
 
         if not remove_duplicates:
-            FPB_FPBIR_DF['FRIP'] = (FPB_FPBIR_DF.Total_nr_frag_in_regions / FPB_FPBIR_DF.Total_nr_frag)
+            FPB_FPBIR_DF["FRIP"] = (
+                FPB_FPBIR_DF.Total_nr_frag_in_regions / FPB_FPBIR_DF.Total_nr_frag
+            )
         else:
-            FPB_FPBIR_DF['FRIP'] = (FPB_FPBIR_DF.Unique_nr_frag_in_regions / FPB_FPBIR_DF.Unique_nr_frag)
+            FPB_FPBIR_DF["FRIP"] = (
+                FPB_FPBIR_DF.Unique_nr_frag_in_regions / FPB_FPBIR_DF.Unique_nr_frag
+            )
 
         if plot is True or save is not None:
             fig = plt.figure()
             if as_density:
-                sns.distplot(
-                    FPB_FPBIR_DF['FRIP'],
-                    hist=False,
-                    kde=True,
-                    color=color)
-                plt.ylabel('Density')
+                sns.distplot(FPB_FPBIR_DF["FRIP"], hist=False, kde=True, color=color)
+                plt.ylabel("Density")
             else:
-                plt.hist(FPB_FPBIR_DF['FRIP'], bins=n_bins, color=color)
-                plt.ylabel('Frequency')
+                plt.hist(FPB_FPBIR_DF["FRIP"], bins=n_bins, color=color)
+                plt.ylabel("Frequency")
             plt.xlabel("FRIP", fontsize=10)
             if save is not None:
                 plt.savefig(save)
@@ -691,7 +801,7 @@ def frip(fragments: Union[str, pd.DataFrame],
 
         output = {}
         if return_plot_data:
-            output.update({'FRIP_plot_data': FPB_FPBIR_DF})
+            output.update({"FRIP_plot_data": FPB_FPBIR_DF})
             return output
 
 
@@ -712,89 +822,109 @@ def metrics2data(metrics: Optional[Dict]):
 
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     # Add log total fragments
     metrics_list = []
-    if 'duplicate_rate' in metrics:
-        metrics['duplicate_rate']['duplicate_rate_plot_data']['Log_total_nr_frag'] = np.log10(
-            metrics['duplicate_rate']['duplicate_rate_plot_data']['Total_nr_frag'])
-        metrics['duplicate_rate']['duplicate_rate_plot_data']['Log_unique_nr_frag'] = np.log10(
-            metrics['duplicate_rate']['duplicate_rate_plot_data']['Unique_nr_frag'])
+    if "duplicate_rate" in metrics:
+        metrics["duplicate_rate"]["duplicate_rate_plot_data"][
+            "Log_total_nr_frag"
+        ] = np.log10(
+            metrics["duplicate_rate"]["duplicate_rate_plot_data"]["Total_nr_frag"]
+        )
+        metrics["duplicate_rate"]["duplicate_rate_plot_data"][
+            "Log_unique_nr_frag"
+        ] = np.log10(
+            metrics["duplicate_rate"]["duplicate_rate_plot_data"]["Unique_nr_frag"]
+        )
         metrics_list.append(
-            metrics['duplicate_rate']['duplicate_rate_plot_data'].iloc[:, [4, 5, 0, 1, 2, 3]])
-    if 'frip' in metrics:
-        if 'duplicate_rate' not in metrics:
-            metrics['frip']['FRIP_plot_data']['Log_total_nr_frag'] = np.log10(
-                metrics['frip']['FRIP_plot_data']['Total_nr_frag'])
-            metrics['frip']['FRIP_plot_data']['Log_unique_nr_frag'] = np.log10(
-                metrics['frip']['FRIP_plot_data']['Unique_nr_frag'])
+            metrics["duplicate_rate"]["duplicate_rate_plot_data"].iloc[
+                :, [4, 5, 0, 1, 2, 3]
+            ]
+        )
+    if "frip" in metrics:
+        if "duplicate_rate" not in metrics:
+            metrics["frip"]["FRIP_plot_data"]["Log_total_nr_frag"] = np.log10(
+                metrics["frip"]["FRIP_plot_data"]["Total_nr_frag"]
+            )
+            metrics["frip"]["FRIP_plot_data"]["Log_unique_nr_frag"] = np.log10(
+                metrics["frip"]["FRIP_plot_data"]["Unique_nr_frag"]
+            )
             metrics_list.append(
-                metrics['frip']['FRIP_plot_data'].iloc[:, [5, 6, 0, 1, 2, 3, 4]])
+                metrics["frip"]["FRIP_plot_data"].iloc[:, [5, 6, 0, 1, 2, 3, 4]]
+            )
         else:
-            metrics_list.append(
-                metrics['frip']['FRIP_plot_data'].iloc[:, [2, 3, 4]])
-    if 'profile_tss' in metrics:
-        metrics_list.append(metrics['profile_tss']['TSS_enrichment'])
+            metrics_list.append(metrics["frip"]["FRIP_plot_data"].iloc[:, [2, 3, 4]])
+    if "profile_tss" in metrics:
+        metrics_list.append(metrics["profile_tss"]["TSS_enrichment"])
 
     if len(metrics_list) > 1:
-        metadata_bc = pd.concat(metrics_list, axis=1, sort=False, join='inner')
+        metadata_bc = pd.concat(metrics_list, axis=1, sort=False, join="inner")
     elif len(metrics_list) == 1:
         metadata_bc = metrics_list[0]
     elif len(metrics_list) < 1:
-        log.info('No barcode statistics have been computed')
+        log.info("No barcode statistics have been computed")
         metadata_bc = []
 
     # Plot dict
     profile_dict = {}
-    if 'barcode_rank_plot' in metrics:
-        profile_dict['barcode_rank_plot'] = metrics['barcode_rank_plot']['valid_bc_plot_data']
-        selected_bc = len(metrics['barcode_rank_plot']['valid_bc'])
-        profile_dict['barcode_rank_plot']['Selected'] = np.ma.masked_where(
-            profile_dict['barcode_rank_plot']['Barcode_rank'] <= selected_bc,
-            profile_dict['barcode_rank_plot']['Barcode_rank']).mask
-    if 'duplicate_rate' in metrics:
-        profile_dict['duplicate_rate'] = metrics['duplicate_rate']['duplicate_rate_plot_data']
-    if 'insert_size_distribution' in metrics:
-        profile_dict['insert_size_distribution'] = metrics['insert_size_distribution']['fragment_size_plot_data']
-    if 'profile_tss' in metrics:
-        profile_dict['profile_tss'] = metrics['profile_tss']['TSS_plot_data']
-        profile_dict['profile_tssPerBarcode'] = metrics['profile_tss']['TSS_coverage_mat']
-    if 'frip' in metrics:
-        profile_dict['frip'] = metrics['frip']['FRIP_plot_data']
+    if "barcode_rank_plot" in metrics:
+        profile_dict["barcode_rank_plot"] = metrics["barcode_rank_plot"][
+            "valid_bc_plot_data"
+        ]
+        selected_bc = len(metrics["barcode_rank_plot"]["valid_bc"])
+        profile_dict["barcode_rank_plot"]["Selected"] = np.ma.masked_where(
+            profile_dict["barcode_rank_plot"]["Barcode_rank"] <= selected_bc,
+            profile_dict["barcode_rank_plot"]["Barcode_rank"],
+        ).mask
+    if "duplicate_rate" in metrics:
+        profile_dict["duplicate_rate"] = metrics["duplicate_rate"][
+            "duplicate_rate_plot_data"
+        ]
+    if "insert_size_distribution" in metrics:
+        profile_dict["insert_size_distribution"] = metrics["insert_size_distribution"][
+            "fragment_size_plot_data"
+        ]
+    if "profile_tss" in metrics:
+        profile_dict["profile_tss"] = metrics["profile_tss"]["TSS_plot_data"]
+        profile_dict["profile_tssPerBarcode"] = metrics["profile_tss"][
+            "TSS_coverage_mat"
+        ]
+    if "frip" in metrics:
+        profile_dict["frip"] = metrics["frip"]["FRIP_plot_data"]
     return metadata_bc, profile_dict
 
 
-def compute_qc_stats(fragments_dict: Dict[str,
-                                          Union[str,
-                                                pd.DataFrame]],
-                     tss_annotation: Union[pd.DataFrame,
-                                           pr.PyRanges],
-                     stats: Optional[List[str]] = ['barcode_rank_plot',
-                                                   'duplicate_rate',
-                                                   'insert_size_distribution',
-                                                   'profile_tss',
-                                                   'frip'],
-                     label_list: Optional[List[str]] = None,
-                     path_to_regions: Optional[Dict[str,
-                                                    str]] = None,
-                     n_cpu: Optional[int] = 1,
-                     partition: Optional[int] = 1,
-                     valid_bc: Optional[List[str]] = None,
-                     n_frag: Optional[int] = None,
-                     n_bc: Optional[int] = None,
-                     tss_flank_window: Optional[int] = 1000,
-                     tss_window: Optional[int] = 50,
-                     tss_minimum_signal_window: Optional[int] = 100,
-                     tss_rolling_window: Optional[int] = 10,
-                     min_norm: Optional[int] = 0.2,
-                     check_for_duplicates: Optional[bool] = True,
-                     remove_duplicates: Optional[bool] = True,
-                     **kwargs):
-    """"
+def compute_qc_stats(
+    fragments_dict: Dict[str, Union[str, pd.DataFrame]],
+    tss_annotation: Union[pd.DataFrame, pr.PyRanges],
+    stats: Optional[List[str]] = [
+        "barcode_rank_plot",
+        "duplicate_rate",
+        "insert_size_distribution",
+        "profile_tss",
+        "frip",
+    ],
+    label_list: Optional[List[str]] = None,
+    path_to_regions: Optional[Dict[str, str]] = None,
+    n_cpu: Optional[int] = 1,
+    partition: Optional[int] = 1,
+    valid_bc: Optional[List[str]] = None,
+    n_frag: Optional[int] = None,
+    n_bc: Optional[int] = None,
+    tss_flank_window: Optional[int] = 1000,
+    tss_window: Optional[int] = 50,
+    tss_minimum_signal_window: Optional[int] = 100,
+    tss_rolling_window: Optional[int] = 10,
+    min_norm: Optional[int] = 0.2,
+    check_for_duplicates: Optional[bool] = True,
+    remove_duplicates: Optional[bool] = True,
+    **kwargs,
+):
+    """ "
     Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
 
     Parameters
@@ -842,17 +972,19 @@ def compute_qc_stats(fragments_dict: Dict[str,
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
     # Convert dictionaries to list
     label_list = list(fragments_dict.keys())
     fragments_list = [fragments_dict[key] for key in fragments_dict.keys()]
     path_to_regions = [path_to_regions[key] for key in fragments_dict.keys()]
 
     if n_cpu > len(fragments_list):
-        log.info('n_cpu is larger than the number of samples. Setting n_cpu to the number of samples')
+        log.info(
+            "n_cpu is larger than the number of samples. Setting n_cpu to the number of samples"
+        )
         n_cpu = len(fragments_list)
 
     ray.init(num_cpus=n_cpu, **kwargs)
@@ -874,41 +1006,47 @@ def compute_qc_stats(fragments_dict: Dict[str,
                 min_norm=min_norm,
                 partition=partition,
                 check_for_duplicates=check_for_duplicates,
-                remove_duplicates=remove_duplicates)
+                remove_duplicates=remove_duplicates,
+            )
             for i in range(len(fragments_list))
         ]
     )
     ray.shutdown()
-    metadata_dict = {key: x[key] for x in list(
-        list(zip(*qc_stats))[0]) for key in x.keys()}
-    profile_data_dict = {key: x[key] for x in list(
-        list(zip(*qc_stats))[1]) for key in x.keys()}
+    metadata_dict = {
+        key: x[key] for x in list(list(zip(*qc_stats))[0]) for key in x.keys()
+    }
+    profile_data_dict = {
+        key: x[key] for x in list(list(zip(*qc_stats))[1]) for key in x.keys()
+    }
     return metadata_dict, profile_data_dict
 
 
 @ray.remote
-def compute_qc_stats_ray(fragments,
-                         tss_annotation: Union[pd.DataFrame,
-                                               pr.PyRanges],
-                         stats: Optional[List[str]] = ['barcode_rank_plot',
-                                                       'duplicate_rate',
-                                                       'insert_size_distribution',
-                                                       'profile_tss',
-                                                       'frip'],
-                         label: Optional[str] = None,
-                         path_to_regions: Optional[str] = None,
-                         valid_bc: Optional[List[str]] = None,
-                         n_frag: Optional[int] = None,
-                         n_bc: Optional[int] = None,
-                         tss_flank_window: Optional[int] = 1000,
-                         tss_window: Optional[int] = 50,
-                         tss_minimum_signal_window: Optional[int] = 100,
-                         tss_rolling_window: Optional[int] = 10,
-                         min_norm: Optional[int] = 0.2,
-                         partition: Optional[int] = 1,
-                         check_for_duplicates: Optional[bool] = True,
-                         remove_duplicates: Optional[bool] = True):
-    """"
+def compute_qc_stats_ray(
+    fragments,
+    tss_annotation: Union[pd.DataFrame, pr.PyRanges],
+    stats: Optional[List[str]] = [
+        "barcode_rank_plot",
+        "duplicate_rate",
+        "insert_size_distribution",
+        "profile_tss",
+        "frip",
+    ],
+    label: Optional[str] = None,
+    path_to_regions: Optional[str] = None,
+    valid_bc: Optional[List[str]] = None,
+    n_frag: Optional[int] = None,
+    n_bc: Optional[int] = None,
+    tss_flank_window: Optional[int] = 1000,
+    tss_window: Optional[int] = 50,
+    tss_minimum_signal_window: Optional[int] = 100,
+    tss_rolling_window: Optional[int] = 10,
+    min_norm: Optional[int] = 0.2,
+    partition: Optional[int] = 1,
+    check_for_duplicates: Optional[bool] = True,
+    remove_duplicates: Optional[bool] = True,
+):
+    """ "
     Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
 
     Parameters
@@ -952,44 +1090,47 @@ def compute_qc_stats_ray(fragments,
 
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
     # Compute stats
     metrics = {}
     metadata_bc_dict = {}
     profile_data_dict = {}
     # Prepare fragments
     if isinstance(fragments, str):
-        log.info('Reading ' + label)
+        log.info("Reading " + label)
         fragments_df = read_fragments_from_file(fragments).df
     else:
         fragments_df = fragments
     # Convert to category for memory efficiency
     fragments_df["Name"] = fragments_df["Name"].astype("category")
     # Check for duplicates
-    if 'Score' not in fragments_df or all(fragments_df['Score'] == '.'):
-        fragments_df = fragments_df[['Chromosome', 'Start', 'End', 'Name']]
+    if "Score" not in fragments_df or all(fragments_df["Score"] == "."):
+        fragments_df = fragments_df[["Chromosome", "Start", "End", "Name"]]
         if check_for_duplicates:
             log.info("Collapsing duplicates")
-            fragments_df = pd.concat([collapse_duplicates(fragments_df[fragments_df.Chromosome == x])
-                                      for x in fragments_df.Chromosome.cat.categories.values])
+            fragments_df = pd.concat(
+                [
+                    collapse_duplicates(fragments_df[fragments_df.Chromosome == x])
+                    for x in fragments_df.Chromosome.cat.categories.values
+                ]
+            )
         else:
-            fragments_df['Score'] = 1
+            fragments_df["Score"] = 1
     else:
-        fragments_df = fragments_df[[
-            'Chromosome', 'Start', 'End', 'Name', 'Score']]
+        fragments_df = fragments_df[["Chromosome", "Start", "End", "Name", "Score"]]
     fragments_df["Score"] = fragments_df["Score"].astype("int32")
     # Prepare valid barcodes
     if valid_bc is not None:
         if n_bc is not None or n_frag is not None:
             valid_bc = None
     # Rank plot
-    if 'barcode_rank_plot' in stats:
+    if "barcode_rank_plot" in stats:
         # Rank plot
-        log.info('Computing barcode rank plot for ' + label)
-        metrics['barcode_rank_plot'] = barcode_rank_plot(
+        log.info("Computing barcode rank plot for " + label)
+        metrics["barcode_rank_plot"] = barcode_rank_plot(
             fragments=fragments_df,
             valid_bc=valid_bc,
             n_frag=n_frag,
@@ -997,37 +1138,40 @@ def compute_qc_stats_ray(fragments,
             remove_duplicates=remove_duplicates,
             plot=False,
             return_bc=True,
-            return_plot_data=True)
+            return_plot_data=True,
+        )
         if valid_bc is None:
-            fragments_df = fragments_df[fragments_df.Name.isin(set(metrics['barcode_rank_plot']['valid_bc']))]
+            fragments_df = fragments_df[
+                fragments_df.Name.isin(set(metrics["barcode_rank_plot"]["valid_bc"]))
+            ]
 
     gc.collect()
     # Duplicate rate
-    if 'duplicate_rate' in stats:
+    if "duplicate_rate" in stats:
         # Duplicate rate
-        log.info('Computing duplicate rate plot for ' + label)
-        metrics['duplicate_rate'] = duplicate_rate(fragments=fragments_df,
-                                                   valid_bc=valid_bc,
-                                                   plot=False,
-                                                   return_plot_data=True)
+        log.info("Computing duplicate rate plot for " + label)
+        metrics["duplicate_rate"] = duplicate_rate(
+            fragments=fragments_df, valid_bc=valid_bc, plot=False, return_plot_data=True
+        )
 
     gc.collect()
     # Fragment size
-    if 'insert_size_distribution' in stats:
+    if "insert_size_distribution" in stats:
         # Fragment size
-        log.info('Computing insert size distribution for ' + label)
-        metrics['insert_size_distribution'] = insert_size_distribution(
+        log.info("Computing insert size distribution for " + label)
+        metrics["insert_size_distribution"] = insert_size_distribution(
             fragments=fragments_df,
             valid_bc=valid_bc,
             remove_duplicates=remove_duplicates,
             plot=False,
-            return_plot_data=True)
+            return_plot_data=True,
+        )
     fragments_df = pr.PyRanges(fragments_df)
     gc.collect()
     # TSS
-    if 'profile_tss' in stats:
+    if "profile_tss" in stats:
         # TSS
-        log.info('Computing TSS profile for ' + label)
+        log.info("Computing TSS profile for " + label)
         profile_tss_metrics = profile_tss(
             fragments=fragments_df,
             annotation=tss_annotation,
@@ -1042,21 +1186,24 @@ def compute_qc_stats_ray(fragments,
             min_norm=min_norm,
             return_TSS_enrichment_per_barcode=True,
             return_TSS_coverage_matrix_per_barcode=True,
-            return_plot_data=True)
+            return_plot_data=True,
+        )
         if profile_tss_metrics is not None:
-            metrics['profile_tss'] = profile_tss_metrics
+            metrics["profile_tss"] = profile_tss_metrics
     gc.collect()
     # FRIP
-    if 'frip' in stats:
+    if "frip" in stats:
         # FRIP
-        log.info('Computing FRIP profile for ' + label)
-        metrics['frip'] = frip(fragments=fragments_df,
-                               path_to_regions=path_to_regions,
-                               valid_bc=valid_bc,
-                               remove_duplicates=remove_duplicates,
-                               n_cpu=1,
-                               plot=False,
-                               return_plot_data=True)
+        log.info("Computing FRIP profile for " + label)
+        metrics["frip"] = frip(
+            fragments=fragments_df,
+            path_to_regions=path_to_regions,
+            valid_bc=valid_bc,
+            remove_duplicates=remove_duplicates,
+            n_cpu=1,
+            plot=False,
+            return_plot_data=True,
+        )
     del fragments_df
     gc.collect()
     metadata_bc, profile_data = metrics2data(metrics)
@@ -1066,33 +1213,39 @@ def compute_qc_stats_ray(fragments,
 
     metadata_bc_dict = {label: metadata_bc}
     profile_data_dict = {label: profile_data}
-    log.info('Sample ' + label + ' done!')
+    log.info("Sample " + label + " done!")
 
     return metadata_bc_dict, profile_data_dict
 
 
-def plot_sample_metrics(profile_data_dict: Dict[str,
-                                                pd.DataFrame],
-                        profile_list: Optional[Union['barcode_rank_plot',
-                                                     'duplicate_rate',
-                                                     'insert_size_distribution',
-                                                     'profile_tss',
-                                                     'frip']] = ['barcode_rank_plot',
-                                                                 'duplicate_rate',
-                                                                 'insert_size_distribution',
-                                                                 'profile_tss',
-                                                                 'frip'],
-                        remove_duplicates: Optional[bool] = True,
-                        color: Optional[List[List[Union[str]]]] = None,
-                        cmap: Optional[str] = None,
-                        ncol: Optional[int] = 1,
-                        figsize: Optional[Tuple[int,
-                                                int]] = None,
-                        insert_size_distriubtion_xlim: Optional[List[int]] = None,
-                        legend_outside: Optional[bool] = False,
-                        duplicate_rate_as_hexbin: Optional[bool] = False,
-                        plot: Optional[bool] = True,
-                        save: Optional[str] = None):
+def plot_sample_metrics(
+    profile_data_dict: Dict[str, pd.DataFrame],
+    profile_list: Optional[
+        Union[
+            "barcode_rank_plot",
+            "duplicate_rate",
+            "insert_size_distribution",
+            "profile_tss",
+            "frip",
+        ]
+    ] = [
+        "barcode_rank_plot",
+        "duplicate_rate",
+        "insert_size_distribution",
+        "profile_tss",
+        "frip",
+    ],
+    remove_duplicates: Optional[bool] = True,
+    color: Optional[List[List[Union[str]]]] = None,
+    cmap: Optional[str] = None,
+    ncol: Optional[int] = 1,
+    figsize: Optional[Tuple[int, int]] = None,
+    insert_size_distriubtion_xlim: Optional[List[int]] = None,
+    legend_outside: Optional[bool] = False,
+    duplicate_rate_as_hexbin: Optional[bool] = False,
+    plot: Optional[bool] = True,
+    save: Optional[str] = None,
+):
     """
     Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample).
 
@@ -1128,39 +1281,50 @@ def plot_sample_metrics(profile_data_dict: Dict[str,
         cmap=cmap,
         insert_size_distriubtion_xlim=insert_size_distriubtion_xlim,
         legend_outside=legend_outside,
-        duplicate_rate_as_hexbin=duplicate_rate_as_hexbin)
+        duplicate_rate_as_hexbin=duplicate_rate_as_hexbin,
+    )
     label_list = list(profile_data_dict.keys())
-    if ('duplicate_rate' in profile_list) & (not isinstance(
-            profile_data_dict[label_list[0]], pd.DataFrame)):
+    if ("duplicate_rate" in profile_list) & (
+        not isinstance(profile_data_dict[label_list[0]], pd.DataFrame)
+    ):
         n_plots = len(profile_list) - 1 + len(profile_data_dict)
     else:
         n_plots = len(profile_list)
 
-    multiplot_from_generator(g=plot_sample_metrics_generator_obj,
-                             num_columns=ncol,
-                             n_plots=n_plots,
-                             figsize=figsize,
-                             plot=plot,
-                             save=save)
+    multiplot_from_generator(
+        g=plot_sample_metrics_generator_obj,
+        num_columns=ncol,
+        n_plots=n_plots,
+        figsize=figsize,
+        plot=plot,
+        save=save,
+    )
 
 
-def plot_sample_metrics_generator(profile_data_dict: Dict[str,
-                                                          pd.DataFrame],
-                                  profile_list: Optional[Union['barcode_rank_plot',
-                                                               'duplicate_rate',
-                                                               'insert_size_distribution',
-                                                               'profile_tss',
-                                                               'frip']] = ['barcode_rank_plot',
-                                                                           'duplicate_rate',
-                                                                           'insert_size_distribution',
-                                                                           'profile_tss',
-                                                                           'frip'],
-                                  remove_duplicates: Optional[bool] = True,
-                                  color: Optional[List[List[Union[str]]]] = None,
-                                  cmap: Optional[str] = None,
-                                  insert_size_distriubtion_xlim: Optional[List[int]] = None,
-                                  legend_outside: Optional[bool] = False,
-                                  duplicate_rate_as_hexbin: Optional[bool] = False):
+def plot_sample_metrics_generator(
+    profile_data_dict: Dict[str, pd.DataFrame],
+    profile_list: Optional[
+        Union[
+            "barcode_rank_plot",
+            "duplicate_rate",
+            "insert_size_distribution",
+            "profile_tss",
+            "frip",
+        ]
+    ] = [
+        "barcode_rank_plot",
+        "duplicate_rate",
+        "insert_size_distribution",
+        "profile_tss",
+        "frip",
+    ],
+    remove_duplicates: Optional[bool] = True,
+    color: Optional[List[List[Union[str]]]] = None,
+    cmap: Optional[str] = None,
+    insert_size_distriubtion_xlim: Optional[List[int]] = None,
+    legend_outside: Optional[bool] = False,
+    duplicate_rate_as_hexbin: Optional[bool] = False,
+):
     """
     Plot sample-level profiles given a list of sample-level profiles dictionaries (one per sample). This function creates the generator to pass to the multiplotting function.
 
@@ -1184,66 +1348,66 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     # Prepare labels
     label_list = list(profile_data_dict.keys())
 
     # Check if it is only one sample, without sample name as entry in dict
     if isinstance(profile_data_dict[label_list[0]], pd.DataFrame):
-        profile_data_dict = {'Sample': profile_data_dict}
+        profile_data_dict = {"Sample": profile_data_dict}
         label_list = list(profile_data_dict.keys())
 
     # Rank plot
-    if 'barcode_rank_plot' in profile_list:
+    if "barcode_rank_plot" in profile_list:
         yield
 
         legend_labels = []
         for i in range(len(profile_data_dict)):
-            if 'barcode_rank_plot' not in profile_data_dict[label_list[i]]:
+            if "barcode_rank_plot" not in profile_data_dict[label_list[i]]:
                 log.error(
-                    'barcode_rank_plot is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['barcode_rank_plot']
+                    "barcode_rank_plot is not included in the profiles dictionary"
+                )
+            plot_data = profile_data_dict[label_list[i]]["barcode_rank_plot"]
 
-            sel = np.ma.masked_where(
-                plot_data['Selected'],
-                plot_data['Barcode_rank'])
+            sel = np.ma.masked_where(plot_data["Selected"], plot_data["Barcode_rank"])
             nosel = np.ma.masked_where(
-                plot_data['Selected'] == False,
-                plot_data['Barcode_rank'])
+                plot_data["Selected"] == False, plot_data["Barcode_rank"]
+            )
 
-            if (len(label_list) > 1) | (label_list[0] != ''):
-                legend_labels.append(f'{label_list[i]} ({sum(sel.mask)})')
+            if (len(label_list) > 1) | (label_list[0] != ""):
+                legend_labels.append(f"{label_list[i]} ({sum(sel.mask)})")
             else:
-                legend_labels.append(f'Selected BC: {sum(sel.mask)}')
+                legend_labels.append(f"Selected BC: {sum(sel.mask)}")
                 legend_labels.append(
-                    f'Non-selected BC: {plot_data.shape[0] - sum(sel.mask)}')
+                    f"Non-selected BC: {plot_data.shape[0] - sum(sel.mask)}"
+                )
 
             if not remove_duplicates:
-                NF = plot_data['Total_nr_frag']
+                NF = plot_data["Total_nr_frag"]
             else:
-                NF = plot_data['Unique_nr_frag']
+                NF = plot_data["Unique_nr_frag"]
 
             if color is None:
                 plt.plot(nosel, NF)
-                if (len(label_list) > 1) | (label_list[0] != ''):
-                    plt.plot(sel, NF, 'grey', label='_nolegend_')
+                if (len(label_list) > 1) | (label_list[0] != ""):
+                    plt.plot(sel, NF, "grey", label="_nolegend_")
                 else:
-                    plt.plot(sel, NF, 'grey')
+                    plt.plot(sel, NF, "grey")
             else:
                 if len(color[i]) < 2:
                     plt.plot(nosel, NF, color[i])
-                    if (len(label_list) > 1) | (label_list[0] != ''):
-                        plt.plot(sel, NF, 'grey', label='_nolegend_')
+                    if (len(label_list) > 1) | (label_list[0] != ""):
+                        plt.plot(sel, NF, "grey", label="_nolegend_")
                     else:
-                        plt.plot(sel, NF, 'grey')
+                        plt.plot(sel, NF, "grey")
                 else:
                     plt.plot(nosel, NF, color[i][0])
-                    if (len(label_list) > 1) | (label_list[0] != ''):
-                        plt.plot(sel, NF, color[i][1], label='_nolegend_')
+                    if (len(label_list) > 1) | (label_list[0] != ""):
+                        plt.plot(sel, NF, color[i][1], label="_nolegend_")
                     else:
                         plt.plot(sel, NF, color[i][1])
 
@@ -1253,21 +1417,20 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
             plt.ylabel("Number of fragments in regions", fontsize=10)
 
             if legend_outside:
-                plt.legend(
-                    legend_labels, bbox_to_anchor=(
-                        1.04, 1), loc="upper left")
+                plt.legend(legend_labels, bbox_to_anchor=(1.04, 1), loc="upper left")
             else:
                 plt.legend(legend_labels)
 
     # Fragment size
-    if 'insert_size_distribution' in profile_list:
+    if "insert_size_distribution" in profile_list:
         yield
 
         for i in range(len(profile_data_dict)):
-            if 'insert_size_distribution' not in profile_data_dict[label_list[i]]:
+            if "insert_size_distribution" not in profile_data_dict[label_list[i]]:
                 log.error(
-                    'insert_size_distribution is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['insert_size_distribution']
+                    "insert_size_distribution is not included in the profiles dictionary"
+                )
+            plot_data = profile_data_dict[label_list[i]]["insert_size_distribution"]
             if color is not None:
                 if len(color[i]) > 2:
                     selected_color = color[i][0]
@@ -1276,33 +1439,27 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
             else:
                 selected_color = None
 
-            plt.plot(
-                plot_data['Width'],
-                plot_data['Ratio_frag'],
-                color=selected_color)
+            plt.plot(plot_data["Width"], plot_data["Ratio_frag"], color=selected_color)
             plt.xlabel("Fragment size", fontsize=10)
             plt.ylabel("Fragments ratio", fontsize=10)
             if insert_size_distriubtion_xlim is not None:
                 plt.xlim(
-                    insert_size_distriubtion_xlim[0],
-                    insert_size_distriubtion_xlim[1])
-        if (len(label_list) > 1) | (label_list[0] != ''):
+                    insert_size_distriubtion_xlim[0], insert_size_distriubtion_xlim[1]
+                )
+        if (len(label_list) > 1) | (label_list[0] != ""):
             if legend_outside:
-                plt.legend(
-                    label_list, bbox_to_anchor=(
-                        1.04, 1), loc="upper left")
+                plt.legend(label_list, bbox_to_anchor=(1.04, 1), loc="upper left")
             else:
                 plt.legend(label_list)
 
     # TSS
-    if 'profile_tss' in profile_list:
+    if "profile_tss" in profile_list:
         yield
 
         for i in range(len(profile_data_dict)):
-            if 'profile_tss' not in profile_data_dict[label_list[i]]:
-                log.error(
-                    'profile_tss is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['profile_tss']
+            if "profile_tss" not in profile_data_dict[label_list[i]]:
+                log.error("profile_tss is not included in the profiles dictionary")
+            plot_data = profile_data_dict[label_list[i]]["profile_tss"]
             if color is not None:
                 if len(color[i]) > 2:
                     selected_color = color[i][0]
@@ -1312,29 +1469,26 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
                 selected_color = None
 
             plt.plot(
-                plot_data['Position'],
-                plot_data['TSS_enrichment'],
-                color=selected_color)
+                plot_data["Position"], plot_data["TSS_enrichment"], color=selected_color
+            )
 
-            plt.xlim(min(plot_data['Position']), max(plot_data['Position']))
+            plt.xlim(min(plot_data["Position"]), max(plot_data["Position"]))
             plt.xlabel("Position from TSS", fontsize=10)
             plt.ylabel("Normalized enrichment", fontsize=10)
-        if (len(label_list) > 1) | (label_list[0] != ''):
+        if (len(label_list) > 1) | (label_list[0] != ""):
             if legend_outside:
-                plt.legend(
-                    label_list, bbox_to_anchor=(
-                        1.04, 1), loc="upper left")
+                plt.legend(label_list, bbox_to_anchor=(1.04, 1), loc="upper left")
             else:
                 plt.legend(label_list)
 
     # FRIP
-    if 'frip' in profile_list:
+    if "frip" in profile_list:
         yield
 
         for i in range(len(profile_data_dict)):
-            if 'frip' not in profile_data_dict[label_list[i]]:
-                log.error('frip is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['frip']
+            if "frip" not in profile_data_dict[label_list[i]]:
+                log.error("frip is not included in the profiles dictionary")
+            plot_data = profile_data_dict[label_list[i]]["frip"]
             if color is not None:
                 if len(color[i]) > 2:
                     selected_color = color[i][0]
@@ -1344,30 +1498,28 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
                 selected_color = None
 
             sns.distplot(
-                plot_data['FRIP'],
+                plot_data["FRIP"],
                 hist=False,
                 kde=True,
                 color=selected_color,
-                label=label_list[i])
+                label=label_list[i],
+            )
 
-        if (len(label_list) > 1) | (label_list[0] != ''):
+        if (len(label_list) > 1) | (label_list[0] != ""):
             if legend_outside:
-                plt.legend(
-                    label_list, bbox_to_anchor=(
-                        1.04, 1), loc="upper left")
+                plt.legend(label_list, bbox_to_anchor=(1.04, 1), loc="upper left")
             else:
                 plt.legend(label_list)
 
     # Duplicate rate
-    if 'duplicate_rate' in profile_list:
+    if "duplicate_rate" in profile_list:
         for i in range(len(profile_data_dict)):
             yield
-            if 'duplicate_rate' not in profile_data_dict[label_list[i]]:
-                log.error(
-                    'duplicate_rate is not included in the profiles dictionary')
-            plot_data = profile_data_dict[label_list[i]]['duplicate_rate']
-            x = plot_data['Unique_nr_frag']
-            y = plot_data['Dupl_rate']
+            if "duplicate_rate" not in profile_data_dict[label_list[i]]:
+                log.error("duplicate_rate is not included in the profiles dictionary")
+            plot_data = profile_data_dict[label_list[i]]["duplicate_rate"]
+            x = plot_data["Unique_nr_frag"]
+            y = plot_data["Dupl_rate"]
 
             if not duplicate_rate_as_hexbin:
                 try:
@@ -1377,7 +1529,7 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
                     x, y, z = x[idx], y[idx], z[idx]
                     plt.scatter(x, y, c=z, s=10, edgecolor=None, cmap=cmap)
                 except BaseException:
-                    log.info('All fragments are unique')
+                    log.info("All fragments are unique")
                     plt.scatter(x, y, s=10, edgecolor=None, cmap=cmap)
             else:
                 plt.hexbin(
@@ -1386,25 +1538,28 @@ def plot_sample_metrics_generator(profile_data_dict: Dict[str,
                     edgecolor=None,
                     cmap=cmap,
                     gridsize=100,
-                    xscale='log',
-                    bins='log',
-                    mincnt=1)
+                    xscale="log",
+                    bins="log",
+                    mincnt=1,
+                )
             plt.title(label_list[i])
             plt.ylim(0, 1)
             plt.xscale("log")
             plt.xlabel("Number of (unique) fragments", fontsize=10)
             plt.ylabel("Duplication rate", fontsize=10)
-            plt.colorbar().set_label('Density')
+            plt.colorbar().set_label("Density")
             plt.xlim(min(x), max(x))
 
 
-def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
-                             barcode: Union[List[str], str],
-                             rolling_window: Optional[int] = 10,
-                             plot: Optional[bool] = True,
-                             color: Optional[List[List[Union[str]]]] = None,
-                             save: Optional[str] = None):
-    """"
+def plot_barcode_profile_tss(
+    tss_profile_per_barcode: pd.DataFrame,
+    barcode: Union[List[str], str],
+    rolling_window: Optional[int] = 10,
+    plot: Optional[bool] = True,
+    color: Optional[List[List[Union[str]]]] = None,
+    save: Optional[str] = None,
+):
+    """ "
     Plot TSS profile per barcode.
 
     Parameters
@@ -1435,8 +1590,7 @@ def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
         plot_data_df = tss_profile_per_barcode.loc[barcode]
         i_iter = range(plot_data_df.shape[0])
 
-    plot_data_df = plot_data_df.rolling(
-        window=100, min_periods=0, axis=1).mean()
+    plot_data_df = plot_data_df.rolling(window=100, min_periods=0, axis=1).mean()
 
     for i in i_iter:
         plot_data = plot_data_df.iloc[i]
@@ -1447,16 +1601,20 @@ def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
                 selected_color = None
         else:
             selected_color = None
-        plt.plot(range(-(int(plot_data_df.shape[1] / 2) + 1), int(
-            plot_data_df.shape[1] / 2)), plot_data, color=selected_color)
-        plt.xlim(-(int(plot_data_df.shape[1] / 2) + 1),
-                 int(plot_data_df.shape[1] / 2))
+        plt.plot(
+            range(
+                -(int(plot_data_df.shape[1] / 2) + 1), int(plot_data_df.shape[1] / 2)
+            ),
+            plot_data,
+            color=selected_color,
+        )
+        plt.xlim(-(int(plot_data_df.shape[1] / 2) + 1), int(plot_data_df.shape[1] / 2))
         plt.xlabel("Position from TSS", fontsize=10)
         plt.ylabel("Normalized enrichment", fontsize=10)
     plt.legend(barcode)
 
     if save is not None:
-        pdf.savefig(fig, bbox_inches='tight')
+        pdf.savefig(fig, bbox_inches="tight")
         pdf.close()
 
     if plot is not False:
@@ -1465,22 +1623,24 @@ def plot_barcode_profile_tss(tss_profile_per_barcode: pd.DataFrame,
         plt.close(fig)
 
 
-def plot_barcode_metrics_per_group(input_metrics: Dict,
-                                   var_x: str,
-                                   var_y: Optional[str] = None,
-                                   min_x: Optional[int] = None,
-                                   max_x: Optional[int] = None,
-                                   min_y: Optional[int] = None,
-                                   max_y: Optional[int] = None,
-                                   color: Optional[str] = '#440154FF',
-                                   cmap: Optional[str] = 'viridis',
-                                   as_density: Optional[bool] = False,
-                                   add_hist: Optional[bool] = True,
-                                   n_bins: Optional[int] = 100,
-                                   plot_as_hexbin: Optional[bool] = False,
-                                   plot: Optional[bool] = True,
-                                   save: Optional[str] = None):
-    """"
+def plot_barcode_metrics_per_group(
+    input_metrics: Dict,
+    var_x: str,
+    var_y: Optional[str] = None,
+    min_x: Optional[int] = None,
+    max_x: Optional[int] = None,
+    min_y: Optional[int] = None,
+    max_y: Optional[int] = None,
+    color: Optional[str] = "#440154FF",
+    cmap: Optional[str] = "viridis",
+    as_density: Optional[bool] = False,
+    add_hist: Optional[bool] = True,
+    n_bins: Optional[int] = 100,
+    plot_as_hexbin: Optional[bool] = False,
+    plot: Optional[bool] = True,
+    save: Optional[str] = None,
+):
+    """ "
     Plot barcode metrics and filter based on used-provided thresholds.
 
     Parameters
@@ -1526,17 +1686,17 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     selected_cells = {}
     fig_dict = {}
     if save is not None:
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
         if not os.path.exists(os.path.dirname(save)):
-            if os.path.dirname(save) != '':
+            if os.path.dirname(save) != "":
                 os.makedirs(os.path.dirname(save))
     for key in input_metrics.keys():
         x = input_metrics[key][var_x]
@@ -1558,13 +1718,7 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
                 except BaseException:
                     plt.scatter(x, y, s=10, edgecolor=None, cmap=cmap)
             else:
-                plt.hexbin(
-                    x,
-                    y,
-                    edgecolor=None,
-                    cmap=cmap,
-                    gridsize=100,
-                    mincnt=0.1)
+                plt.hexbin(x, y, edgecolor=None, cmap=cmap, gridsize=100, mincnt=0.1)
             plt.xlabel(var_x, fontsize=10)
             plt.ylabel(var_y, fontsize=10)
             plt.xlim(min(x), max(x))
@@ -1574,21 +1728,25 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
                 plt.title(key, y=-0.2, fontsize=10, fontweight="bold")
             # Add limits
             if min_x is not None:
-                plt.axvline(x=min_x, color='skyblue', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_x] > min_x]
+                plt.axvline(x=min_x, color="skyblue", linestyle="--")
+                input_metrics[key] = input_metrics[key].loc[
+                    input_metrics[key][var_x] > min_x
+                ]
             if max_x is not None:
-                plt.axvline(x=max_x, color='tomato', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_x] < max_x]
+                plt.axvline(x=max_x, color="tomato", linestyle="--")
+                input_metrics[key] = input_metrics[key].loc[
+                    input_metrics[key][var_x] < max_x
+                ]
             if min_y is not None:
-                plt.axhline(y=min_y, color='skyblue', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_y] > min_y]
+                plt.axhline(y=min_y, color="skyblue", linestyle="--")
+                input_metrics[key] = input_metrics[key].loc[
+                    input_metrics[key][var_y] > min_y
+                ]
             if max_y is not None:
-                plt.axhline(y=max_y, color='tomato', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_y] < max_y]
+                plt.axhline(y=max_y, color="tomato", linestyle="--")
+                input_metrics[key] = input_metrics[key].loc[
+                    input_metrics[key][var_y] < max_y
+                ]
 
             # first barplot on axis
             fig.add_axes([0, 0.8, 0.8, 0.2])
@@ -1598,13 +1756,13 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
                     hist=add_hist,
                     kde=True,
                     color=color,
-                    kde_kws={
-                        'shade': True},
-                    bins=n_bins)
+                    kde_kws={"shade": True},
+                    bins=n_bins,
+                )
             else:
                 plt.hist(x, bins=n_bins, color=color)
             plt.xlim(min(x), max(x))
-            plt.axis('off')
+            plt.axis("off")
             # second barplot on axis
             fig.add_axes([0.8, 0, 0.2, 0.8])
             if as_density:
@@ -1613,17 +1771,17 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
                     hist=add_hist,
                     kde=True,
                     color=color,
-                    kde_kws={
-                        'shade': True},
+                    kde_kws={"shade": True},
                     vertical=True,
-                    bins=n_bins)
+                    bins=n_bins,
+                )
             else:
-                plt.hist(y, bins=n_bins, orientation='horizontal', color=color)
+                plt.hist(y, bins=n_bins, orientation="horizontal", color=color)
             plt.ylim(min(y), max(y))
-            plt.axis('off')
+            plt.axis("off")
 
             if save is not None:
-                pdf.savefig(fig, bbox_inches='tight')
+                pdf.savefig(fig, bbox_inches="tight")
 
             if plot is not False:
                 plt.show()
@@ -1634,8 +1792,7 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
             plt.close()
             fig = plt.figure()
             if isinstance(var_y, str):
-                log.info(
-                    'The given var_y is not a column in cistopic_obj.cell_data')
+                log.info("The given var_y is not a column in cistopic_obj.cell_data")
 
             # first barplot on axis
             if as_density:
@@ -1644,9 +1801,9 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
                     hist=add_hist,
                     kde=True,
                     color=color,
-                    kde_kws={
-                        'shade': True},
-                    bins=n_bins)
+                    kde_kws={"shade": True},
+                    bins=n_bins,
+                )
             else:
                 plt.hist(x, bins=n_bins, color=color)
                 plt.xlim(min(x), max(x))
@@ -1656,16 +1813,18 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
 
             # Add limits
             if min_x is not None:
-                plt.axvline(x=min_x, color='skyblue', linestyle='--')
-                input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                            [var_x] > min_x]
+                plt.axvline(x=min_x, color="skyblue", linestyle="--")
+                input_metrics[key] = input_metrics[key].loc[
+                    input_metrics[key][var_x] > min_x
+                ]
                 if max_x is not None:
-                    plt.axvline(x=max_x, color='tomato', linestyle='--')
-                    input_metrics[key] = input_metrics[key].loc[input_metrics[key]
-                                                                [var_x] < max_x]
+                    plt.axvline(x=max_x, color="tomato", linestyle="--")
+                    input_metrics[key] = input_metrics[key].loc[
+                        input_metrics[key][var_x] < max_x
+                    ]
 
             if save is not None:
-                pdf.savefig(fig, bbox_inches='tight')
+                pdf.savefig(fig, bbox_inches="tight")
 
             if plot is not False:
                 plt.show()
@@ -1681,29 +1840,29 @@ def plot_barcode_metrics_per_group(input_metrics: Dict,
     return fig_dict, selected_cells
 
 
-def plot_barcode_metrics(input_metrics: Union[Dict,
-                                              pd.DataFrame,
-                                              'CistopicObject'],
-                         var_x: str,
-                         var_group: Optional[str] = None,
-                         var_y: Optional[str] = None,
-                         min_x: Optional[float] = None,
-                         max_x: Optional[float] = None,
-                         min_y: Optional[float] = None,
-                         max_y: Optional[float] = None,
-                         color: Optional[str] = '#440154FF',
-                         cmap: Optional[str] = 'viridis',
-                         as_density: Optional[bool] = True,
-                         add_hist: Optional[bool] = True,
-                         n_bins: Optional[int] = 100,
-                         plot_as_hexbin: Optional[bool] = False,
-                         combine_samples_ridgeline: Optional[bool] = True,
-                         overlap_ridgeline: Optional[float] = .85,
-                         plot: Optional[bool] = True,
-                         save: Optional[str] = None,
-                         return_cells: Optional[bool] = True,
-                         return_fig: Optional[bool] = False):
-    """"
+def plot_barcode_metrics(
+    input_metrics: Union[Dict, pd.DataFrame, "CistopicObject"],
+    var_x: str,
+    var_group: Optional[str] = None,
+    var_y: Optional[str] = None,
+    min_x: Optional[float] = None,
+    max_x: Optional[float] = None,
+    min_y: Optional[float] = None,
+    max_y: Optional[float] = None,
+    color: Optional[str] = "#440154FF",
+    cmap: Optional[str] = "viridis",
+    as_density: Optional[bool] = True,
+    add_hist: Optional[bool] = True,
+    n_bins: Optional[int] = 100,
+    plot_as_hexbin: Optional[bool] = False,
+    combine_samples_ridgeline: Optional[bool] = True,
+    overlap_ridgeline: Optional[float] = 0.85,
+    plot: Optional[bool] = True,
+    save: Optional[str] = None,
+    return_cells: Optional[bool] = True,
+    return_fig: Optional[bool] = False,
+):
+    """ "
     Plot barcode metrics and filter based on used-provided thresholds.
 
     Parameters
@@ -1757,27 +1916,43 @@ def plot_barcode_metrics(input_metrics: Union[Dict,
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     # Take cell data
     if isinstance(input_metrics, CistopicObject):
         input_metrics = input_metrics.cell_data
     if isinstance(input_metrics, dict):
         input_metrics = merge_metadata(input_metrics)
-        var_group = 'Sample'
+        var_group = "Sample"
 
     # If there is only one sample
     if var_group is None:
-        input_metrics = {'Sample': input_metrics}
+        input_metrics = {"Sample": input_metrics}
         fig_dict, selected_cells = plot_barcode_metrics_per_group(
-            input_metrics, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins,
-            plot_as_hexbin, plot, save)
+            input_metrics,
+            var_x,
+            var_y,
+            min_x,
+            max_x,
+            min_y,
+            max_y,
+            color,
+            cmap,
+            as_density,
+            add_hist,
+            n_bins,
+            plot_as_hexbin,
+            plot,
+            save,
+        )
     else:
-        input_metrics_dict = {x: input_metrics[input_metrics.loc[:, var_group] == x] for x in list(
-            set(input_metrics.loc[:, var_group]))}
+        input_metrics_dict = {
+            x: input_metrics[input_metrics.loc[:, var_group] == x]
+            for x in list(set(input_metrics.loc[:, var_group]))
+        }
         if combine_samples_ridgeline is True and var_y is None:
             selected_cells = plot_barcode_metrics_per_group(
                 input_metrics_dict,
@@ -1794,37 +1969,36 @@ def plot_barcode_metrics(input_metrics: Union[Dict,
                 n_bins,
                 plot_as_hexbin,
                 plot=False,
-                save=None)
+                save=None,
+            )
             if save is not None:
                 if not os.path.exists(os.path.dirname(save)):
                     os.makedirs(os.path.dirname(save))
                 pdf = matplotlib.backends.backend_pdf.PdfPages(save)
             plt.close()
             fig = plt.figure()
-            grouped = [(v, d.loc[:, var_x].dropna().values)
-                       for v, d in input_metrics.groupby(var_group)]
+            grouped = [
+                (v, d.loc[:, var_x].dropna().values)
+                for v, d in input_metrics.groupby(var_group)
+            ]
             sample, data = zip(*grouped)
             if color is None:
-                color = 'skyblue'
-            ridgeline(
-                data,
-                labels=sample,
-                overlap=overlap_ridgeline,
-                fill=color)
+                color = "skyblue"
+            ridgeline(data, labels=sample, overlap=overlap_ridgeline, fill=color)
             plt.xlabel(var_x)
             plt.grid(zorder=0)
             # Add limits
             if min_x is not None:
-                plt.axvline(x=min_x, color='skyblue', linestyle='--')
+                plt.axvline(x=min_x, color="skyblue", linestyle="--")
             if max_x is not None:
-                plt.axvline(x=max_x, color='tomato', linestyle='--')
+                plt.axvline(x=max_x, color="tomato", linestyle="--")
             if min_y is not None:
-                plt.axhline(y=min_y, color='skyblue', linestyle='--')
+                plt.axhline(y=min_y, color="skyblue", linestyle="--")
             if max_y is not None:
-                plt.axhline(y=max_y, color='tomato', linestyle='--')
+                plt.axhline(y=max_y, color="tomato", linestyle="--")
 
             if save is not None:
-                pdf.savefig(fig, bbox_inches='tight')
+                pdf.savefig(fig, bbox_inches="tight")
                 pdf.close()
 
             if plot is not False:
@@ -1835,8 +2009,22 @@ def plot_barcode_metrics(input_metrics: Union[Dict,
 
         else:
             fig_dict, selected_cells = plot_barcode_metrics_per_group(
-                input_metrics_dict, var_x, var_y, min_x, max_x, min_y, max_y, color, cmap, as_density, add_hist, n_bins,
-                plot_as_hexbin, plot, save)
+                input_metrics_dict,
+                var_x,
+                var_y,
+                min_x,
+                max_x,
+                min_y,
+                max_y,
+                color,
+                cmap,
+                as_density,
+                add_hist,
+                n_bins,
+                plot_as_hexbin,
+                plot,
+                save,
+            )
 
     if return_cells:
         if len(selected_cells) == 1:
@@ -1870,19 +2058,20 @@ def merge_metadata(metadata_bc_dict: Dict):
     """
 
     for key in metadata_bc_dict.keys():
-        metadata_bc_dict[key]['Sample'] = [key] * metadata_bc_dict[key].shape[0]
+        metadata_bc_dict[key]["Sample"] = [key] * metadata_bc_dict[key].shape[0]
 
-    metadata_bc_list = [metadata_bc_dict[key]
-                        for key in metadata_bc_dict.keys()]
+    metadata_bc_list = [metadata_bc_dict[key] for key in metadata_bc_dict.keys()]
     metadata_bc_combined = pd.concat(metadata_bc_list, axis=0, sort=False)
     return metadata_bc_combined
 
 
-def ridgeline(data: List,
-              overlap: Optional[float] = 0,
-              fill: Optional[str] = None,
-              labels: Optional[List] = None,
-              n_points: Optional[int] = 150):
+def ridgeline(
+    data: List,
+    overlap: Optional[float] = 0,
+    fill: Optional[str] = None,
+    labels: Optional[List] = None,
+    n_points: Optional[int] = 150,
+):
     """
     Create a standard ridgeline plot.
 
@@ -1900,9 +2089,10 @@ def ridgeline(data: List,
             Number of points to evaluate each distribution function. Default: 150/
     """
     if overlap > 1 or overlap < 0:
-        raise ValueError('overlap must be in [0 1]')
-    xx = np.linspace(np.min(np.concatenate(data)),
-                     np.max(np.concatenate(data)), n_points)
+        raise ValueError("overlap must be in [0 1]")
+    xx = np.linspace(
+        np.min(np.concatenate(data)), np.max(np.concatenate(data)), n_points
+    )
     curves = []
     ys = []
     for i, d in enumerate(data):
@@ -1911,8 +2101,13 @@ def ridgeline(data: List,
         ys.append(y)
         curve = pdf(xx)
         if fill:
-            plt.fill_between(xx, np.ones(n_points) * y,
-                             curve + y, zorder=len(data) - i + 1, color=fill)
-            plt.plot(xx, curve + y, c='k', zorder=len(data) - i + 1)
+            plt.fill_between(
+                xx,
+                np.ones(n_points) * y,
+                curve + y,
+                zorder=len(data) - i + 1,
+                color=fill,
+            )
+            plt.plot(xx, curve + y, c="k", zorder=len(data) - i + 1)
     if labels:
         plt.yticks(ys, labels)

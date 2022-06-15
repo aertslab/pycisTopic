@@ -1,28 +1,29 @@
-import lda
 import logging
-import matplotlib.backends.backend_pdf
-import matplotlib.pyplot as plt
-import numpy as np
 import os
-import pandas as pd
 import pickle
 import random
-import ray
 import subprocess
 import sys
 import tempfile
-import tmtoolkit
+import time
 import warnings
 import xml.etree.ElementTree as et
 import zipfile
-import time
-from gensim import utils, matutils, corpora
+from itertools import chain
+from typing import Iterable, List, Optional, Tuple, Union
+
+import lda
+import matplotlib.backends.backend_pdf
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import ray
+import tmtoolkit
+from gensim import corpora, matutils, utils
 from gensim.models import basemodel
 from gensim.models.ldamodel import LdaModel
 from gensim.utils import check_output, revdict
-from itertools import chain
 from scipy import sparse
-from typing import List, Iterable, Optional, Tuple, Union
 
 from pycisTopic.cistopic_class import *
 from pycisTopic.utils import *
@@ -68,14 +69,16 @@ class CistopicLDAModel:
     Arun, R., Suresh, V., Madhavan, C. V., & Murthy, M. N. (2010). On finding the natural number of topics with latent dirichlet allocation: Some observations. In Pacific-Asia conference on knowledge discovery and data mining (pp. 391-402). Springer, Berlin, Heidelberg.
     """
 
-    def __init__(self,
-                 metrics: pd.DataFrame,
-                 coherence: pd.DataFrame,
-                 marg_topic: pd.DataFrame,
-                 topic_ass: pd.DataFrame,
-                 cell_topic: pd.DataFrame,
-                 topic_region: pd.DataFrame,
-                 parameters: pd.DataFrame):
+    def __init__(
+        self,
+        metrics: pd.DataFrame,
+        coherence: pd.DataFrame,
+        marg_topic: pd.DataFrame,
+        topic_ass: pd.DataFrame,
+        cell_topic: pd.DataFrame,
+        topic_region: pd.DataFrame,
+        parameters: pd.DataFrame,
+    ):
         self.metrics = metrics
         self.coherence = coherence
         self.marg_topic = marg_topic
@@ -93,18 +96,20 @@ class CistopicLDAModel:
         return descr
 
 
-def run_cgs_models(cistopic_obj: 'cisTopicObject',
-                   n_topics: List[int],
-                   n_cpu: Optional[int] = 1,
-                   n_iter: Optional[int] = 150,
-                   random_state: Optional[int] = 555,
-                   alpha: Optional[float] = 50,
-                   alpha_by_topic: Optional[bool] = True,
-                   eta: Optional[float] = 0.1,
-                   eta_by_topic: Optional[bool] = False,
-                   top_topics_coh: Optional[int] = 5,
-                   save_path: Optional[str] = None,
-                   **kwargs):
+def run_cgs_models(
+    cistopic_obj: "cisTopicObject",
+    n_topics: List[int],
+    n_cpu: Optional[int] = 1,
+    n_iter: Optional[int] = 150,
+    random_state: Optional[int] = 555,
+    alpha: Optional[float] = 50,
+    alpha_by_topic: Optional[bool] = True,
+    eta: Optional[float] = 0.1,
+    eta_by_topic: Optional[bool] = False,
+    top_topics_coh: Optional[int] = 5,
+    save_path: Optional[str] = None,
+    **kwargs,
+):
     """
     Run Latent Dirichlet Allocation using Gibbs Sampling as described in Griffiths and Steyvers, 2004.
 
@@ -143,39 +148,50 @@ def run_cgs_models(cistopic_obj: 'cisTopicObject',
     Griffiths, T. L., & Steyvers, M. (2004). Finding scientific topics. Proceedings of the National academy of Sciences, 101(suppl 1), 5228-5235.
     """
 
-    binary_matrix = sparse.csr_matrix(cistopic_obj.binary_matrix.transpose(), dtype=np.integer)
+    binary_matrix = sparse.csr_matrix(
+        cistopic_obj.binary_matrix.transpose(), dtype=np.integer
+    )
     region_names = cistopic_obj.region_names
     cell_names = cistopic_obj.cell_names
     ray.init(num_cpus=n_cpu, **kwargs)
-    model_list = ray.get([run_cgs_model.remote(binary_matrix,
-                                               n_topics=n_topic,
-                                               cell_names=cell_names,
-                                               region_names=region_names,
-                                               n_iter=n_iter,
-                                               random_state=random_state,
-                                               alpha=alpha,
-                                               alpha_by_topic=alpha_by_topic,
-                                               eta=eta,
-                                               eta_by_topic=eta_by_topic,
-                                               top_topics_coh=top_topics_coh,
-                                               save_path=save_path) for n_topic in n_topics])
+    model_list = ray.get(
+        [
+            run_cgs_model.remote(
+                binary_matrix,
+                n_topics=n_topic,
+                cell_names=cell_names,
+                region_names=region_names,
+                n_iter=n_iter,
+                random_state=random_state,
+                alpha=alpha,
+                alpha_by_topic=alpha_by_topic,
+                eta=eta,
+                eta_by_topic=eta_by_topic,
+                top_topics_coh=top_topics_coh,
+                save_path=save_path,
+            )
+            for n_topic in n_topics
+        ]
+    )
     ray.shutdown()
     return model_list
 
 
 @ray.remote
-def run_cgs_model(binary_matrix: sparse.csr_matrix,
-                  n_topics: int,
-                  cell_names: List[str],
-                  region_names: List[str],
-                  n_iter: Optional[int] = 150,
-                  random_state: Optional[int] = 555,
-                  alpha: Optional[float] = 50,
-                  alpha_by_topic: Optional[bool] = True,
-                  eta: Optional[float] = 0.1,
-                  eta_by_topic: Optional[bool] = False,
-                  top_topics_coh: Optional[int] = 5,
-                  save_path: Optional[str] = None):
+def run_cgs_model(
+    binary_matrix: sparse.csr_matrix,
+    n_topics: int,
+    cell_names: List[str],
+    region_names: List[str],
+    n_iter: Optional[int] = 150,
+    random_state: Optional[int] = 555,
+    alpha: Optional[float] = 50,
+    alpha_by_topic: Optional[bool] = True,
+    eta: Optional[float] = 0.1,
+    eta_by_topic: Optional[bool] = False,
+    top_topics_coh: Optional[int] = 5,
+    save_path: Optional[str] = None,
+):
     """
     Run Latent Dirichlet Allocation per model using Gibbs Sampling as described in Griffiths and Steyvers, 2004.
 
@@ -217,98 +233,102 @@ def run_cgs_model(binary_matrix: sparse.csr_matrix,
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     # Suppress lda logger
-    lda_log = logging.getLogger('lda')
+    lda_log = logging.getLogger("lda")
     lda_log.addHandler(logging.NullHandler())
     lda_log.propagate = False
-    warnings.filterwarnings('ignore')
+    warnings.filterwarnings("ignore")
 
     # Set models
     if alpha_by_topic and eta_by_topic:
-        model = lda.LDA(n_topics=n_topics,
-                        n_iter=n_iter,
-                        random_state=random_state,
-                        alpha=alpha / n_topics,
-                        eta=eta / n_topics,
-                        refresh=n_iter)
+        model = lda.LDA(
+            n_topics=n_topics,
+            n_iter=n_iter,
+            random_state=random_state,
+            alpha=alpha / n_topics,
+            eta=eta / n_topics,
+            refresh=n_iter,
+        )
     elif alpha_by_topic and eta_by_topic is False:
-        model = lda.LDA(n_topics=n_topics,
-                        n_iter=n_iter,
-                        random_state=random_state,
-                        alpha=alpha / n_topics,
-                        eta=eta,
-                        refresh=n_iter)
+        model = lda.LDA(
+            n_topics=n_topics,
+            n_iter=n_iter,
+            random_state=random_state,
+            alpha=alpha / n_topics,
+            eta=eta,
+            refresh=n_iter,
+        )
     elif alpha_by_topic is False and eta_by_topic is True:
-        model = lda.LDA(n_topics=n_topics,
-                        n_iter=n_iter,
-                        random_state=random_state,
-                        alpha=alpha,
-                        eta=eta / n_topics,
-                        refresh=n_iter)
+        model = lda.LDA(
+            n_topics=n_topics,
+            n_iter=n_iter,
+            random_state=random_state,
+            alpha=alpha,
+            eta=eta / n_topics,
+            refresh=n_iter,
+        )
     else:
-        model = lda.LDA(n_topics=n_topics,
-                        n_iter=n_iter,
-                        random_state=random_state,
-                        alpha=alpha,
-                        eta=eta,
-                        refresh=n_iter)
+        model = lda.LDA(
+            n_topics=n_topics,
+            n_iter=n_iter,
+            random_state=random_state,
+            alpha=alpha,
+            eta=eta,
+            refresh=n_iter,
+        )
 
     # Running model
     log.info(f"Running model with {n_topics} topics")
     start_time = time.time()
     model.fit(binary_matrix)
-    end_time = time.time()-start_time
+    end_time = time.time() - start_time
 
     # Model evaluation
     arun_2010 = tmtoolkit.topicmod.evaluate.metric_arun_2010(
-        model.topic_word_, model.doc_topic_, np.asarray(binary_matrix.sum(axis=1)).astype(float)
+        model.topic_word_,
+        model.doc_topic_,
+        np.asarray(binary_matrix.sum(axis=1)).astype(float),
     )
-    cao_juan_2009 = tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(
-        model.topic_word_
-    )
+    cao_juan_2009 = tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(model.topic_word_)
     mimno_2011 = tmtoolkit.topicmod.evaluate.metric_coherence_mimno_2011(
         model.topic_word_,
         dtm=binary_matrix,
         top_n=20,
         eps=1e-12,
         normalize=True,
-        return_mean=False
+        return_mean=False,
     )
     ll = loglikelihood(model.nzw_, model.ndz_, alpha, eta)
 
     # Organize data
     if len(mimno_2011) <= top_topics_coh:
-        metrics = pd.DataFrame([arun_2010,
-                                cao_juan_2009,
-                                np.mean(mimno_2011),
-                                ll
-                                ],
-                               index=['Arun_2010',
-                                      'Cao_Juan_2009',
-                                      'Mimno_2011',
-                                      'loglikelihood'],
-                               columns=['Metric']
-                               ).transpose()
+        metrics = pd.DataFrame(
+            [arun_2010, cao_juan_2009, np.mean(mimno_2011), ll],
+            index=["Arun_2010", "Cao_Juan_2009", "Mimno_2011", "loglikelihood"],
+            columns=["Metric"],
+        ).transpose()
     else:
-        metrics = pd.DataFrame([arun_2010,
-                                cao_juan_2009,
-                                np.mean(mimno_2011[np.argpartition(mimno_2011, -top_topics_coh)[-top_topics_coh:]]),
-                                ll
-                                ],
-                               index=['Arun_2010',
-                                      'Cao_Juan_2009',
-                                      'Mimno_2011',
-                                      'loglikelihood'],
-                               columns=['Metric']
-                               ).transpose()
+        metrics = pd.DataFrame(
+            [
+                arun_2010,
+                cao_juan_2009,
+                np.mean(
+                    mimno_2011[
+                        np.argpartition(mimno_2011, -top_topics_coh)[-top_topics_coh:]
+                    ]
+                ),
+                ll,
+            ],
+            index=["Arun_2010", "Cao_Juan_2009", "Mimno_2011", "loglikelihood"],
+            columns=["Metric"],
+        ).transpose()
     coherence = pd.DataFrame(
-        [range(1, n_topics + 1), mimno_2011],
-        index=['Topic', 'Mimno_2011']
+        [range(1, n_topics + 1), mimno_2011], index=["Topic", "Mimno_2011"]
     ).transpose()
     marg_topic = pd.DataFrame(
         [
@@ -316,70 +336,61 @@ def run_cgs_model(binary_matrix: sparse.csr_matrix,
             list(
                 chain.from_iterable(
                     tmtoolkit.topicmod.model_stats.marginal_topic_distrib(
-                        model.doc_topic_,
-                        binary_matrix.sum(axis=1)
+                        model.doc_topic_, binary_matrix.sum(axis=1)
                     ).tolist()
                 )
-            )
+            ),
         ],
-        index=['Topic', 'Marg_Topic']
+        index=["Topic", "Marg_Topic"],
     ).transpose()
     topic_ass = pd.DataFrame.from_records(
-        [range(1, n_topics + 1), model.nz_],
-        index=['Topic', 'Assignments']
+        [range(1, n_topics + 1), model.nz_], index=["Topic", "Assignments"]
     ).transpose()
     cell_topic = pd.DataFrame.from_records(
         model.doc_topic_,
         index=cell_names,
-        columns=[
-            'Topic' + str(i)
-            for i in range(1, n_topics + 1)
-        ]
+        columns=["Topic" + str(i) for i in range(1, n_topics + 1)],
     ).transpose()
     topic_region = pd.DataFrame.from_records(
         model.topic_word_,
         columns=region_names,
-        index=[
-            'Topic' + str(i)
-            for i in range(1, n_topics + 1)
-        ]
+        index=["Topic" + str(i) for i in range(1, n_topics + 1)],
     ).transpose()
-    parameters = pd.DataFrame(['lda',
-                               n_topics,
-                               n_iter,
-                               random_state,
-                               alpha,
-                               alpha_by_topic,
-                               eta,
-                               eta_by_topic,
-                               top_topics_coh,
-                               end_time
-                               ],
-                              index=['package',
-                                     'n_topics',
-                                     'n_iter',
-                                     'random_state',
-                                     'alpha',
-                                     'alpha_by_topic',
-                                     'eta',
-                                     'eta_by_topic',
-                                     'top_topics_coh',
-                                     'time'],
-                              columns=['Parameter']
-                              )
+    parameters = pd.DataFrame(
+        [
+            "lda",
+            n_topics,
+            n_iter,
+            random_state,
+            alpha,
+            alpha_by_topic,
+            eta,
+            eta_by_topic,
+            top_topics_coh,
+            end_time,
+        ],
+        index=[
+            "package",
+            "n_topics",
+            "n_iter",
+            "random_state",
+            "alpha",
+            "alpha_by_topic",
+            "eta",
+            "eta_by_topic",
+            "top_topics_coh",
+            "time",
+        ],
+        columns=["Parameter"],
+    )
     # Create object
     model = CistopicLDAModel(
-        metrics,
-        coherence,
-        marg_topic,
-        topic_ass,
-        cell_topic,
-        topic_region,
-        parameters)
+        metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters
+    )
     log.info(f"Model with {n_topics} topics done!")
     if isinstance(save_path, str):
         log.info(f"Saving model with {n_topics} topics at {save_path}")
-        with open(os.path.join(save_path, 'Topic' + str(n_topics) + '.pkl'), 'wb') as f:
+        with open(os.path.join(save_path, "Topic" + str(n_topics) + ".pkl"), "wb") as f:
             pickle.dump(model, f)
     return model
 
@@ -415,27 +426,29 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
     """
 
     def __init__(
-            self,
-            mallet_path: str,
-            num_topics: int,
-            corpus: Optional[Iterable] = None,
-            alpha: Optional[float] = 50,
-            eta: Optional[float] = 0.1,
-            id2word: Optional['gensim.corpora.dictionary.Dictionary'] = None,
-            n_cpu: Optional[int] = 1,
-            tmp_dir: Optional[str] = None,
-            optimize_interval: Optional[int] = 0,
-            iterations: Optional[int] = 150,
-            topic_threshold: Optional[float] = 0.0,
-            random_seed: Optional[int] = 555,
-            reuse_corpus: Optional[bool] = False
-            ):
+        self,
+        mallet_path: str,
+        num_topics: int,
+        corpus: Optional[Iterable] = None,
+        alpha: Optional[float] = 50,
+        eta: Optional[float] = 0.1,
+        id2word: Optional["gensim.corpora.dictionary.Dictionary"] = None,
+        n_cpu: Optional[int] = 1,
+        tmp_dir: Optional[str] = None,
+        optimize_interval: Optional[int] = 0,
+        iterations: Optional[int] = 150,
+        topic_threshold: Optional[float] = 0.0,
+        random_seed: Optional[int] = 555,
+        reuse_corpus: Optional[bool] = False,
+    ):
 
-        logger = logging.getLogger('LDAMalletWrapper')
+        logger = logging.getLogger("LDAMalletWrapper")
         self.mallet_path = mallet_path
         self.id2word = id2word
         if self.id2word is None:
-            logger.warning("No word id mapping provided; initializing from corpus, assuming identity")
+            logger.warning(
+                "No word id mapping provided; initializing from corpus, assuming identity"
+            )
             self.id2word = utils.dict_from_corpus(corpus)
             self.num_terms = len(self.id2word)
         else:
@@ -447,9 +460,9 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         self.alpha = alpha
         self.eta = eta
         if tmp_dir is None:
-            tmp_dir = os.path.join(tempfile.gettempdir()) + '/'
+            tmp_dir = os.path.join(tempfile.gettempdir()) + "/"
         self.tmp_dir = tmp_dir
-        self.random_label = hex(random.randint(0, 0xffffff))[2:] + '_'
+        self.random_label = hex(random.randint(0, 0xFFFFFF))[2:] + "_"
         self.n_cpu = n_cpu
         self.optimize_interval = optimize_interval
         self.iterations = iterations
@@ -471,15 +484,13 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         for docno, doc in enumerate(corpus):
             if self.id2word:
                 tokens = chain.from_iterable(
-                    [self.id2word[tokenid]] * int(cnt)
-                    for tokenid, cnt in doc
+                    [self.id2word[tokenid]] * int(cnt) for tokenid, cnt in doc
                 )
             else:
                 tokens = chain.from_iterable(
-                    [str(tokenid)] * int(cnt)
-                    for tokenid, cnt in doc
+                    [str(tokenid)] * int(cnt) for tokenid, cnt in doc
                 )
-            file_like.write(utils.to_utf8("%s 0 %s\n" % (docno, ' '.join(tokens))))
+            file_like.write(utils.to_utf8("%s 0 %s\n" % (docno, " ".join(tokens))))
 
     def convert_input(self, corpus, infer=False, serialize_corpus=True):
         """
@@ -492,28 +503,22 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         infer : bool, optional
         serialize_corpus : bool, optional
         """
-        logger = logging.getLogger('LDAMalletWrapper')
+        logger = logging.getLogger("LDAMalletWrapper")
         if serialize_corpus:
-            logger.info(
-                "Serializing temporary corpus to %s",
-                self.fcorpustxt()
-            )
-            with utils.open(self.fcorpustxt(), 'wb') as fout:
+            logger.info("Serializing temporary corpus to %s", self.fcorpustxt())
+            with utils.open(self.fcorpustxt(), "wb") as fout:
                 self.corpus2mallet(corpus, fout)
 
-        cmd = \
-            self.mallet_path + \
-            " import-file --preserve-case --keep-sequence " \
-            "--remove-stopwords --token-regex \"\\S+\" --input %s --output %s"
+        cmd = (
+            self.mallet_path + " import-file --preserve-case --keep-sequence "
+            '--remove-stopwords --token-regex "\\S+" --input %s --output %s'
+        )
         if infer:
-            cmd += ' --use-pipe-from ' + self.fcorpusmallet()
-            cmd = cmd % (self.fcorpustxt(), self.fcorpusmallet() + '.infer')
+            cmd += " --use-pipe-from " + self.fcorpusmallet()
+            cmd = cmd % (self.fcorpustxt(), self.fcorpusmallet() + ".infer")
         else:
             cmd = cmd % (self.fcorpustxt(), self.fcorpusmallet())
-        logger.info(
-            "Converting temporary corpus to MALLET format with %s",
-            cmd
-        )
+        logger.info("Converting temporary corpus to MALLET format with %s", cmd)
         check_output(args=cmd, shell=True)
 
     def train(self, corpus, reuse_corpus):
@@ -527,38 +532,47 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         reuse_corpus: bool, optional
             Whether to reuse the mallet corpus in the tmp directory. Default: False
         """
-        logger = logging.getLogger('LDAMalletWrapper')
+        logger = logging.getLogger("LDAMalletWrapper")
         if os.path.isfile(self.fcorpusmallet()) is False or reuse_corpus is False:
             self.convert_input(corpus, infer=False)
         else:
             logger.info("MALLET corpus already exists, training model")
-        cmd = self.mallet_path + ' train-topics --input %s --num-topics %s  --alpha %s --beta %s --optimize-interval %s ' \
-                                 '--num-threads %s --output-state %s --output-doc-topics %s --output-topic-keys %s ' \
-                                 '--num-iterations %s --inferencer-filename %s --doc-topics-threshold %s  --random-seed %s'
+        cmd = (
+            self.mallet_path
+            + " train-topics --input %s --num-topics %s  --alpha %s --beta %s --optimize-interval %s "
+            "--num-threads %s --output-state %s --output-doc-topics %s --output-topic-keys %s "
+            "--num-iterations %s --inferencer-filename %s --doc-topics-threshold %s  --random-seed %s"
+        )
 
-        cmd = cmd % (self.fcorpusmallet(),
-                     self.num_topics,
-                     self.alpha,
-                     self.eta,
-                     self.optimize_interval,
-                     self.n_cpu,
-                     self.fstate(),
-                     self.fdoctopics(),
-                     self.ftopickeys(),
-                     self.iterations,
-                     self.finferencer(),
-                     self.topic_threshold,
-                     str(self.random_seed))
+        cmd = cmd % (
+            self.fcorpusmallet(),
+            self.num_topics,
+            self.alpha,
+            self.eta,
+            self.optimize_interval,
+            self.n_cpu,
+            self.fstate(),
+            self.fdoctopics(),
+            self.ftopickeys(),
+            self.iterations,
+            self.finferencer(),
+            self.topic_threshold,
+            str(self.random_seed),
+        )
         start = time.time()
         logger.info("Training MALLET LDA with %s", cmd)
         cmd = cmd.split()
         try:
             subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            raise RuntimeError("command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
+            raise RuntimeError(
+                "command '{}' return with error (code {}): {}".format(
+                    e.cmd, e.returncode, e.output
+                )
+            )
         self.word_topics = self.load_word_topics()
         self.wordtopics = self.word_topics
-        self.time = time.time()-start
+        self.time = time.time() - start
 
     def load_word_topics(self):
         """
@@ -569,19 +583,20 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         np.ndarray
             Matrix words X topics.
         """
-        logger = logging.getLogger('LDAMalletWrapper')
+        logger = logging.getLogger("LDAMalletWrapper")
         logger.info("loading assigned topics from %s", self.fstate())
         word_topics = np.zeros((self.num_topics, self.num_terms), dtype=np.float64)
-        if hasattr(self.id2word, 'token2id'):
+        if hasattr(self.id2word, "token2id"):
             word2id = self.id2word.token2id
         else:
             word2id = revdict(self.id2word)
 
-        with utils.open(self.fstate(), 'rb') as fin:
+        with utils.open(self.fstate(), "rb") as fin:
             _ = next(fin)  # header
             self.alpha = np.fromiter(next(fin).split()[2:], dtype=float)
-            assert len(
-                self.alpha) == self.num_topics, "Mismatch between MALLET vs. requested topics"
+            assert (
+                len(self.alpha) == self.num_topics
+            ), "Mismatch between MALLET vs. requested topics"
             _ = next(fin)  # noqa:F841 beta
             for lineno, line in enumerate(fin):
                 line = utils.to_unicode(line)
@@ -613,7 +628,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         str
             Path to corpus text file.
         """
-        return self.tmp_dir + 'corpus.txt'
+        return self.tmp_dir + "corpus.txt"
 
     def fcorpusmallet(self):
         """
@@ -624,7 +639,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         str
             Path to corpus.mallet file.
         """
-        return self.tmp_dir + 'corpus.mallet'
+        return self.tmp_dir + "corpus.mallet"
 
     def fstate(self):
         """
@@ -636,7 +651,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             Path to file.
 
         """
-        return self.tmp_dir + self.random_label + 'state.mallet.gz'
+        return self.tmp_dir + self.random_label + "state.mallet.gz"
 
     def fdoctopics(self):
         """
@@ -647,7 +662,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         str
             Path to document topic text file.
         """
-        return self.tmp_dir + self.random_label + 'doctopics.txt'
+        return self.tmp_dir + self.random_label + "doctopics.txt"
 
     def finferencer(self):
         """
@@ -658,7 +673,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         str
             Path to inferencer.mallet file.
         """
-        return self.tmp_dir + self.random_label + 'inferencer.mallet'
+        return self.tmp_dir + self.random_label + "inferencer.mallet"
 
     def ftopickeys(self):
         """
@@ -670,23 +685,25 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             Path to topic keys text file.
 
         """
-        return self.tmp_dir + self.random_label + 'topickeys.txt'
+        return self.tmp_dir + self.random_label + "topickeys.txt"
 
 
-def run_cgs_models_mallet(path_to_mallet_binary: str,
-                          cistopic_obj: 'cisTopicObject',
-                          n_topics: List[int],
-                          n_cpu: Optional[int] = 1,
-                          n_iter: Optional[int] = 150,
-                          random_state: Optional[int] = 555,
-                          alpha: Optional[float] = 50,
-                          alpha_by_topic: Optional[bool] = True,
-                          eta: Optional[float] = 0.1,
-                          eta_by_topic: Optional[bool] = False,
-                          top_topics_coh: Optional[int] = 5,
-                          tmp_path: Optional[str] = None,
-                          save_path: Optional[str] = None,
-                          reuse_corpus: Optional[bool] = False):
+def run_cgs_models_mallet(
+    path_to_mallet_binary: str,
+    cistopic_obj: "cisTopicObject",
+    n_topics: List[int],
+    n_cpu: Optional[int] = 1,
+    n_iter: Optional[int] = 150,
+    random_state: Optional[int] = 555,
+    alpha: Optional[float] = 50,
+    alpha_by_topic: Optional[bool] = True,
+    eta: Optional[float] = 0.1,
+    eta_by_topic: Optional[bool] = False,
+    top_topics_coh: Optional[int] = 5,
+    tmp_path: Optional[str] = None,
+    save_path: Optional[str] = None,
+    reuse_corpus: Optional[bool] = False,
+):
     """
     Run Latent Dirichlet Allocation per model as implemented in Mallet (McCallum, 2002).
 
@@ -731,10 +748,10 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     binary_matrix = cistopic_obj.binary_matrix
     region_names = cistopic_obj.region_names
@@ -764,31 +781,33 @@ def run_cgs_models_mallet(path_to_mallet_binary: str,
             top_topics_coh=top_topics_coh,
             tmp_path=tmp_path,
             save_path=save_path,
-            reuse_corpus=reuse_corpus
+            reuse_corpus=reuse_corpus,
         )
         for n_topic in n_topics
     ]
     return model_list
 
 
-def run_cgs_model_mallet(path_to_mallet_binary: str,
-                         binary_matrix: sparse.csr_matrix,
-                         corpus: Iterable,
-                         id2word: 'gensim.corpora.dictionary.Dictionary',
-                         n_topics: List[int],
-                         cell_names: List[str],
-                         region_names: List[str],
-                         n_cpu: Optional[int] = 1,
-                         n_iter: Optional[int] = 500,
-                         random_state: Optional[int] = 555,
-                         alpha: Optional[float] = 50,
-                         alpha_by_topic: Optional[bool] = True,
-                         eta: Optional[float] = 0.1,
-                         eta_by_topic: Optional[bool] = False,
-                         top_topics_coh: Optional[int] = 5,
-                         tmp_path: Optional[str] = None,
-                         save_path: Optional[str] = None,
-                         reuse_corpus: Optional[bool] = False):
+def run_cgs_model_mallet(
+    path_to_mallet_binary: str,
+    binary_matrix: sparse.csr_matrix,
+    corpus: Iterable,
+    id2word: "gensim.corpora.dictionary.Dictionary",
+    n_topics: List[int],
+    cell_names: List[str],
+    region_names: List[str],
+    n_cpu: Optional[int] = 1,
+    n_iter: Optional[int] = 500,
+    random_state: Optional[int] = 555,
+    alpha: Optional[float] = 50,
+    alpha_by_topic: Optional[bool] = True,
+    eta: Optional[float] = 0.1,
+    eta_by_topic: Optional[bool] = False,
+    top_topics_coh: Optional[int] = 5,
+    tmp_path: Optional[str] = None,
+    save_path: Optional[str] = None,
+    reuse_corpus: Optional[bool] = False,
+):
     """
     Run Latent Dirichlet Allocation in a model as implemented in Mallet (McCallum, 2002).
 
@@ -837,10 +856,10 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
     """
     # Create cisTopic logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     # Set models
     if not alpha_by_topic:
@@ -862,29 +881,29 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
         n_cpu=n_cpu,
         tmp_dir=tmp_path,
         random_seed=random_state,
-        reuse_corpus=reuse_corpus)
-    end_time = time.time()-start
+        reuse_corpus=reuse_corpus,
+    )
+    end_time = time.time() - start
 
     # Get distributions
     topic_word = model.get_topics()
-    doc_topic = pd.read_csv(model.fdoctopics(), header=None,
-                            sep='\t').iloc[:, 2:].to_numpy()
+    doc_topic = (
+        pd.read_csv(model.fdoctopics(), header=None, sep="\t").iloc[:, 2:].to_numpy()
+    )
 
     # Model evaluation
     cell_cov = np.asarray(binary_matrix.sum(axis=0)).astype(float)
     arun_2010 = tmtoolkit.topicmod.evaluate.metric_arun_2010(
         topic_word, doc_topic, cell_cov
     )
-    cao_juan_2009 = tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(
-        topic_word
-    )
+    cao_juan_2009 = tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(topic_word)
     mimno_2011 = tmtoolkit.topicmod.evaluate.metric_coherence_mimno_2011(
         topic_word,
         dtm=binary_matrix.transpose(),
         top_n=20,
         eps=1e-12,
         normalize=True,
-        return_mean=False
+        return_mean=False,
     )
     topic_word_assig = model.word_topics
     doc_topic_assig = (doc_topic.T * (cell_cov)).T
@@ -892,118 +911,108 @@ def run_cgs_model_mallet(path_to_mallet_binary: str,
 
     # Organize data
     if len(mimno_2011) <= top_topics_coh:
-        metrics = pd.DataFrame([arun_2010,
-                                cao_juan_2009,
-                                np.mean(mimno_2011),
-                                ll
-                                ],
-                               index=['Arun_2010',
-                                      'Cao_Juan_2009',
-                                      'Mimno_2011',
-                                      'loglikelihood'],
-                               columns=['Metric']
-                               ).transpose()
+        metrics = pd.DataFrame(
+            [arun_2010, cao_juan_2009, np.mean(mimno_2011), ll],
+            index=["Arun_2010", "Cao_Juan_2009", "Mimno_2011", "loglikelihood"],
+            columns=["Metric"],
+        ).transpose()
     else:
-        metrics = pd.DataFrame([arun_2010,
-                                cao_juan_2009,
-                                np.mean(mimno_2011[np.argpartition(mimno_2011,
-                                                                   -top_topics_coh)[-top_topics_coh:]]),
-                                ll
-                                ],
-                               index=['Arun_2010',
-                                      'Cao_Juan_2009',
-                                      'Mimno_2011',
-                                      'loglikelihood'],
-                               columns=['Metric']
-                               ).transpose()
+        metrics = pd.DataFrame(
+            [
+                arun_2010,
+                cao_juan_2009,
+                np.mean(
+                    mimno_2011[
+                        np.argpartition(mimno_2011, -top_topics_coh)[-top_topics_coh:]
+                    ]
+                ),
+                ll,
+            ],
+            index=["Arun_2010", "Cao_Juan_2009", "Mimno_2011", "loglikelihood"],
+            columns=["Metric"],
+        ).transpose()
     coherence = pd.DataFrame(
-        [range(1, n_topics + 1), mimno_2011],
-        index=['Topic', 'Mimno_2011']
+        [range(1, n_topics + 1), mimno_2011], index=["Topic", "Mimno_2011"]
     ).transpose()
     marg_topic = pd.DataFrame(
         [
             range(1, n_topics + 1),
-            tmtoolkit.topicmod.model_stats.marginal_topic_distrib(
-                doc_topic,
-                cell_cov
-            )
+            tmtoolkit.topicmod.model_stats.marginal_topic_distrib(doc_topic, cell_cov),
         ],
-        index=['Topic', 'Marg_Topic']).transpose()
+        index=["Topic", "Marg_Topic"],
+    ).transpose()
     topic_ass = pd.DataFrame.from_records(
         [
             range(1, n_topics + 1),
-            list(chain.from_iterable(model.word_topics.sum(axis=1)[:, None]))
+            list(chain.from_iterable(model.word_topics.sum(axis=1)[:, None])),
         ],
-        index=['Topic', 'Assignments']
+        index=["Topic", "Assignments"],
     ).transpose()
     cell_topic = pd.DataFrame.from_records(
         doc_topic,
         index=cell_names,
-        columns=[
-            'Topic' + str(i)
-            for i in range(1, n_topics + 1)
-        ]
+        columns=["Topic" + str(i) for i in range(1, n_topics + 1)],
     ).transpose()
     topic_region = pd.DataFrame.from_records(
         topic_word,
         columns=region_names,
-        index=[
-            'Topic' + str(i)
-            for i in range(1, n_topics + 1)
-        ]
+        index=["Topic" + str(i) for i in range(1, n_topics + 1)],
     ).transpose()
-    parameters = pd.DataFrame(['Mallet',
-                               n_topics,
-                               n_iter,
-                               random_state,
-                               alpha,
-                               alpha_by_topic,
-                               eta,
-                               top_topics_coh,
-                               end_time,
-                               model.time
-                               ],
-                              index=['package',
-                                     'n_topics',
-                                     'n_iter',
-                                     'random_state',
-                                     'alpha',
-                                     'alpha_by_topic',
-                                     'eta',
-                                     'top_topics_coh',
-                                     'full_time',
-                                     'model_time'],
-                              columns=['Parameter'])
+    parameters = pd.DataFrame(
+        [
+            "Mallet",
+            n_topics,
+            n_iter,
+            random_state,
+            alpha,
+            alpha_by_topic,
+            eta,
+            top_topics_coh,
+            end_time,
+            model.time,
+        ],
+        index=[
+            "package",
+            "n_topics",
+            "n_iter",
+            "random_state",
+            "alpha",
+            "alpha_by_topic",
+            "eta",
+            "top_topics_coh",
+            "full_time",
+            "model_time",
+        ],
+        columns=["Parameter"],
+    )
     # Create object
     model = CistopicLDAModel(
-        metrics,
-        coherence,
-        marg_topic,
-        topic_ass,
-        cell_topic,
-        topic_region,
-        parameters
+        metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters
     )
     log.info(f"Model with {n_topics} topics done!")
     if isinstance(save_path, str):
         log.info(f"Saving model with {n_topics} topics at {save_path}")
-        with open(os.path.join(save_path, 'Topic' + str(n_topics) + '.pkl'), 'wb') as f:
+        with open(os.path.join(save_path, "Topic" + str(n_topics) + ".pkl"), "wb") as f:
             pickle.dump(model, f)
     return model
 
 
-def evaluate_models(models: List['CistopicLDAModel'],
-                    select_model: Optional[int] = None,
-                    return_model: Optional[bool] = True,
-                    metrics: Optional[str] = ['Minmo_2011',
-                                              'loglikelihood',
-                                              'Cao_Juan_2009',
-                                              'Arun_2010'],
-                    min_topics_coh: Optional[int] = 5,
-                    plot: Optional[bool] = True,
-                    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-                    plot_metrics: Optional[bool] = False,
-                    save: Optional[str] = None):
+def evaluate_models(
+    models: List["CistopicLDAModel"],
+    select_model: Optional[int] = None,
+    return_model: Optional[bool] = True,
+    metrics: Optional[str] = [
+        "Minmo_2011",
+        "loglikelihood",
+        "Cao_Juan_2009",
+        "Arun_2010",
+    ],
+    min_topics_coh: Optional[int] = 5,
+    plot: Optional[bool] = True,
+    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
+    plot_metrics: Optional[bool] = False,
+    save: Optional[str] = None,
+):
     """
     Model selection based on model quality metrics (model coherence (adaptation from Mimno et al., 2011), log-likelihood (Griffiths and Steyvers, 2004), density-based (Cao Juan et al., 2009) and divergence-based (Arun et al., 2010)).
 
@@ -1052,141 +1061,155 @@ def evaluate_models(models: List['CistopicLDAModel'],
     all_topics = sorted([models[x].n_topic for x in range(0, len(models))])
     metrics_dict = {}
     fig = plt.figure(figsize=figsize)
-    if 'Minmo_2011' in metrics:
+    if "Minmo_2011" in metrics:
         in_index = [
-            i
-            for i in range(len(all_topics))
-            if all_topics[i] >= min_topics_coh
+            i for i in range(len(all_topics)) if all_topics[i] >= min_topics_coh
         ]
-    if 'Arun_2010' in metrics:
-        arun_2010 = [models[index].metrics.loc['Metric', 'Arun_2010']
-                     for index in range(0, len(all_topics))]
+    if "Arun_2010" in metrics:
+        arun_2010 = [
+            models[index].metrics.loc["Metric", "Arun_2010"]
+            for index in range(0, len(all_topics))
+        ]
         arun_2010_negative = [-x for x in arun_2010]
-        arun_2010_rescale = (arun_2010_negative - min(arun_2010_negative)) / \
-                            (max(arun_2010_negative) - min(arun_2010_negative))
-        if 'Minmo_2011' in metrics:
-            metrics_dict['Arun_2010'] = np.array(
+        arun_2010_rescale = (arun_2010_negative - min(arun_2010_negative)) / (
+            max(arun_2010_negative) - min(arun_2010_negative)
+        )
+        if "Minmo_2011" in metrics:
+            metrics_dict["Arun_2010"] = np.array(
                 subset_list(arun_2010_rescale, in_index)
             )
         else:
-            metrics_dict['Arun_2010'] = arun_2010_rescale
+            metrics_dict["Arun_2010"] = arun_2010_rescale
         plt.plot(
             all_topics,
             arun_2010_rescale,
-            linestyle='--',
-            marker='o',
-            label='Inv_Arun_2010'
+            linestyle="--",
+            marker="o",
+            label="Inv_Arun_2010",
         )
 
-    if 'Cao_Juan_2009' in metrics:
-        Cao_Juan_2009 = [models[index].metrics.loc['Metric', 'Cao_Juan_2009']
-                         for index in range(0, len(all_topics))]
+    if "Cao_Juan_2009" in metrics:
+        Cao_Juan_2009 = [
+            models[index].metrics.loc["Metric", "Cao_Juan_2009"]
+            for index in range(0, len(all_topics))
+        ]
         Cao_Juan_2009_negative = [-x for x in Cao_Juan_2009]
         Cao_Juan_2009_rescale = (
-                                        Cao_Juan_2009_negative - min(Cao_Juan_2009_negative)) / (
-                                        max(Cao_Juan_2009_negative) - min(Cao_Juan_2009_negative))
-        if 'Minmo_2011' in metrics:
-            metrics_dict['Cao_Juan_2009'] = np.array(subset_list(Cao_Juan_2009_rescale, in_index))
+            Cao_Juan_2009_negative - min(Cao_Juan_2009_negative)
+        ) / (max(Cao_Juan_2009_negative) - min(Cao_Juan_2009_negative))
+        if "Minmo_2011" in metrics:
+            metrics_dict["Cao_Juan_2009"] = np.array(
+                subset_list(Cao_Juan_2009_rescale, in_index)
+            )
         else:
-            metrics_dict['Cao_Juan_2009'] = Cao_Juan_2009_rescale
+            metrics_dict["Cao_Juan_2009"] = Cao_Juan_2009_rescale
         plt.plot(
             all_topics,
             Cao_Juan_2009_rescale,
-            linestyle='--',
-            marker='o',
-            label='Inv_Cao_Juan_2009'
+            linestyle="--",
+            marker="o",
+            label="Inv_Cao_Juan_2009",
         )
 
-    if 'Minmo_2011' in metrics:
-        Mimno_2011 = [models[index].metrics.loc['Metric', 'Mimno_2011']
-                      for index in range(0, len(all_topics))]
+    if "Minmo_2011" in metrics:
+        Mimno_2011 = [
+            models[index].metrics.loc["Metric", "Mimno_2011"]
+            for index in range(0, len(all_topics))
+        ]
         Mimno_2011 = subset_list(Mimno_2011, in_index)
         Mimno_2011_all_topics = subset_list(all_topics, in_index)
-        Mimno_2011_rescale = (Mimno_2011 - min(Mimno_2011)) / \
-                             (max(Mimno_2011) - min(Mimno_2011))
-        metrics_dict['Minmo_2011'] = np.array(Mimno_2011_rescale)
+        Mimno_2011_rescale = (Mimno_2011 - min(Mimno_2011)) / (
+            max(Mimno_2011) - min(Mimno_2011)
+        )
+        metrics_dict["Minmo_2011"] = np.array(Mimno_2011_rescale)
         plt.plot(
             Mimno_2011_all_topics,
             Mimno_2011_rescale,
-            linestyle='--',
-            marker='o',
-            label='Mimno_2011')
+            linestyle="--",
+            marker="o",
+            label="Mimno_2011",
+        )
 
-    if 'loglikelihood' in metrics:
-        loglikelihood = [models[index].metrics.loc['Metric', 'loglikelihood']
-                         for index in range(0, len(all_topics))]
-        loglikelihood_rescale = (
-                                        loglikelihood - min(loglikelihood)) / (max(loglikelihood) - min(loglikelihood))
-        if 'Minmo_2011' in metrics:
-            metrics_dict['loglikelihood'] = np.array(
-                subset_list(loglikelihood_rescale, in_index))
+    if "loglikelihood" in metrics:
+        loglikelihood = [
+            models[index].metrics.loc["Metric", "loglikelihood"]
+            for index in range(0, len(all_topics))
+        ]
+        loglikelihood_rescale = (loglikelihood - min(loglikelihood)) / (
+            max(loglikelihood) - min(loglikelihood)
+        )
+        if "Minmo_2011" in metrics:
+            metrics_dict["loglikelihood"] = np.array(
+                subset_list(loglikelihood_rescale, in_index)
+            )
         else:
-            metrics_dict['loglikelihood'] = loglikelihood_rescale
+            metrics_dict["loglikelihood"] = loglikelihood_rescale
         plt.plot(
             all_topics,
             loglikelihood_rescale,
-            linestyle='--',
-            marker='o',
-            label='Loglikelihood')
+            linestyle="--",
+            marker="o",
+            label="Loglikelihood",
+        )
 
     if select_model is None:
         combined_metric = sum(metrics_dict.values())
-        if 'Minmo_2011' in metrics:
-            best_model = Mimno_2011_all_topics[combined_metric.tolist().index(max(combined_metric))]
+        if "Minmo_2011" in metrics:
+            best_model = Mimno_2011_all_topics[
+                combined_metric.tolist().index(max(combined_metric))
+            ]
         else:
-            best_model = all_topics[combined_metric.tolist().index(max(combined_metric))]
+            best_model = all_topics[
+                combined_metric.tolist().index(max(combined_metric))
+            ]
     else:
         combined_metric = None
         best_model = select_model
 
-    plt.axvline(best_model, linestyle='--', color='grey')
-    plt.xlabel('Number of topics\nOptimal number of topics: ' + str(best_model))
-    plt.ylabel('Rescaled metric')
+    plt.axvline(best_model, linestyle="--", color="grey")
+    plt.xlabel("Number of topics\nOptimal number of topics: " + str(best_model))
+    plt.ylabel("Rescaled metric")
     plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
     if save is not None:
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
-        pdf.savefig(fig, bbox_inches='tight')
+        pdf.savefig(fig, bbox_inches="tight")
     if plot is True:
         plt.show()
     else:
         plt.close(fig)
 
     if plot_metrics:
-        if 'Arun_2010' in metrics:
+        if "Arun_2010" in metrics:
             fig = plt.figure()
-            plt.plot(all_topics, arun_2010, linestyle='--', marker='o')
-            plt.axvline(best_model, linestyle='--', color='grey')
-            plt.title('Arun_2010 - Minimize')
+            plt.plot(all_topics, arun_2010, linestyle="--", marker="o")
+            plt.axvline(best_model, linestyle="--", color="grey")
+            plt.title("Arun_2010 - Minimize")
             if save is not None:
                 pdf.savefig(fig)
             plt.show()
 
-        if 'Cao_Juan_2009' in metrics:
+        if "Cao_Juan_2009" in metrics:
             fig = plt.figure()
-            plt.plot(all_topics, Cao_Juan_2009, linestyle='--', marker='o')
-            plt.axvline(best_model, linestyle='--', color='grey')
-            plt.title('Cao_Juan_2009 - Minimize')
+            plt.plot(all_topics, Cao_Juan_2009, linestyle="--", marker="o")
+            plt.axvline(best_model, linestyle="--", color="grey")
+            plt.title("Cao_Juan_2009 - Minimize")
             if save is not None:
                 pdf.savefig(fig)
             plt.show()
-        if 'Minmo_2011' in metrics:
+        if "Minmo_2011" in metrics:
             fig = plt.figure()
-            plt.plot(
-                Mimno_2011_all_topics,
-                Mimno_2011,
-                linestyle='--',
-                marker='o')
-            plt.axvline(best_model, linestyle='--', color='grey')
-            plt.title('Mimno_2011 - Maximize')
+            plt.plot(Mimno_2011_all_topics, Mimno_2011, linestyle="--", marker="o")
+            plt.axvline(best_model, linestyle="--", color="grey")
+            plt.title("Mimno_2011 - Maximize")
             if save is not None:
                 pdf.savefig(fig)
             plt.show()
 
-        if 'loglikelihood' in metrics:
+        if "loglikelihood" in metrics:
             fig = plt.figure()
-            plt.plot(all_topics, loglikelihood, linestyle='--', marker='o')
-            plt.axvline(best_model, linestyle='--', color='grey')
-            plt.title('Loglikelihood - Maximize')
+            plt.plot(all_topics, loglikelihood, linestyle="--", marker="o")
+            plt.axvline(best_model, linestyle="--", color="grey")
+            plt.title("Loglikelihood - Maximize")
             if save is not None:
                 pdf.savefig(fig)
             plt.show()

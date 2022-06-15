@@ -1,38 +1,35 @@
 import gc
 import logging
 import os
-import pandas as pd
-import pyBigWig
-import pyranges as pr
-import numpy as np
-import ray
 import re
 import subprocess
 import sys
-
 from typing import Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
+import pyBigWig
+import pyranges as pr
+import ray
 
 from .cistopic_class import *
 from .utils import *
 
 
-def export_pseudobulk(input_data: Union['CistopicObject',
-                                        pd.DataFrame,
-                                        Dict[str,
-                                             pd.DataFrame]],
-                      variable: str,
-                      chromsizes: Union[pd.DataFrame,
-                                        pr.PyRanges],
-                      bed_path: str,
-                      bigwig_path: str,
-                      path_to_fragments: Optional[Dict[str,
-                                                       str]] = None,
-                      sample_id_col: Optional[str] = 'sample_id',
-                      n_cpu: Optional[int] = 1,
-                      normalize_bigwig: Optional[bool] = True,
-                      remove_duplicates: Optional[bool] = True,
-                      split_pattern: Optional[str] = '___',
-                      **kwargs):
+def export_pseudobulk(
+    input_data: Union["CistopicObject", pd.DataFrame, Dict[str, pd.DataFrame]],
+    variable: str,
+    chromsizes: Union[pd.DataFrame, pr.PyRanges],
+    bed_path: str,
+    bigwig_path: str,
+    path_to_fragments: Optional[Dict[str, str]] = None,
+    sample_id_col: Optional[str] = "sample_id",
+    n_cpu: Optional[int] = 1,
+    normalize_bigwig: Optional[bool] = True,
+    remove_duplicates: Optional[bool] = True,
+    split_pattern: Optional[str] = "___",
+    **kwargs
+):
     """
     Create pseudobulks as bed and bigwig from single cell fragments file given a barcode annotation.
 
@@ -64,9 +61,9 @@ def export_pseudobulk(input_data: Union['CistopicObject',
     normalize_bigwig: bool, optional
             Whether bigwig files should be CPM normalized. Default: True.
     remove_duplicates: bool, optional
-            Whether duplicates should be removed before converting the data to bigwig.		
+            Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str
-			Pattern to split cell barcode from sample id. Default: ___
+                        Pattern to split cell barcode from sample id. Default: ___
 
     Return
     ------
@@ -76,84 +73,85 @@ def export_pseudobulk(input_data: Union['CistopicObject',
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     # Get fragments file
     if isinstance(input_data, CistopicObject):
         path_to_fragments = input_data.path_to_fragments
         if path_to_fragments is None:
-            log.error('No path_to_fragments in this cisTopic object.')
+            log.error("No path_to_fragments in this cisTopic object.")
         cell_data = input_data.cell_data
     elif isinstance(input_data, pd.DataFrame):
         if path_to_fragments is None:
-            log.error('Please, provide path_to_fragments.')
+            log.error("Please, provide path_to_fragments.")
         cell_data = input_data
     # Check for sample_id column
     try:
         sample_ids = list(set(cell_data[sample_id_col]))
     except ValueError:
-        print('Please, include a sample identification column (e.g. "sample_id") in your cell metadata!')
+        print(
+            'Please, include a sample identification column (e.g. "sample_id") in your cell metadata!'
+        )
 
     # Get fragments
     fragments_df_dict = {}
     for sample_id in path_to_fragments.keys():
         if sample_id not in sample_ids:
             log.info(
-                'The following path_to_fragments entry is not found in the cell metadata sample_id_col: ',
+                "The following path_to_fragments entry is not found in the cell metadata sample_id_col: ",
                 sample_id,
-                '. It will be ignored.')
+                ". It will be ignored.",
+            )
         else:
-            log.info('Reading fragments from ' + path_to_fragments[sample_id])
-            fragments_df = read_fragments_from_file(
-                path_to_fragments[sample_id]).df
+            log.info("Reading fragments from " + path_to_fragments[sample_id])
+            fragments_df = read_fragments_from_file(path_to_fragments[sample_id]).df
             # Convert to int32 for memory efficiency
             fragments_df.Start = np.int32(fragments_df.Start)
             fragments_df.End = np.int32(fragments_df.End)
-            if 'Score' in fragments_df:
+            if "Score" in fragments_df:
                 fragments_df.Score = np.int32(fragments_df.Score)
-            if 'barcode' in cell_data:
-                fragments_df = fragments_df.loc[fragments_df['Name'].isin(
-                    cell_data['barcode'].tolist())]
+            if "barcode" in cell_data:
+                fragments_df = fragments_df.loc[
+                    fragments_df["Name"].isin(cell_data["barcode"].tolist())
+                ]
             else:
-                fragments_df = fragments_df.loc[fragments_df['Name'].isin(
-                    prepare_tag_cells(cell_data.index.tolist(), split_pattern))]
+                fragments_df = fragments_df.loc[
+                    fragments_df["Name"].isin(
+                        prepare_tag_cells(cell_data.index.tolist(), split_pattern)
+                    )
+                ]
             fragments_df_dict[sample_id] = fragments_df
 
     # Set groups
-    if 'barcode' in cell_data:
-        cell_data = cell_data.loc[:, [variable, sample_id_col, 'barcode']]
+    if "barcode" in cell_data:
+        cell_data = cell_data.loc[:, [variable, sample_id_col, "barcode"]]
     else:
         cell_data = cell_data.loc[:, [variable, sample_id_col]]
-    cell_data[variable] = cell_data[variable].replace(' ', '', regex=True)
-    cell_data[variable] = cell_data[variable].replace(
-        '[^A-Za-z0-9]+', '_', regex=True)
+    cell_data[variable] = cell_data[variable].replace(" ", "", regex=True)
+    cell_data[variable] = cell_data[variable].replace("[^A-Za-z0-9]+", "_", regex=True)
     groups = sorted(list(set(cell_data[variable])))
     # Check chromosome sizes
     if isinstance(chromsizes, pd.DataFrame):
-        chromsizes = chromsizes.loc[:, ['Chromosome', 'Start', 'End']]
+        chromsizes = chromsizes.loc[:, ["Chromosome", "Start", "End"]]
         chromsizes = pr.PyRanges(chromsizes)
     # Check that output dir exist and generate output paths
     if isinstance(bed_path, str):
         if not os.path.exists(bed_path):
             os.makedirs(bed_path)
         bed_paths = {
-        group: os.path.join(
-            bed_path,
-            str(group) +
-            '.bed.gz') for group in groups}
+            group: os.path.join(bed_path, str(group) + ".bed.gz") for group in groups
+        }
     else:
         bed_paths = {}
     if isinstance(bigwig_path, str):
         if not os.path.exists(bigwig_path):
-                os.makedirs(bigwig_path)
+            os.makedirs(bigwig_path)
         bw_paths = {
-        group: os.path.join(
-            bigwig_path,
-            str(group) +
-            '.bw') for group in groups}
+            group: os.path.join(bigwig_path, str(group) + ".bw") for group in groups
+        }
     else:
         bw_paths = {}
     # Create pseudobulks
@@ -171,35 +169,45 @@ def export_pseudobulk(input_data: Union['CistopicObject',
                     sample_id_col,
                     normalize_bigwig,
                     remove_duplicates,
-                    split_pattern) for group in groups],
-            num_returns=len(groups))
+                    split_pattern,
+                )
+                for group in groups
+            ],
+            num_returns=len(groups),
+        )
         ray.shutdown()
     else:
-        [export_pseudobulk_one_sample(
-                    cell_data,
-                    group,
-                    fragments_df_dict,
-                    chromsizes,
-                    bigwig_path,
-                    bed_path,
-                    sample_id_col,
-                    normalize_bigwig,
-                    remove_duplicates,
-                    split_pattern) for group in groups]
+        [
+            export_pseudobulk_one_sample(
+                cell_data,
+                group,
+                fragments_df_dict,
+                chromsizes,
+                bigwig_path,
+                bed_path,
+                sample_id_col,
+                normalize_bigwig,
+                remove_duplicates,
+                split_pattern,
+            )
+            for group in groups
+        ]
 
     return bw_paths, bed_paths
 
 
-def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
-                          group: str,
-                          fragments_df_dict: Dict[str, pd.DataFrame],
-                          chromsizes: pr.PyRanges,
-                          bigwig_path: str,
-                          bed_path: str,
-                          sample_id_col: Optional[str] = 'sample_id',
-                          normalize_bigwig: Optional[bool] = True,
-                          remove_duplicates: Optional[bool] = True,
-                          split_pattern: Optional[str] = '___'):
+def export_pseudobulk_one_sample(
+    cell_data: pd.DataFrame,
+    group: str,
+    fragments_df_dict: Dict[str, pd.DataFrame],
+    chromsizes: pr.PyRanges,
+    bigwig_path: str,
+    bed_path: str,
+    sample_id_col: Optional[str] = "sample_id",
+    normalize_bigwig: Optional[bool] = True,
+    remove_duplicates: Optional[bool] = True,
+    split_pattern: Optional[str] = "___",
+):
     """
     Create pseudobulk as bed and bigwig from single cell fragments file given a barcode annotation and a group.
 
@@ -225,37 +233,39 @@ def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str
-			Pattern to split cell barcode from sample id. Default: ___
+                        Pattern to split cell barcode from sample id. Default: ___
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
-    log.info('Creating pseudobulk for ' + str(group))
+    log.info("Creating pseudobulk for " + str(group))
     group_fragments_list = []
     group_fragments_dict = {}
     for sample_id in fragments_df_dict:
-        sample_data = cell_data[cell_data.loc[:,
-                                              sample_id_col].isin([sample_id])]
-        if 'barcode' in sample_data:
-            sample_data.index = sample_data['barcode'].tolist()
+        sample_data = cell_data[cell_data.loc[:, sample_id_col].isin([sample_id])]
+        if "barcode" in sample_data:
+            sample_data.index = sample_data["barcode"].tolist()
         else:
-            sample_data.index = prepare_tag_cells(sample_data.index.tolist(), split_pattern)
+            sample_data.index = prepare_tag_cells(
+                sample_data.index.tolist(), split_pattern
+            )
         group_var = sample_data.iloc[:, 0]
         barcodes = group_var[group_var.isin([group])].index.tolist()
         fragments_df = fragments_df_dict[sample_id]
-        group_fragments = fragments_df.loc[fragments_df['Name'].isin(barcodes)]
+        group_fragments = fragments_df.loc[fragments_df["Name"].isin(barcodes)]
         if len(fragments_df_dict) > 1:
             group_fragments_dict[sample_id] = group_fragments
 
     if len(fragments_df_dict) > 1:
-        group_fragments_list = [group_fragments_dict[list(group_fragments_dict.keys())[
-            x]] for x in range(len(fragments_df_dict))]
-        group_fragments = group_fragments_list[0].append(
-            group_fragments_list[1:])
+        group_fragments_list = [
+            group_fragments_dict[list(group_fragments_dict.keys())[x]]
+            for x in range(len(fragments_df_dict))
+        ]
+        group_fragments = group_fragments_list[0].append(group_fragments_list[1:])
 
     del group_fragments_dict
     del group_fragments_list
@@ -264,39 +274,42 @@ def export_pseudobulk_one_sample(cell_data: pd.DataFrame,
 
     group_pr = pr.PyRanges(group_fragments)
     if isinstance(bigwig_path, str):
-        bigwig_path_group = os.path.join(bigwig_path, str(group) + '.bw')
+        bigwig_path_group = os.path.join(bigwig_path, str(group) + ".bw")
         if remove_duplicates:
             group_pr.to_bigwig(
                 path=bigwig_path_group,
                 chromosome_sizes=chromsizes,
-                rpm=normalize_bigwig)
+                rpm=normalize_bigwig,
+            )
         else:
             group_pr.to_bigwig(
                 path=bigwig_path_group,
                 chromosome_sizes=chromsizes,
                 rpm=normalize_bigwig,
-                value_col='Score')
+                value_col="Score",
+            )
     if isinstance(bed_path, str):
-        bed_path_group = os.path.join(bed_path, str(group) + '.bed.gz')
+        bed_path_group = os.path.join(bed_path, str(group) + ".bed.gz")
         group_pr.to_bed(
-            path=bed_path_group,
-            keep=True,
-            compression='infer',
-            chain=False)
+            path=bed_path_group, keep=True, compression="infer", chain=False
+        )
 
-    log.info(str(group) + ' done!')
-    
+    log.info(str(group) + " done!")
+
+
 @ray.remote
-def export_pseudobulk_ray(cell_data: pd.DataFrame,
-                          group: str,
-                          fragments_df_dict: Dict[str, pd.DataFrame],
-                          chromsizes: pr.PyRanges,
-                          bigwig_path: str,
-                          bed_path: str,
-                          sample_id_col: Optional[str] = 'sample_id',
-                          normalize_bigwig: Optional[bool] = True,
-                          remove_duplicates: Optional[bool] = True,
-                          split_pattern: Optional[str] = '___'):
+def export_pseudobulk_ray(
+    cell_data: pd.DataFrame,
+    group: str,
+    fragments_df_dict: Dict[str, pd.DataFrame],
+    chromsizes: pr.PyRanges,
+    bigwig_path: str,
+    bed_path: str,
+    sample_id_col: Optional[str] = "sample_id",
+    normalize_bigwig: Optional[bool] = True,
+    remove_duplicates: Optional[bool] = True,
+    split_pattern: Optional[str] = "___",
+):
     """
     Create pseudobulk as bed and bigwig from single cell fragments file given a barcode annotation and a group.
 
@@ -322,33 +335,36 @@ def export_pseudobulk_ray(cell_data: pd.DataFrame,
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str
-			Pattern to split cell barcode from sample id. Default: ___
+                        Pattern to split cell barcode from sample id. Default: ___
     """
     export_pseudobulk_one_sample(
-                    cell_data,
-                    group,
-                    fragments_df_dict,
-                    chromsizes,
-                    bigwig_path,
-                    bed_path,
-                    sample_id_col,
-                    normalize_bigwig,
-                    remove_duplicates,
-                    split_pattern)
+        cell_data,
+        group,
+        fragments_df_dict,
+        chromsizes,
+        bigwig_path,
+        bed_path,
+        sample_id_col,
+        normalize_bigwig,
+        remove_duplicates,
+        split_pattern,
+    )
 
 
-def peak_calling(macs_path: str,
-                 bed_paths: Dict,
-                 outdir: str,
-                 genome_size: str,
-                 n_cpu: Optional[int] = 1,
-                 input_format: Optional[str] = 'BEDPE',
-                 shift: Optional[int] = 73,
-                 ext_size: Optional[int] = 146,
-                 keep_dup: Optional[str] = 'all',
-                 q_value: Optional[float] = 0.05,
-                 nolambda: Optional[bool] = True,
-                 **kwargs):
+def peak_calling(
+    macs_path: str,
+    bed_paths: Dict,
+    outdir: str,
+    genome_size: str,
+    n_cpu: Optional[int] = 1,
+    input_format: Optional[str] = "BEDPE",
+    shift: Optional[int] = 73,
+    ext_size: Optional[int] = 146,
+    keep_dup: Optional[str] = "all",
+    q_value: Optional[float] = 0.05,
+    nolambda: Optional[bool] = True,
+    **kwargs
+):
     """
     Performs pseudobulk peak calling with MACS2. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
 
@@ -400,28 +416,33 @@ def peak_calling(macs_path: str,
                 ext_size,
                 keep_dup,
                 q_value,
-                nolambda) for name in list(
-                bed_paths.keys())])
+                nolambda,
+            )
+            for name in list(bed_paths.keys())
+        ]
+    )
     ray.shutdown()
     narrow_peaks_dict = {
-        list(
-            bed_paths.keys())[i]: narrow_peaks[i].narrow_peak for i in range(
-            len(narrow_peaks))}
+        list(bed_paths.keys())[i]: narrow_peaks[i].narrow_peak
+        for i in range(len(narrow_peaks))
+    }
     return narrow_peaks_dict
 
 
 @ray.remote
-def macs_call_peak_ray(macs_path: str,
-                       bed_path: str,
-                       name: str,
-                       outdir: str,
-                       genome_size: str,
-                       input_format: Optional[str] = 'BEDPE',
-                       shift: Optional[int] = 73,
-                       ext_size: Optional[int] = 146,
-                       keep_dup: Optional[str] = 'all',
-                       q_value: Optional[int] = 0.05,
-                       nolambda: Optional[bool] = True):
+def macs_call_peak_ray(
+    macs_path: str,
+    bed_path: str,
+    name: str,
+    outdir: str,
+    genome_size: str,
+    input_format: Optional[str] = "BEDPE",
+    shift: Optional[int] = 73,
+    ext_size: Optional[int] = 146,
+    keep_dup: Optional[str] = "all",
+    q_value: Optional[int] = 0.05,
+    nolambda: Optional[bool] = True,
+):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
 
@@ -458,10 +479,10 @@ def macs_call_peak_ray(macs_path: str,
     """
     # Create logger
     level = logging.INFO
-    log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger('cisTopic')
+    log = logging.getLogger("cisTopic")
 
     MACS_peak_calling = MACSCallPeak(
         macs_path,
@@ -474,12 +495,13 @@ def macs_call_peak_ray(macs_path: str,
         ext_size=ext_size,
         keep_dup=keep_dup,
         q_value=q_value,
-        nolambda=nolambda)
-    log.info(name + ' done!')
+        nolambda=nolambda,
+    )
+    log.info(name + " done!")
     return MACS_peak_calling
 
 
-class MACSCallPeak():
+class MACSCallPeak:
     """
     Parameters
     ---------
@@ -508,18 +530,20 @@ class MACSCallPeak():
             The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
     """
 
-    def __init__(self,
-                 macs_path: str,
-                 bed_path: str,
-                 name: str,
-                 outdir: str,
-                 genome_size: str,
-                 input_format: Optional[str] = 'BEDPE',
-                 shift: Optional[int] = 73,
-                 ext_size: Optional[int] = 146,
-                 keep_dup: Optional[str] = 'all',
-                 q_value: Optional[int] = 0.05,
-                 nolambda: Optional[bool] = True):
+    def __init__(
+        self,
+        macs_path: str,
+        bed_path: str,
+        name: str,
+        outdir: str,
+        genome_size: str,
+        input_format: Optional[str] = "BEDPE",
+        shift: Optional[int] = 73,
+        ext_size: Optional[int] = 146,
+        keep_dup: Optional[str] = "all",
+        q_value: Optional[int] = 0.05,
+        nolambda: Optional[bool] = True,
+    ):
         self.macs_path = macs_path
         self.treatment = bed_path
         self.name = name
@@ -539,30 +563,44 @@ class MACSCallPeak():
         """
         # Create logger
         level = logging.INFO
-        log_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
         handlers = [logging.StreamHandler(stream=sys.stdout)]
         logging.basicConfig(level=level, format=log_format, handlers=handlers)
-        log = logging.getLogger('cisTopic')
+        log = logging.getLogger("cisTopic")
 
         if self.nolambda is True:
-            cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
-            '--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits --nolambda'
+            cmd = (
+                self.macs_path
+                + " callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s "
+                "--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits --nolambda"
+            )
         else:
-            cmd = self.macs_path + ' callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s '\
-            '--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits'
+            cmd = (
+                self.macs_path
+                + " callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s "
+                "--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits"
+            )
 
         cmd = cmd % (
-            self.treatment, self.name, self.outdir, self.input_format, self.gsize,
-            self.qvalue, self.shift, self.ext_size, self.keep_dup
+            self.treatment,
+            self.name,
+            self.outdir,
+            self.input_format,
+            self.gsize,
+            self.qvalue,
+            self.shift,
+            self.ext_size,
+            self.keep_dup,
         )
         log.info("Calling peaks for " + self.name + " with %s", cmd)
         try:
-            subprocess.check_output(
-                args=cmd, shell=True, stderr=subprocess.STDOUT)
+            subprocess.check_output(args=cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(
                 "command '{}' return with error (code {}): {}".format(
-                    e.cmd, e.returncode, e.output))
+                    e.cmd, e.returncode, e.output
+                )
+            )
         self.narrow_peak = self.load_narrow_peak()
 
     def load_narrow_peak(self):
@@ -570,22 +608,21 @@ class MACSCallPeak():
         Load MACS2 narrow peak files as :class:`pr.PyRanges`.
         """
         narrow_peak = pd.read_csv(
-            os.path.join(
-                self.outdir,
-                self.name +
-                '_peaks.narrowPeak'),
-            sep='\t',
-            header=None)
+            os.path.join(self.outdir, self.name + "_peaks.narrowPeak"),
+            sep="\t",
+            header=None,
+        )
         narrow_peak.columns = [
-            'Chromosome',
-            'Start',
-            'End',
-            'Name',
-            'Score',
-            'Strand',
-            'FC_summit',
-            '-log10_pval',
-            '-log10_qval',
-            'Summit']
+            "Chromosome",
+            "Start",
+            "End",
+            "Name",
+            "Score",
+            "Strand",
+            "FC_summit",
+            "-log10_pval",
+            "-log10_qval",
+            "Summit",
+        ]
         narrow_peak_pr = pr.PyRanges(narrow_peak)
         return narrow_peak_pr

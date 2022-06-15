@@ -8,6 +8,7 @@
 !/.gitignore
 
 # Ignore the following dirs.
+/venv
 /fly_brain
 /job_template
 /liver_data
