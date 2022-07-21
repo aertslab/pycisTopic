@@ -121,15 +121,6 @@ def loglikelihood(nzw, ndz, alpha, eta):
     return ll
 
 
-def sparse2bow(X):
-    for indprev, indnow in zip(X.indptr, X.indptr[1:]):
-        yield np.array(X.indices[indprev:indnow])
-
-
-def chunks(l, n):
-    return [l[x : x + n] for x in xrange(0, len(l), n)]
-
-
 def gini(array):
     """Calculate the Gini coefficient of a numpy array."""
     # based on bottom eq: http://www.statsdirect.com/help/content/image/stat0206_wmf.gif
@@ -171,31 +162,6 @@ def regions_overlap(target, query):
         + target_pr.End.astype(str)
     ).to_list()
     return selected_regions
-
-
-def format_input_regions(input_data):
-    new_data = {}
-    for key in input_data.keys():
-        data = input_data[key]
-        if isinstance(data, pd.DataFrame):
-            regions = data.index.tolist()
-            if len(regions) > 0:
-                new_data[key] = pr.PyRanges(regionNamesToCoordinates(regions))
-        else:
-            new_data[key] = data
-    return new_data
-
-
-def inplace_change(filename, old_string, new_string):
-    # Safely read the input filename using 'with'
-    with open(filename) as f:
-        s = f.read()
-        if old_string not in s:
-            return
-    # Safely write the changed content, if found in the file
-    with open(filename, "w") as f:
-        s = s.replace(old_string, new_string)
-        f.write(s)
 
 
 def load_cisTopic_model(path_to_cisTopic_model_matrices):
