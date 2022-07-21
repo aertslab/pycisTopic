@@ -1,28 +1,67 @@
+from __future__ import annotations
+
 import gc
 import gzip
 import logging
 import math
 import re
 import sys
+from typing import Sequence
 
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import polars as pl
 import pyranges as pr
 from PIL import Image
 from scipy import sparse
 
 
-def region_names_to_coordinates(region_names):
-    chrom = pd.DataFrame([i.split(":", 1)[0] for i in region_names if ":" in i])
-    coor = [i.split(":", 1)[1] for i in region_names if ":" in i]
-    start = pd.DataFrame([int(i.split("-", 1)[0]) for i in coor])
-    end = pd.DataFrame([int(i.split("-", 1)[1]) for i in coor])
-    regiondf = pd.concat([chrom, start, end], axis=1, sort=False)
-    regiondf.index = [i for i in region_names if ":" in i]
-    regiondf.columns = ["Chromosome", "Start", "End"]
-    return regiondf
+def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
+    """
+    Create Pandas dataframe with region IDs to coordinates mapping.
+
+    Parameters
+    ----------
+    region_names: List of region names in "chrom:start-end" format.
+
+    Returns
+    -------
+
+    Pandas dataframe with region IDs to coordinates mapping.
+    """
+
+    region_df = (
+        pl.DataFrame(
+            data=region_names,
+            columns=["RegionIDs"],
+        )
+        .with_columns(
+            pl.col("RegionIDs")
+            # Replace first ":" with "-".
+            .str.replace(":", "-")
+            # Split on "-" to generate 3 parts: "Chromosome", "Start" and "End"
+            .str.split_exact("-", 2)
+            # Give sensible names to each splitted part.
+            .struct.rename_fields(
+                ["Chromosome", "Start", "End"])
+            .alias("RegionIDsFields")
+        )
+        # Unpack "RegionIDsFields" struct column and create Chromosome", "Start" and "End" columns.
+        .unnest("RegionIDsFields")
+        .with_column(
+            # Convert "Start" and "End" string columns to int32 columns.
+            pl.col(["Start", "End"]).cast(pl.Int32)
+        )
+        # Convert to pandas.
+        .to_pandas()
+    )
+
+    # Set RegionIDs as index.
+    region_df.set_index("RegionIDs", inplace=True)
+
+    return region_df
 
 
 def get_position_index(query_list, target_list):
