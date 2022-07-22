@@ -17,6 +17,7 @@ import pyranges as pr
 from PIL import Image
 from scipy import sparse
 
+from pycisTopic.lda_models import CistopicLDAModel
 
 def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
     """
