@@ -6,7 +6,7 @@ import logging
 import math
 import re
 import sys
-from typing import Sequence
+from typing import Sequence, Union
 
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
@@ -65,27 +65,28 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
     return region_df
 
 
-def get_position_index(query_list, target_list):
-    d = {k: v for v, k in enumerate(target_list)}
-    index = (d[k] for k in query_list)
-    return list(index)
+def get_position_index(
+    query_list: Sequence[str], target_list: Sequence[str]
+) -> Sequence[int]:
+    d = {k: idx for idx, k in enumerate(target_list)}
+    index = [d[k] for k in query_list]
+    return index
 
 
-def non_zero_rows(X):
-    if isinstance(X, sparse.csr_matrix):
+def subset_list(target_list: Sequence[str], index_list: Sequence[int]) -> Sequence[str]:
+    return list(map(target_list.__getitem__, index_list))
+
+
+def non_zero_rows(matrix: Union[sparse.csr_matrix, np.ndarray]):
+    if isinstance(matrix, sparse.csr_matrix):
         # Remove all explicit zeros in sparse matrix.
-        X.eliminate_zeros()
+        matrix.eliminate_zeros()
         # Get number of non zeros per row and get indices for each row which is
         # not completely zero.
-        return np.nonzero(X.getnnz(axis=1))[0]
+        return np.nonzero(matrix.getnnz(axis=1))[0]
     else:
         # For non sparse matrices.
-        return np.nonzero(np.count_nonzero(X, axis=1))[0]
-
-
-def subset_list(target_list, index_list):
-    X = list(map(target_list.__getitem__, index_list))
-    return X
+        return np.nonzero(np.count_nonzero(matrix, axis=1))[0]
 
 
 def loglikelihood(nzw, ndz, alpha, eta):
