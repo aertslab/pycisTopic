@@ -63,7 +63,9 @@ def export_pseudobulk(
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str
-                        Pattern to split cell barcode from sample id. Default: ___
+            Pattern to split cell barcode from sample id. Default: ___
+    **kwargs
+            Additional parameters for ray.init()
 
     Return
     ------
@@ -222,10 +224,10 @@ def export_pseudobulk_one_sample(
             as keys. 'Score' indicates the number of times that a fragments is found assigned to that barcode.
     chromsizes: pr.PyRanges
             A :class:`pr.PyRanges` containing size of each column, containing 'Chromosome', 'Start' and 'End' columns.
-    bed_path: str
-            Path to folder where the fragments bed file will be saved.
     bigwig_path: str
             Path to folder where the bigwig file will be saved.
+    bed_path: str
+            Path to folder where the fragments bed file will be saved.
     sample_id_col: str, optional
             Name of the column containing the sample name per barcode in the input :class:`CistopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
     normalize_bigwig: bool, optional
@@ -393,6 +395,8 @@ def peak_calling(
             Whether to keep duplicate tags at te exact same location. Default: 'all'.
     q_value: float, optional
             The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
+    **kwargs
+            Additional parameters to pass to ray.init()
 
     Return
     ------
@@ -471,6 +475,8 @@ def macs_call_peak_ray(
             Whether to keep duplicate tags at te exact same location. Default: 'all'.
     q_value: float, optional
             The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
+    nolambda: bool, optional
+            Do not consider the local bias/lambda at peak candidate regions.
 
     Return
     ------
@@ -528,6 +534,8 @@ class MACSCallPeak:
             Whether to keep duplicate tags at te exact same location. Default: 'all'.
     q_value: float, optional
             The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
+    nolambda: bool, optional
+            Do not consider the local bias/lambda at peak candidate regions.
     """
 
     def __init__(
