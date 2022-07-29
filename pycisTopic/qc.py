@@ -40,7 +40,7 @@ def barcode_rank_plot(
     return_bc: Optional[bool] = False,
 ):
     """
-    Generate a barcode rank plot and marks the selected barcodes
+    Generate a barcode rank plot and marks the selected barcodes.
 
     Parameters
     ---------
@@ -322,9 +322,9 @@ def insert_size_distribution(
                     import pyranges as pr
                     fragments = pr.read_bed(fragments_file, as_df=True))
     valid_bc: list, optional
-            A list containing selected barcodes. Default: None
+            A list containing selected barcodes. Default: None.
     remove_duplicates: optional, bool
-            Whether duplicated should not be considered. Default: True
+            Whether duplicated should not be considered. Default: True.
     plot: bool, optional
             Whether to return the plot to the console. Default: True.
     plot_data: pd.DataFrame, optional
@@ -456,7 +456,7 @@ def profile_tss(
                     # Select TSSs of protein coding genes
                     annot = annot[annot.Transcript_type == 'protein_coding']
     valid_bc: list, optional
-            A list containing selected barcodes. Default: None,
+            A list containing selected barcodes. Default: None.
     plot: bool, optional
             Whether to return the plot to the console. Default: True.
     plot_data: pd.DataFrame, optional
@@ -482,12 +482,12 @@ def profile_tss(
     return_TSS_coverage_matrix_per_barcode: bool, optional
             Whether to return a matrix containing the normalized enrichment in each position in the window for each barcode, with positions as columns and barcodes as rows. Default: False.
     return_plot_data: bool, optional
-                    Whether to return the TSS profile plot data. Default: False.
+            Whether to return the TSS profile plot data. Default: False.
 
     Return
     ------
     dict
-    A dictionary containing a :class:`pd.DataFrame` with the normalized enrichment score on the TSS for each barcode, a :class:`pd.DataFrame` with the normalized enrichment scores in each position for each barcode and/or a :class:`pd.DataFrame` with the TSS profile plot data.
+            A dictionary containing a :class:`pd.DataFrame` with the normalized enrichment score on the TSS for each barcode, a :class:`pd.DataFrame` with the normalized enrichment scores in each position for each barcode and/or a :class:`pd.DataFrame` with the TSS profile plot data.
     """
     # Create logger
     level = logging.INFO
@@ -695,7 +695,7 @@ def frip(
     plot: bool, optional
             Whether to return the plot to the console. Default: True.
     as_density: bool, optional
-    Whether to plot density plot instead of histogram. Default: True.
+            Whether to plot density plot instead of histogram. Default: True.
     plot_data: pd.DataFrame, optional
             Data frame containing precomputed plot data. Default: None.
     return_plot_data: bool, optional

@@ -63,7 +63,7 @@ def export_pseudobulk(
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str
-            Pattern to split cell barcode from sample id. Default: ___
+            Pattern to split cell barcode from sample id. Default: ___ .
     **kwargs
             Additional parameters for ray.init()
 
@@ -235,7 +235,7 @@ def export_pseudobulk_one_sample(
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str
-                        Pattern to split cell barcode from sample id. Default: ___
+            Pattern to split cell barcode from sample id. Default: ___ .
     """
     # Create logger
     level = logging.INFO
@@ -337,7 +337,7 @@ def export_pseudobulk_ray(
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str
-                        Pattern to split cell barcode from sample id. Default: ___
+            Pattern to split cell barcode from sample id. Default: ___ .
     """
     export_pseudobulk_one_sample(
         cell_data,
@@ -396,7 +396,7 @@ def peak_calling(
     q_value: float, optional
             The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
     **kwargs
-            Additional parameters to pass to ray.init()
+            Additional parameters to pass to ray.init().
 
     Return
     ------
