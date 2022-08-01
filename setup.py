@@ -1,5 +1,8 @@
 from setuptools import find_packages, setup
 
+fname = 'requirements.txt'
+with open(fname, 'r', encoding='utf-8') as f:
+        requirements =  f.read().splitlines()
 
 required = []
 dependency_links = []
