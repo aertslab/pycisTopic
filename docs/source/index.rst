@@ -1,19 +1,20 @@
-Welcome to the documentation of pycisTopic
-===========================================
+Welcome to the documentation of pycisTopic!
+==========
 
-**pycisTopic** is a python packge for analyzing single-cell Chromatin accessbility data (e.g. scATAC0seq), making using of Topic modeling.
+pycisTopic is a Python module to simultaneously identify cell states and cis-regulatory topics from single cell epigenomics data.
 
-Check out the :doc:`usage` section for further information, including
-how to :ref:`installation` the project.
+.. warning::
+	pycisTopic is still under development. It is currently a beta version. Functions in this package may change in a future release.
+	
+.. warning::
+	Detailed tutorials will be posted in the coming days. Stay tuned!
 
-.. note::
-
-   This project is under active development.
 
 Contents
 --------
 
 .. toctree::
 
-   usage
+   installation
+   tutorials
    api
