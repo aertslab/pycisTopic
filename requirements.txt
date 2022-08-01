@@ -11,7 +11,6 @@ ipympl
 leidenalg
 lda
 loompy
-loomxpy
 matplotlib
 macs2
 networkx
@@ -25,7 +24,6 @@ pyranges
 pybiomart
 pyBigWig
 python-Levenshtein
-pyscenic>=0.11.1
 python-igraph
 ray[default]
 scipy
@@ -40,3 +38,9 @@ tmtoolkit
 typing
 umap-learn
 xlrd
+git+https://github.com/aertslab/pySCENIC@@master#egg=pyscenic
+git+https://github.com/aertslab/LoomXpy@main#egg=loomxpy
+sphinx_rtd_theme
+nbsphinx
+nbsphinx_link
+numpydoc
