@@ -38,6 +38,13 @@ tmtoolkit
 typing
 umap-learn
 xlrd
+fitsne
+papermill
+igv_jupyterlab
+bs4
+MACS2
+lxml
+tspex
 git+https://github.com/aertslab/pySCENIC@master#egg=pyscenic
 git+https://github.com/aertslab/LoomXpy@main#egg=loomxpy
 sphinx_rtd_theme
