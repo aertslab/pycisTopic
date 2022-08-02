@@ -406,32 +406,120 @@ def peak_calling(
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    ray.init(num_cpus=n_cpu, **kwargs)
-    narrow_peaks = ray.get(
-        [
-            macs_call_peak_ray.remote(
-                macs_path,
-                bed_paths[name],
-                name,
-                outdir,
-                genome_size,
-                input_format,
-                shift,
-                ext_size,
-                keep_dup,
-                q_value,
-                nolambda,
-            )
-            for name in list(bed_paths.keys())
-        ]
-    )
-    ray.shutdown()
+    if n_cpu > 1:
+        ray.init(num_cpus=n_cpu, **kwargs)
+        narrow_peaks = ray.get(
+            [
+                macs_call_peak_ray.remote(
+                    macs_path,
+                    bed_paths[name],
+                    name,
+                    outdir,
+                    genome_size,
+                    input_format,
+                    shift,
+                    ext_size,
+                    keep_dup,
+                    q_value,
+                    nolambda,
+                )
+                for name in list(bed_paths.keys())
+            ]
+        )
+        ray.shutdown()
+    else:
+        narrow_peaks = [macs_call_peak(
+                    macs_path,
+                    bed_paths[name],
+                    name,
+                    outdir,
+                    genome_size,
+                    input_format,
+                    shift,
+                    ext_size,
+                    keep_dup,
+                    q_value,
+                    nolambda,
+                )
+                for name in list(bed_paths.keys())
+            ]
     narrow_peaks_dict = {
         list(bed_paths.keys())[i]: narrow_peaks[i].narrow_peak
         for i in range(len(narrow_peaks))
     }
     return narrow_peaks_dict
 
+def macs_call_peak(
+    macs_path: str,
+    bed_path: str,
+    name: str,
+    outdir: str,
+    genome_size: str,
+    input_format: Optional[str] = "BEDPE",
+    shift: Optional[int] = 73,
+    ext_size: Optional[int] = 146,
+    keep_dup: Optional[str] = "all",
+    q_value: Optional[int] = 0.05,
+    nolambda: Optional[bool] = True,
+):
+    """
+    Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
+
+    Parameters
+    ---------
+    macs_path: str
+            Path to MACS binary (e.g. /xxx/MACS/xxx/bin/macs2).
+    bed_path: str
+            Path to fragments file bed file.
+    name: str
+            Name of string of the group.
+    outdir: str
+            Path to the output directory.
+    genome_size: str
+            Effective genome size which is defined as the genome size which can be sequenced. Possible values: 'hs', 'mm', 'ce' and 'dm'.
+    input_format: str, optional
+            Format of tag file can be ELAND, BED, ELANDMULTI, ELANDEXPORT, SAM, BAM, BOWTIE, BAMPE, or BEDPE. Default is AUTO which will
+            allow MACS to decide the format automatically. Default: 'BEDPE'.
+    shift: int, optional
+            To set an arbitrary shift in bp. For finding enriched cutting sites (such as in ATAC-seq) a shift of 73 bp is recommended.
+            Default: 73.
+    ext_size: int, optional
+            To extend reads in 5'->3' direction to fix-sized fragment. For ATAC-seq data, a extension of 146 bp is recommended.
+            Default: 146.
+    keep_dup: str, optional
+            Whether to keep duplicate tags at te exact same location. Default: 'all'.
+    q_value: float, optional
+            The q-value (minimum FDR) cutoff to call significant regions. Default: 0.05.
+    nolambda: bool, optional
+            Do not consider the local bias/lambda at peak candidate regions.
+
+    Return
+    ------
+    dict
+            A :class:`pr.PyRanges` with MACS2 narrow peaks as values.
+    """
+    # Create logger
+    level = logging.INFO
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
+    log = logging.getLogger("cisTopic")
+
+    MACS_peak_calling = MACSCallPeak(
+        macs_path,
+        bed_path,
+        name,
+        outdir,
+        genome_size,
+        input_format=input_format,
+        shift=shift,
+        ext_size=ext_size,
+        keep_dup=keep_dup,
+        q_value=q_value,
+        nolambda=nolambda,
+    )
+    log.info(name + " done!")
+    return MACS_peak_calling
 
 @ray.remote
 def macs_call_peak_ray(
