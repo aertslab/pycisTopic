@@ -38,6 +38,7 @@ tmtoolkit
 typing
 umap-learn
 xlrd
+fftw
 fitsne
 papermill
 igv_jupyterlab
