@@ -753,6 +753,7 @@ def create_cistopic_object_from_fragments(
     partition: Optional[int] = 5,
     fragments_df: Optional[Union[pd.DataFrame, pr.PyRanges]] = None,
     split_pattern: Optional[str] = "___",
+    use_polars: Optional[bool] = True
 ):
     """
     Creates a CistopicObject from a fragments file and defined genomic intervals (compatible with CellRangerATAC output)
@@ -787,6 +788,8 @@ def create_cistopic_object_from_fragments(
         A PyRanges or DataFrame containing chromosome, start, end and assigned barcode for each read, corresponding to the data in path_to_fragments.
     split_pattern: str
         Pattern to split cell barcode from sample id. Default: ___
+    use_polars: bool, optional
+            Whether to use polars to read fragments files. Default: True.
 
     Return
     ------
@@ -810,7 +813,7 @@ def create_cistopic_object_from_fragments(
         if path_to_fragments is not None:
             log.info("Using fragments of provided pandas data frame")
     else:
-        fragments = read_fragments_from_file(path_to_fragments)
+        fragments = read_fragments_from_file(path_to_fragments, use_polars=use_polars)
 
     if "Score" not in fragments.df:
         fragments_df = fragments.df

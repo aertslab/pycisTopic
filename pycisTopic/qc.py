@@ -38,6 +38,7 @@ def barcode_rank_plot(
     save: Optional[str] = None,
     return_plot_data: Optional[bool] = False,
     return_bc: Optional[bool] = False,
+    use_polars: Optional[bool] = True
 ):
     """
     Generate a barcode rank plot and marks the selected barcodes.
@@ -72,6 +73,8 @@ def barcode_rank_plot(
             Whether to return the plot data frame. Default: False.
     return_bc: bool, optional
             Whether to return the list of valid barcodes. Default: False.
+    use_polars: bool, optional
+            Whether to use polars to read fragments files. Default: True.
 
     Return
     ------
@@ -90,7 +93,7 @@ def barcode_rank_plot(
         FPB_DF = plot_data
     else:
         if isinstance(fragments, str):
-            fragments = read_fragments_from_file(fragments).df
+            fragments = read_fragments_from_file(fragments, use_polars=use_polars).df
 
         log.info("Counting fragments")
 
@@ -198,6 +201,7 @@ def duplicate_rate(
     plot_data: Optional[pd.DataFrame] = None,
     save: Optional[str] = None,
     return_plot_data: Optional[bool] = False,
+    use_polars: Optiona[bool] = True
 ):
     """
     Generate duplication rate plot.
@@ -222,6 +226,8 @@ def duplicate_rate(
             Output file to save plot. Default: None
     return_plot_data: bool, optional
             Whether to return the plot data frame. Default: False.
+    use_polars: bool, optional
+            Whether to use polars to read fragments files. Default: True.
 
     Return
     ------
@@ -242,7 +248,7 @@ def duplicate_rate(
     else:
         if isinstance(fragments, str):
             log.info("Reading fragments file")
-            fragments = read_fragments_from_file(fragments).df
+            fragments = read_fragments_from_file(fragments, use_polars=use_polars).df
 
         if valid_bc is not None:
             log.info("Using provided valid barcodes")
@@ -309,6 +315,7 @@ def insert_size_distribution(
     save: Optional[str] = None,
     return_plot_data: Optional[bool] = False,
     xlim: Optional[List[float]] = None,
+    use_polars: Optional[bool] = True
 ):
     """
     Plot the insert size distribution of the sample.
@@ -337,6 +344,8 @@ def insert_size_distribution(
             Whether to return the plot data frame. Default: False.
     xlim: list, optional
             A list with two numbers that indicate the x axis limits. Default: None.
+    use_polars: bool, optional
+            Whether to use polars to read fragments files. Default: True.
 
     Return
     ------
@@ -356,7 +365,7 @@ def insert_size_distribution(
     else:
         if isinstance(fragments, str):
             log.info("Reading fragments file")
-            fragments = read_fragments_from_file(fragments).df
+            fragments = read_fragments_from_file(fragments, use_polars=use_polars).df
 
         if valid_bc is not None:
             log.info("Using provided valid barcodes")
@@ -425,6 +434,7 @@ def profile_tss(
     return_TSS_enrichment_per_barcode: Optional[bool] = False,
     return_TSS_coverage_matrix_per_barcode: Optional[bool] = False,
     return_plot_data: Optional[bool] = False,
+    use_polars: Optional[bool] = True
 ):
     """
     Plot the Transcription Start Site (TSS) profile. It is computed as the summed accessibility signal (sample-level), or the number of cut sites per base (barcode-level), in a space around the full set of annotated TSSs and is normalized by the minimum signal in the window. This profile is helpful to assess the signal-to-noise ratio of the library, as it is well known that TSSs and the promoter regions around them have, on average, a high degree of chromatin accessibility compared to the intergenic and intronic regions of the genome.
@@ -506,7 +516,7 @@ def profile_tss(
     else:
         if isinstance(fragments, str):
             log.info("Reading fragments file")
-            fragments = read_fragments_from_file(fragments)
+            fragments = read_fragments_from_file(fragments, use_polars=use_polars)
         else:
             if isinstance(fragments, pd.DataFrame):
                 fragments = pr.PyRanges(fragments)
@@ -664,6 +674,7 @@ def frip(
     as_density: Optional[bool] = True,
     plot_data: Optional[pd.DataFrame] = None,
     return_plot_data: Optional[bool] = False,
+    use_polars: Optional[bool] = True
 ):
     """
     Plot the Fraction of Reads In a given set of Peaks (FRIP). This metric is useful to assess the noise in cells.
@@ -700,6 +711,8 @@ def frip(
             Data frame containing precomputed plot data. Default: None.
     return_plot_data: bool, optional
             Whether to return the plot data frame. Default: False.
+    use_polars: bool, optional
+            Whether to use polars to read fragments files. Default: True.
 
     Return
     ------
@@ -720,7 +733,7 @@ def frip(
     else:
         if isinstance(fragments, str):
             log.info("Reading fragments file")
-            fragments = read_fragments_from_file(fragments)
+            fragments = read_fragments_from_file(fragments, use_polars=use_polars)
         else:
             if isinstance(fragments, pd.DataFrame):
                 fragments = pr.PyRanges(fragments)
@@ -1066,6 +1079,7 @@ def compute_qc_stats_single(
     partition: Optional[int] = 1,
     check_for_duplicates: Optional[bool] = True,
     remove_duplicates: Optional[bool] = True,
+    use_polars: Optional[bool] = True
 ):
     """ "
     Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
@@ -1102,6 +1116,8 @@ def compute_qc_stats_single(
             If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
     remove_duplicates: bool, optional
             Whether to remove duplicates. Default: True.
+    use_polars: bool, optional
+            Whether to use polars to read fragments files. Default: True.
 
     Return
     ---
@@ -1122,7 +1138,7 @@ def compute_qc_stats_single(
     # Prepare fragments
     if isinstance(fragments, str):
         log.info("Reading " + label)
-        fragments_df = read_fragments_from_file(fragments).df
+        fragments_df = read_fragments_from_file(fragments, use_polars=use_polars).df
     else:
         fragments_df = fragments
     # Convert to category for memory efficiency
