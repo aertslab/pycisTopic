@@ -201,7 +201,7 @@ def duplicate_rate(
     plot_data: Optional[pd.DataFrame] = None,
     save: Optional[str] = None,
     return_plot_data: Optional[bool] = False,
-    use_polars: Optiona[bool] = True
+    use_polars: Optional[bool] = True
 ):
     """
     Generate duplication rate plot.
