@@ -296,7 +296,7 @@ def export_pseudobulk_one_sample(
     if isinstance(bed_path, str):
         bed_path_group = os.path.join(bed_path, str(group) + ".bed.gz")
         group_pr.to_bed(
-            path=bed_path_group, keep=True, compression="infer", chain=False
+            path=bed_path_group, keep=False, compression="infer", chain=False
         )
 
     log.info(str(group) + " done!")
