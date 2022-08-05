@@ -28,6 +28,7 @@ def export_pseudobulk(
     normalize_bigwig: Optional[bool] = True,
     remove_duplicates: Optional[bool] = True,
     split_pattern: Optional[str] = "___",
+    use_polars: Optional[bool] = True,
     **kwargs
 ):
     """
@@ -62,8 +63,10 @@ def export_pseudobulk(
             Whether bigwig files should be CPM normalized. Default: True.
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
-    split_pattern: str
+    split_pattern: str, optional
             Pattern to split cell barcode from sample id. Default: ___ .
+    use_polars: bool, optional
+            Whether to use polars to read fragments files. Default: True.
     **kwargs
             Additional parameters for ray.init()
 
@@ -109,7 +112,7 @@ def export_pseudobulk(
             )
         else:
             log.info("Reading fragments from " + path_to_fragments[sample_id])
-            fragments_df = read_fragments_from_file(path_to_fragments[sample_id]).df
+            fragments_df = read_fragments_from_file(path_to_fragments[sample_id], use_polars=use_polars).df
             # Convert to int32 for memory efficiency
             fragments_df.Start = np.int32(fragments_df.Start)
             fragments_df.End = np.int32(fragments_df.End)
