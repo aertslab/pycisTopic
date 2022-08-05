@@ -331,7 +331,7 @@ def get_tss_matrix(fragments, flank_window, tss_space_annotation):
 
 
 def read_fragments_from_file(
-    fragments_bed_filename, use_polars: bool = False
+    fragments_bed_filename, use_polars: bool = True
 ) -> pr.PyRanges:
     """
     Read fragments BED file to PyRanges object.
