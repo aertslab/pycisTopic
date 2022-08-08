@@ -1320,7 +1320,7 @@ def compute_qc_stats_ray(
     pd.DataFrame or list and list
             A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
     """
-    compute_qc_stats_single(
+    return compute_qc_stats_single(
         fragments,
         tss_annotation,
         stats,
