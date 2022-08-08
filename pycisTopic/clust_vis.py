@@ -859,26 +859,23 @@ def plot_imputed_features(
         pdf = pdf.close()
 
 
-def cell_topic_heatmap(
-    cistopic_obj: "CistopicObject",
-    variables: Optional[List[str]] = None,
-    remove_nan: Optional[bool] = True,
-    scale: Optional[bool] = False,
-    cluster_topics: Optional[bool] = False,
-    color_dictionary: Optional[Dict[str, Dict[str, str]]] = {},
-    seed: Optional[int] = 555,
-    legend_loc_x: Optional[float] = 1.2,
-    legend_loc_y: Optional[float] = -0.5,
-    legend_dist_y: Optional[float] = -1,
-    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-    selected_topics: Optional[List[int]] = None,
-    selected_cells: Optional[List[str]] = None,
-    harmony: Optional[bool] = False,
-    save: Optional[str] = None,
-):
+def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
+                       variables: Optional[List[str]] = None,
+                       remove_nan: Optional[bool] = True,
+                       scale: Optional[bool] = False,
+                       cluster_topics: Optional[bool] = False,
+                       color_dict: Optional[Dict[str, Dict[str, str]]] = {},
+                       seed: Optional[int] = 555,
+                       legend_loc_x: Optional[float] = 1.2,
+                       legend_loc_y: Optional[float] = -0.5,
+                       legend_dist_y: Optional[float] = -1,
+                       figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
+                       selected_topics: Optional[List[int]] = None,
+                       selected_cells: Optional[List[str]] = None,
+                       harmony: Optional[bool] = False,
+                       save: Optional[str] = None):
     """
     Plot heatmap with cell-topic distributions.
-
     Parameters
     ---------
     cistopic_obj: `class::CistopicObject`
@@ -924,19 +921,14 @@ def cell_topic_heatmap(
     cell_data = cistopic_obj.cell_data
 
     if selected_topics is not None:
-        cell_topic = cell_topic.loc[
-            ["Topic" + str(x) for x in selected_topics],
-        ]
+        cell_topic = cell_topic.loc[['Topic' + str(x) for x in selected_topics], ]
     if selected_cells is not None:
         cell_topic = cell_topic.loc[:, selected_cells]
         cell_data = cell_data.loc[selected_cells]
 
     if scale:
-        cell_topic = pd.DataFrame(
-            sklearn.preprocessing.StandardScaler().fit_transform(cell_topic),
-            index=cell_topic.index.to_list(),
-            columns=cell_topic.columns,
-        )
+        cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
+            cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
 
     if (remove_nan) & (sum(cell_data[variables].isnull().sum()) > 0):
         cell_data = cell_data[variables].dropna()
@@ -960,28 +952,22 @@ def cell_topic_heatmap(
                 color_dict = color_dictionary[var]
             except BaseException:
                 random.seed(seed)
-                color = list(
-                    map(
-                        lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),
-                        range(len(categories)),
-                    )
-                )
+                color = list(map(
+                    lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF), range(len(categories))
+                ))
                 color = [mcolors.to_rgb(x) for x in color]
-                color_dict = dict(zip(categories, color))
-            col_colors[var] = var_data.map(color_dict)
-        col_colors = pd.concat(
-            [col_colors[var] for var in variables], axis=1, sort=False
-        )
+                color_dict[var] = dict(zip(categories, color))
+            col_colors[var] = var_data.map(color_dict[var])
+        col_colors = pd.concat([col_colors[var]
+                                for var in variables], axis=1, sort=False)
 
-        g = sns.clustermap(
-            cell_topic,
-            row_cluster=cluster_topics,
-            col_cluster=False,
-            col_colors=col_colors,
-            cmap=cm.viridis,
-            xticklabels=False,
-            figsize=figsize,
-        )
+        g = sns.clustermap(cell_topic,
+                           row_cluster=cluster_topics,
+                           col_cluster=False,
+                           col_colors=col_colors,
+                           cmap=cm.viridis,
+                           xticklabels=False,
+                           figsize=figsize)
 
         cbar = g.cax
         cbar.set_position([legend_loc_x, 0.55, 0.05, 0.2])
@@ -989,33 +975,31 @@ def cell_topic_heatmap(
         g.ax_row_dendrogram.set_visible(False)
 
         pos = legend_loc_y
-        for key in color_dictionary:
+        for key in color_dict:
             patchList = []
-            for subkey in color_dictionary[key]:
+            for subkey in color_dict[key]:
                 data_key = mpatches.Patch(
-                    color=color_dictionary[key][subkey], label=subkey
-                )
+                    color=color_dict[key][subkey], label=subkey)
                 patchList.append(data_key)
             legend = plt.legend(
                 handles=patchList,
-                bbox_to_anchor=(legend_loc_x, pos),
+                bbox_to_anchor=(
+                    legend_loc_x,
+                    pos),
                 loc="center",
-                title=key,
-            )
+                title=key)
             ax = plt.gca().add_artist(legend)
             pos += legend_dist_y
     else:
-        g = sns.clustermap(
-            cell_topic,
-            row_cluster=cluster_topics,
-            col_cluster=True,
-            cmap=cm.viridis,
-            xticklabels=False,
-            figsize=figsize,
-        )
+        g = sns.clustermap(cell_topic,
+                           row_cluster=cluster_topics,
+                           col_cluster=True,
+                           cmap=cm.viridis,
+                           xticklabels=False,
+                           figsize=figsize)
 
     if save is not None:
-        g.savefig(save, bbox_inches="tight")
+        g.savefig(save, bbox_inches='tight')
     plt.show()
 
 
