@@ -1081,7 +1081,7 @@ def compute_qc_stats_single(
     remove_duplicates: Optional[bool] = True,
     use_polars: Optional[bool] = True
 ):
-    """ "
+    """
     Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
 
     Parameters
@@ -1676,7 +1676,7 @@ def plot_barcode_profile_tss(
     color: Optional[List[List[Union[str]]]] = None,
     save: Optional[str] = None,
 ):
-    """ "
+    """
     Plot TSS profile per barcode.
 
     Parameters
@@ -1757,7 +1757,7 @@ def plot_barcode_metrics_per_group(
     plot: Optional[bool] = True,
     save: Optional[str] = None,
 ):
-    """ "
+    """
     Plot barcode metrics and filter based on used-provided thresholds.
 
     Parameters
@@ -1979,7 +1979,7 @@ def plot_barcode_metrics(
     return_cells: Optional[bool] = True,
     return_fig: Optional[bool] = False,
 ):
-    """ "
+    """
     Plot barcode metrics and filter based on used-provided thresholds.
 
     Parameters
