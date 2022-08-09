@@ -12,8 +12,11 @@ To install pycisTopic::
 	pip install -e . 
 	
 
-Creating a Docker/Singularity Image
-================
+To check your pycisTopic version::
+
+	import pycisTopic
+	pycisTopic.__version__
+	
 
 To build a Docker image, then create a Singularity image from this::
 
@@ -32,12 +35,8 @@ To build a Docker image, then create a Singularity image from this::
 
 	# Add all binding paths where you would need to access
 	singularity exec -B /lustre1,/staging,/data,/vsc-hard-mounts,/scratch pycistopic.sif ipython3
+	
+.. warning::
 
+	If you are planning to run the whole SCENIC+ workflow we recommend to install the SCENIC+ image. You can find more information at https://scenicplus.readthedocs.io/en/latest/install.html.
 
-Check version
-================
-
-To check your pycisTopic version::
-
-	import pycisTopic
-	pycisTopic.__version__

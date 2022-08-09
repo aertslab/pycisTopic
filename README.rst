@@ -49,7 +49,7 @@ To check your pycisTopic version::
 	import pycisTopic
 	pycisTopic.__version__
 
-Tutorials
+Tutorials & documentation
 **********************
 
--  `Single sample - Complete workflow <https://htmlpreview.github.io/?https://github.com/aertslab/pycisTopic/blob/master/notebooks/Single_sample_workflow.html>`__
+Tutorial and documentation are available at https://pycistopic.readthedocs.io/.

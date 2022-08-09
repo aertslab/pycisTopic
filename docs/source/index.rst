@@ -5,16 +5,11 @@ pycisTopic is a Python module to simultaneously identify cell states and cis-reg
 
 .. warning::
 	pycisTopic is still under development. It is currently a beta version. Functions in this package may change in a future release.
-	
-.. warning::
-	Detailed tutorials will be posted in the coming days. Stay tuned!
-
-
-Contents
---------
 
 .. toctree::
-
+   :hidden:
+   
    installation
+   features
    tutorials
    api
