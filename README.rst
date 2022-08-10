@@ -53,3 +53,10 @@ Tutorials & documentation
 **********************
 
 Tutorial and documentation are available at https://pycistopic.readthedocs.io/.
+
+Questions?
+**********************
+
+* If you have **technical questions or problems**, such as bug reports or ideas for new features, please open an issue under the issues tab.
+* If you have **questions about the interpretation of results or your analysis**, please start a Discussion un der the Discussions tab.
+
