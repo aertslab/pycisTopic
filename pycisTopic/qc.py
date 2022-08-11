@@ -1360,7 +1360,7 @@ def plot_sample_metrics(
     cmap: Optional[str] = None,
     ncol: Optional[int] = 1,
     figsize: Optional[Tuple[int, int]] = None,
-    insert_size_distriubtion_xlim: Optional[List[int]] = None,
+    insert_size_distribution_xlim: Optional[List[int]] = None,
     legend_outside: Optional[bool] = False,
     duplicate_rate_as_hexbin: Optional[bool] = False,
     plot: Optional[bool] = True,
@@ -1384,7 +1384,7 @@ def plot_sample_metrics(
             Number of columns for grid plot. If 1 each plot will be drawn independently, while the number of rows is automatically adjusted. Default: 1.
     figsize: tuple, optional
             Figure size. If drawing each plot independently it corresponds to the size of each plot, if using grid plotting it will correspond to the total size of the figure.
-    insert_size_distriubtion_xlim: list, optional
+    insert_size_distribution_xlim: list, optional
             A list with two numbers that indicate the x axis limits. Default: None
     plot: bool, optional
             Whether the plots should be returned to the console. Default: True
@@ -1398,7 +1398,7 @@ def plot_sample_metrics(
         remove_duplicates=remove_duplicates,
         color=color,
         cmap=cmap,
-        insert_size_distriubtion_xlim=insert_size_distriubtion_xlim,
+        insert_size_distribution_xlim=insert_size_distribution_xlim,
         legend_outside=legend_outside,
         duplicate_rate_as_hexbin=duplicate_rate_as_hexbin,
     )
@@ -1440,7 +1440,7 @@ def plot_sample_metrics_generator(
     remove_duplicates: Optional[bool] = True,
     color: Optional[List[List[Union[str]]]] = None,
     cmap: Optional[str] = None,
-    insert_size_distriubtion_xlim: Optional[List[int]] = None,
+    insert_size_distribution_xlim: Optional[List[int]] = None,
     legend_outside: Optional[bool] = False,
     duplicate_rate_as_hexbin: Optional[bool] = False,
 ):
@@ -1458,7 +1458,7 @@ def plot_sample_metrics_generator(
         List containing the colors to each for sample. When using barcode_rank_plot, at least two colors must be provided per sample. Default: None.
     cmap: list, optional
         Color map to color the plot by density for the duplicate rate plot.
-    insert_size_distriubtion_xlim: list, optional
+    insert_size_distribution_xlim: list, optional
         A list with two numbers that indicate the x axis limits. Default: None
     duplicate_rate_as_hexbin: bool, optional
         A boolean indicating if the duplicate rate should be plotted as an hexagonal binning plot. The quality of the plot will be reduced, but is a faster alternative
@@ -1560,9 +1560,9 @@ def plot_sample_metrics_generator(
             plt.plot(plot_data["Width"], plot_data["Ratio_frag"], color=selected_color)
             plt.xlabel("Fragment size", fontsize=10)
             plt.ylabel("Fragments ratio", fontsize=10)
-            if insert_size_distriubtion_xlim is not None:
+            if insert_size_distribution_xlim is not None:
                 plt.xlim(
-                    insert_size_distriubtion_xlim[0], insert_size_distriubtion_xlim[1]
+                    insert_size_distribution_xlim[0], insert_size_distribution_xlim[1]
                 )
         if (len(label_list) > 1) | (label_list[0] != ""):
             if legend_outside:
