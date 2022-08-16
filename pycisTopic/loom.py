@@ -13,10 +13,10 @@ import loompy as lp
 import numpy as np
 import pandas as pd
 import scipy.sparse as sparse
+from ctxcore.genesig import Regulon
 from loomxpy.loomxpy import SCopeLoom
 from pyscenic.aucell import aucell
 from pyscenic.binarization import binarize
-from ctxcore.genesig import Regulon
 from sklearn.feature_extraction.text import CountVectorizer
 
 
