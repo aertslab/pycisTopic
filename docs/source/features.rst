@@ -28,7 +28,7 @@ Pycistopic is an improved Python-based version of our Bayesian framework cisTopi
 
 	* **Count matrix generation (RQ)**: PycisTopic can generate a fragment count matrix from the fragments files, a set of regions (preferably, consensus regions as previously explained) and a list of high quality cells. Alternatively, a precomputed count matrix can also be used as input. In this step a cisTopic object will be created, including the fragment counts, path/s to the fragments files (if used to generate the count matrix) and cell/region metadata.
 
-	* **Doublet identification**: The fragment count matrix can be used as input for Scrublet102 (v0.2.3), By default, and when dealing with 10x data sets, we set the expected doublet rate to 10%.
+	* **Doublet identification**: The fragment count matrix can be used as input for Scrublet (v0.2.3), By default, and when dealing with 10x data sets, we set the expected doublet rate to 10%.
 
 	* **Topic modelling algorithms and model selection (RQ)**: PycisTopic implements two algorithms for topic modelling, serial LDA with a Collapsed Gibbs Sampler (as implemented in the lda module) and Mallet, which allows to parallelize the LDA model estimation. We use the same default parameters as in cisTopic. In addition, we have included additional metrics for model selection:
 		
