@@ -34,7 +34,7 @@ def make_argument_parser():
                         default=None, help='Whether intermediate models should be saved')
     parser.add_argument('--seed', '-s', type=int, required=False,
                         default=555, help='Seed for ensuring reproducibility')
-    parser.add_argument('--temp_dir', '-td', type=int, required=False,
+    parser.add_argument('--temp_dir', '-td', type=str, required=False,
                         default=None, help='Path to TMP directory')
     return parser
 
