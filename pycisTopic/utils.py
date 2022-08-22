@@ -628,3 +628,43 @@ def read_fragments_to_polars_df(
         df_pl = df_pl.with_column(pl.col("Score").cast(pl.Int32()))
 
     return df_pl
+
+
+def create_pyranges_from_polars_df(df_pl: pl.DataFrame) -> pr.PyRanges:
+    """
+    Create PyRanges dataframe from polars Dataframe.
+
+    Parameters
+    ----------
+    df_pl: Polars dataframe
+
+    Returns
+    -------
+    PyRanges dataframe.
+    """
+
+    # Create empty PyRanges object.
+    df_pr = pr.PyRanges()
+
+    # Create PyArrow schema.
+    fragments_pa_schema = pa.schema(
+        [
+            pa.field("Chromosome", pa.dictionary(pa.int32(), pa.large_string())),
+            pa.field("Start", pa.int32()),
+            pa.field("End", pa.int32()),
+            pa.field("Name", pa.dictionary(pa.int32(), pa.large_string())),
+            pa.field("Score", pa.int32()),
+        ]
+    )
+
+    df_pr.__dict__["dfs"] = {
+        chrom: df_chrom_pl.to_arrow().cast(fragments_pa_schema).to_pandas()
+        for chrom, df_chrom_pl in df_pl.partition_by(
+            groups="Chromosome", maintain_order=True, as_dict=True
+        ).items()
+    }
+
+    df_pr.__dict__["features"] = pr.genomicfeatures.GenomicFeaturesMethods
+    df_pr.__dict__["statistics"] = pr.statistics.StatisticsMethods
+
+    return df_pr
