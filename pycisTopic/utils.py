@@ -4,8 +4,10 @@ import gc
 import gzip
 import logging
 import math
+import os
 import re
 import sys
+from pathlib import Path
 from typing import Literal, Sequence, Union
 
 import matplotlib.backends.backend_pdf
@@ -20,6 +22,14 @@ from PIL import Image
 from scipy import sparse
 
 from pycisTopic.lda_models import CistopicLDAModel
+
+
+def format_path(path: str | Path) -> str:
+    """
+    Create a string path, expanding the home directory if present.
+    """
+
+    return os.path.expanduser(path)
 
 
 def coord_to_region_names(df_pl: pl.DataFrame) -> list[str]:
@@ -401,7 +411,9 @@ def read_fragments_to_pyranges(
         "BlockStarts",
     )
 
-    # Set the correct open function, depending if the fragments BED file is gzip compressed or not.
+    fragments_bed_filename = format_path(fragments_bed_filename)
+
+    # Set the correct open function, depending upon if the fragments BED file is gzip compressed or not.
     open_fn = gzip.open if fragments_bed_filename.endswith(".gz") else open
 
     skip_rows = 0
