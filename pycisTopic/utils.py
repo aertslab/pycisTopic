@@ -21,6 +21,34 @@ from scipy import sparse
 
 from pycisTopic.lda_models import CistopicLDAModel
 
+
+def coord_to_region_names(df_pl: pl.DataFrame) -> list[str]:
+    """
+    Convert polars dataframe with fragments to region names.
+
+    Parameters
+    ----------
+    df_pl
+
+    Returns
+    -------
+
+    List of region names.
+    """
+
+    df_pl.select(
+        [
+            (
+                pl.col("Chromosome").cast(pl.Utf8)
+                + ":"
+                + pl.col("Start").cast(pl.Utf8)
+                + "-"
+                + pl.col("End").cast(pl.Utf8)
+            ).alias("RegionIDs")
+        ]
+    ).get_column("RegionIDs").to_list()
+
+
 def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
     """
     Create Pandas dataframe with region IDs to coordinates mapping.
@@ -48,8 +76,8 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
             .str.split_exact("-", 2)
             # Give sensible names to each splitted part.
             .struct.rename_fields(
-                ["Chromosome", "Start", "End"])
-            .alias("RegionIDsFields")
+                ["Chromosome", "Start", "End"],
+            ).alias("RegionIDsFields")
         )
         # Unpack "RegionIDsFields" struct column and create Chromosome", "Start" and "End" columns.
         .unnest("RegionIDsFields")
@@ -468,16 +496,6 @@ def read_fragments_to_pyranges(
     return pr.PyRanges(df)
 
 
-def coord_to_region_names(coord):
     """
-    PyRanges to region names
     """
-    if isinstance(coord, pr.PyRanges):
-        coord = coord.as_df()
-        return list(
-            coord["Chromosome"].astype(str)
-            + ":"
-            + coord["Start"].astype(str)
-            + "-"
-            + coord["End"].astype(str)
         )
