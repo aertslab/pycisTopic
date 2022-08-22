@@ -6,13 +6,15 @@ import logging
 import math
 import re
 import sys
-from typing import Sequence, Union
+from typing import Literal, Sequence, Union
 
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import polars as pl
+import pyarrow as pa
+import pyarrow.csv
 import pyranges as pr
 from PIL import Image
 from scipy import sparse
@@ -337,8 +339,11 @@ def get_tss_matrix(fragments, flank_window, tss_space_annotation):
     return TSS_matrix
 
 
-def read_fragments_from_file(
-    fragments_bed_filename, use_polars: bool = True
+def read_fragments_to_pyranges(
+    fragments_bed_filename: str,
+    engine: Union[
+        str, Literal["polars"], Literal["pyarrow"], Literal["pandas"]
+    ] = "polars",
 ) -> pr.PyRanges:
     """
     Read fragments BED file to PyRanges object.
@@ -368,7 +373,7 @@ def read_fragments_from_file(
         "BlockStarts",
     )
 
-    # Set the correct open function depending if the fragments BED file is gzip compressed or not.
+    # Set the correct open function, depending if the fragments BED file is gzip compressed or not.
     open_fn = gzip.open if fragments_bed_filename.endswith(".gz") else open
 
     skip_rows = 0
@@ -394,32 +399,51 @@ def read_fragments_from_file(
             f"{nbr_columns} columns."
         )
 
-    if use_polars:
-        import polars as pl
+    if not engine:
+        engine = "pandas"
 
+    if engine == "polars":
         # Read fragments BED file with polars.
-        df = (
-            pl.read_csv(
-                fragments_bed_filename,
-                has_header=False,
+        df = pl.read_csv(
+            fragments_bed_filename,
+            has_header=False,
+            skip_rows=skip_rows,
+            sep="\t",
+            use_pyarrow=False,
+            new_columns=bed_column_names[:nbr_columns],
+            dtypes={
+                "Chromosome": pl.Categorical,
+                "Start": pl.Int32,
+                "End": pl.Int32,
+                "Name": pl.Categorical,
+                "Strand": pl.Categorical,
+            },
+        ).to_pandas()
+    elif engine == "pyarrow":
+        # Read fragments BED file with pyarrow.
+        df = pa.csv.read_csv(
+            fragments_bed_filename,
+            read_options=pa.csv.ReadOptions(
+                use_threads=True,
                 skip_rows=skip_rows,
-                separator="\t",
-                use_pyarrow=True,
-                new_columns=bed_column_names[:nbr_columns],
-            )
-            .with_columns(
-                [
-                    pl.col("Chromosome").cast(pl.Utf8),
-                    pl.col("Start").cast(pl.Int32),
-                    pl.col("End").cast(pl.Int32),
-                    pl.col("Name").cast(pl.Utf8),
-                ]
-            )
-            .to_pandas()
-        )
-
-        # Convert "Name" column to pd.Categorical as groupby operations will be done on it later.
-        df["Name"] = df["Name"].astype("category")
+                column_names=bed_column_names[:nbr_columns],
+            ),
+            parse_options=pa.csv.ParseOptions(
+                delimiter="\t",
+                quote_char=False,
+                escape_char=False,
+                newlines_in_values=False,
+            ),
+            convert_options=pa.csv.ConvertOptions(
+                column_types={
+                    "Chromosome": pa.dictionary(pa.int32(), pa.string()),
+                    "Start": pa.int32(),
+                    "End": pa.int32(),
+                    "Name": pa.dictionary(pa.int32(), pa.string()),
+                    "Strand": pa.dictionary(pa.int32(), pa.string()),
+                },
+            ),
+        ).to_pandas()
     else:
         # Read fragments BED file with pandas.
         df = pd.read_table(
@@ -431,11 +455,11 @@ def read_fragments_from_file(
             doublequote=False,
             engine="c",
             dtype={
-                "Chromosome": str,
-                "Start'": np.int32,
+                "Chromosome": "category",
+                "Start": np.int32,
                 "End": np.int32,
                 "Name": "category",
-                "Strand": str,
+                "Strand": "category",
             },
         )
 
