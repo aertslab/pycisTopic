@@ -508,6 +508,123 @@ def read_fragments_to_pyranges(
     return pr.PyRanges(df)
 
 
+def read_fragments_to_polars_df(
+    fragments_bed_filename: str,
+    engine: Union[str, Literal["polars"], Literal["pyarrow"]] = "pyarrow",
+) -> pl.DataFrame:
     """
+    Read fragments BED file to a polars dataframe.
+
+    If fragments don't have a Score column, a Score columns is created by counting the number of fragments with the same
+    chromosome, start, end and CB.
+
+    Parameters
+    ----------
+    fragments_bed_filename: Fragments BED filename.
+    engine: Use polars or pyarrow to read the fragments BED file (default: pyarrow).
+
+    Returns
+    -------
+    Polars Dataframe with fragments.
     """
+
+    bed_column_names = (
+        "Chromosome",
+        "Start",
+        "End",
+        "Name",
+        "Score",
+        "Strand",
+        "ThickStart",
+        "ThickEnd",
+        "ItemRGB",
+        "BlockCount",
+        "BlockSizes",
+        "BlockStarts",
+    )
+
+    fragments_bed_filename = format_path(fragments_bed_filename)
+
+    # Set the correct open function, depending upon if the fragments BED file is gzip compressed or not.
+    open_fn = gzip.open if fragments_bed_filename.endswith(".gz") else open
+
+    skip_rows = 0
+    nbr_columns = 0
+    with open_fn(fragments_bed_filename, "rt") as fragments_bed_fh:
+        for line in fragments_bed_fh:
+            # Remove newlines and spaces.
+            line = line.strip()
+
+            if not line or line.startswith("#"):
+                # Count number of empty lines and lines which start with a comment before the actual data.
+                skip_rows += 1
+            else:
+                # Get number of columns from the first real BED entry.
+                nbr_columns = len(line.split("\t"))
+
+                # Stop reading the BED file.
+                break
+
+    if nbr_columns < 4:
+        raise ValueError(
+            f'Fragments BED file needs to have at least 4 columns. "{fragments_bed_filename}" contains only '
+            f"{nbr_columns} columns."
         )
+
+    pl.Config.set_global_string_cache()
+
+    if engine == "polars":
+        # Read fragments BED file with polars.
+        df_pl = pl.read_csv(
+            fragments_bed_filename,
+            has_header=False,
+            skip_rows=skip_rows,
+            sep="\t",
+            use_pyarrow=False,
+            new_columns=bed_column_names[:nbr_columns],
+            dtypes={
+                "Chromosome": pl.Categorical,
+                "Start": pl.Int32,
+                "End": pl.Int32,
+                "Name": pl.Categorical,
+                "Strand": pl.Categorical,
+            },
+        )
+    elif engine == "pyarrow":
+        # Read fragments BED file with pyarrow.
+        df_pl = pl.from_arrow(
+            pa.csv.read_csv(
+                fragments_bed_filename,
+                read_options=pa.csv.ReadOptions(
+                    use_threads=True,
+                    skip_rows=skip_rows,
+                    column_names=bed_column_names[:nbr_columns],
+                ),
+                parse_options=pa.csv.ParseOptions(
+                    delimiter="\t",
+                    quote_char=False,
+                    escape_char=False,
+                    newlines_in_values=False,
+                ),
+                convert_options=pa.csv.ConvertOptions(
+                    column_types={
+                        "Chromosome": pa.dictionary(pa.int32(), pa.large_string()),
+                        "Start": pa.int32(),
+                        "End": pa.int32(),
+                        "Name": pa.dictionary(pa.int32(), pa.large_string()),
+                        "Strand": pa.dictionary(pa.int32(), pa.large_string()),
+                    },
+                ),
+            )
+        )
+
+    # If no score is provided or score column is ".", generate a score column with the number of fragments with have
+    # the same chromosome, start,end and CB.
+    if "Score" not in df_pl.columns or df_pl.schema["Score"] == pl.Utf8:
+        df_pl = df_pl.groupby(["Chromosome", "Start", "End", "Name"]).agg(
+            pl.count().cast(pl.Int32()).alias("Score")
+        )
+    else:
+        df_pl = df_pl.with_column(pl.col("Score").cast(pl.Int32()))
+
+    return df_pl
