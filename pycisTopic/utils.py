@@ -184,14 +184,14 @@ def regions_overlap(target, query):
     if isinstance(target, str):
         target_pr = pr.read_bed(target)
     if isinstance(target, list):
-        target_pr = pr.PyRanges(regionNamesToCoordinates(target))
+        target_pr = pr.PyRanges(region_names_to_coordinates(target))
     if isinstance(target, pr.PyRanges):
         target_pr = target
     # Read input
     if isinstance(query, str):
         query_pr = pr.read_bed(query)
     if isinstance(query, list):
-        query_pr = pr.PyRanges(regionNamesToCoordinates(query))
+        query_pr = pr.PyRanges(region_names_to_coordinates(query))
     if isinstance(query, pr.PyRanges):
         query_pr = query
 
