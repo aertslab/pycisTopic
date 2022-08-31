@@ -295,7 +295,7 @@ class CistopicImputedFeatures:
 
         # Create zeroed imputed object rankings database.
         imputed_acc_ranking = CistopicImputedFeatures(
-            np.zeros((len(self.feature_names), len(self.cell_names))),
+            np.zeros((len(self.feature_names), len(self.cell_names)), dtype=np.int32),
             self.feature_names,
             self.cell_names,
             self.project,
