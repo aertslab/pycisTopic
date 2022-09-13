@@ -508,24 +508,23 @@ def read_fragments_to_pyranges(
     return pr.PyRanges(df)
 
 
-def read_fragments_to_polars_df(
-    fragments_bed_filename: str,
-    engine: Union[str, Literal["polars"], Literal["pyarrow"]] = "pyarrow",
+def read_bed_to_polars_df(
+    bed_filename: str,
+    engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
+    min_column_count: int = 3,
 ) -> pl.DataFrame:
     """
-    Read fragments BED file to a polars dataframe.
-
-    If fragments don't have a Score column, a Score columns is created by counting the number of fragments with the same
-    chromosome, start, end and CB.
+    Read BED file to a polars dataframe.
 
     Parameters
     ----------
-    fragments_bed_filename: Fragments BED filename.
-    engine: Use polars or pyarrow to read the fragments BED file (default: pyarrow).
+    bed_filename: BED filename.
+    engine: Use polars or pyarrow to read the BED file (default: pyarrow).
+    min_column_count: Minimum number of required columns needed in BED file.
 
     Returns
     -------
-    Polars Dataframe with fragments.
+    Polars Dataframe with BED entries.
     """
 
     bed_column_names = (
@@ -543,15 +542,15 @@ def read_fragments_to_polars_df(
         "BlockStarts",
     )
 
-    fragments_bed_filename = format_path(fragments_bed_filename)
+    bed_filename = format_path(bed_filename)
 
     # Set the correct open function, depending upon if the fragments BED file is gzip compressed or not.
-    open_fn = gzip.open if fragments_bed_filename.endswith(".gz") else open
+    open_fn = gzip.open if bed_filename.endswith(".gz") else open
 
     skip_rows = 0
-    nbr_columns = 0
-    with open_fn(fragments_bed_filename, "rt") as fragments_bed_fh:
-        for line in fragments_bed_fh:
+    column_count = 0
+    with open_fn(bed_filename, "rt") as bed_fh:
+        for line in bed_fh:
             # Remove newlines and spaces.
             line = line.strip()
 
@@ -560,28 +559,29 @@ def read_fragments_to_polars_df(
                 skip_rows += 1
             else:
                 # Get number of columns from the first real BED entry.
-                nbr_columns = len(line.split("\t"))
+                column_count = len(line.split("\t"))
 
                 # Stop reading the BED file.
                 break
 
-    if nbr_columns < 4:
+    if column_count < min_column_count:
         raise ValueError(
-            f'Fragments BED file needs to have at least 4 columns. "{fragments_bed_filename}" contains only '
-            f"{nbr_columns} columns."
+            f'BED file needs to have at least {min_column_count} columns. '
+            f'"{bed_filename}" contains only {column_count} columns.'
         )
 
+    # Set global string cache so categorical columns from multiple Polars Dataframes can be joined later, if necessary.
     pl.Config.set_global_string_cache()
 
     if engine == "polars":
-        # Read fragments BED file with polars.
-        df_pl = pl.read_csv(
-            fragments_bed_filename,
+        # Read BED file with polars.
+        bed_df_pl = pl.read_csv(
+            bed_filename,
             has_header=False,
             skip_rows=skip_rows,
             sep="\t",
             use_pyarrow=False,
-            new_columns=bed_column_names[:nbr_columns],
+            new_columns=bed_column_names[:column_count],
             dtypes={
                 "Chromosome": pl.Categorical,
                 "Start": pl.Int32,
@@ -591,14 +591,14 @@ def read_fragments_to_polars_df(
             },
         )
     elif engine == "pyarrow":
-        # Read fragments BED file with pyarrow.
-        df_pl = pl.from_arrow(
+        # Read BED file with pyarrow.
+        bed_df_pl = pl.from_arrow(
             pa.csv.read_csv(
-                fragments_bed_filename,
+                bed_filename,
                 read_options=pa.csv.ReadOptions(
                     use_threads=True,
                     skip_rows=skip_rows,
-                    column_names=bed_column_names[:nbr_columns],
+                    column_names=bed_column_names[:column_count],
                 ),
                 parse_options=pa.csv.ParseOptions(
                     delimiter="\t",
@@ -617,17 +617,48 @@ def read_fragments_to_polars_df(
                 ),
             )
         )
+    else:
+        raise ValueError(f'Unsupported engine value "{engine}" (allowed: ["polars", "pyarrow"]).')
 
-    # If no score is provided or score column is ".", generate a score column with the number of fragments with have
-    # the same chromosome, start,end and CB.
-    if "Score" not in df_pl.columns or df_pl.schema["Score"] == pl.Utf8:
-        df_pl = df_pl.groupby(["Chromosome", "Start", "End", "Name"]).agg(
+    return bed_df_pl
+
+
+def read_fragments_to_polars_df(
+    fragments_bed_filename: str,
+    engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
+) -> pl.DataFrame:
+    """
+    Read fragments BED file to a polars dataframe.
+
+    If fragments don't have a Score column, a Score columns is created by counting
+    the number of fragments with the same chromosome, start, end and CB.
+
+    Parameters
+    ----------
+    fragments_bed_filename: Fragments BED filename.
+    engine: Use polars or pyarrow to read the fragments BED file (default: pyarrow).
+
+    Returns
+    -------
+    Polars Dataframe with fragments.
+    """
+
+    fragments_df_pl = read_bed_to_polars_df(
+        bed_filename=fragments_bed_filename,
+        engine=engine,
+        min_column_count=4,
+    )
+
+    # If no score is provided or score column is ".", generate a score column with the number of fragments which have
+    # the same chromosome, start, end and CB.
+    if "Score" not in fragments_df_pl.columns or fragments_df_pl.schema["Score"] == pl.Utf8:
+        fragments_df_pl = fragments_df_pl.groupby(["Chromosome", "Start", "End", "Name"]).agg(
             pl.count().cast(pl.Int32()).alias("Score")
         )
     else:
-        df_pl = df_pl.with_column(pl.col("Score").cast(pl.Int32()))
+        fragments_df_pl = fragments_df_pl.with_column(pl.col("Score").cast(pl.Int32()))
 
-    return df_pl
+    return fragments_df_pl
 
 
 def create_pyranges_from_polars_df(df_pl: pl.DataFrame) -> pr.PyRanges:
