@@ -677,19 +677,26 @@ def create_pyranges_from_polars_df(df_pl: pl.DataFrame) -> pr.PyRanges:
     # Create empty PyRanges object.
     df_pr = pr.PyRanges()
 
-    # Create PyArrow schema.
-    fragments_pa_schema = pa.schema(
-        [
-            pa.field("Chromosome", pa.dictionary(pa.int32(), pa.large_string())),
-            pa.field("Start", pa.int32()),
-            pa.field("End", pa.int32()),
-            pa.field("Name", pa.dictionary(pa.int32(), pa.large_string())),
-            pa.field("Score", pa.int32()),
-        ]
-    )
+    # Create PyArrow schema for Polars DataFrame, where categorical columns are cast from
+    # pa.dictionary(pa.uint32(), pa.large_string()) to pa.dictionary(pa.int32(), pa.large_string())
+    # as for the later conversion to a Pandas Dataframe, only the latter is supported by pyarrow.
+    pa_schema_fixed_categoricals_list = []
+    for pa_field in df_pl.head(1).to_arrow().schema:
+        if pa_field.type == pa.dictionary(pa.uint32(), pa.large_string()):
+            # ArrowTypeError: Converting unsigned dictionary indices to pandas not yet supported, index type: uint32
+            pa_schema_fixed_categoricals_list.append(
+                pa.field(pa_field.name, pa.dictionary(pa.int32(), pa.large_string()))
+            )
+        else:
+            pa_schema_fixed_categoricals_list.append(
+                pa.field(pa_field.name, pa_field.type)
+            )
 
+    pa_schema_fixed_categoricals_list = pa.schema(pa_schema_fixed_categoricals_list)
+
+    # Populate empty PyRanges object directly with per chromosome Pandas dataframes (unstranded).
     df_pr.__dict__["dfs"] = {
-        chrom: df_chrom_pl.to_arrow().cast(fragments_pa_schema).to_pandas()
+        chrom: df_chrom_pl.to_arrow().cast(pa_schema_fixed_categoricals_list).to_pandas()
         for chrom, df_chrom_pl in df_pl.partition_by(
             groups="Chromosome", maintain_order=True, as_dict=True
         ).items()
