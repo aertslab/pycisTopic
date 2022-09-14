@@ -34,7 +34,7 @@ def format_path(path: str | Path) -> str:
 
 def coord_to_region_names(df_pl: pl.DataFrame) -> list[str]:
     """
-    Convert polars dataframe with fragments to region names.
+    Convert Polars DataFrame with fragments to region names.
 
     Parameters
     ----------
@@ -61,7 +61,7 @@ def coord_to_region_names(df_pl: pl.DataFrame) -> list[str]:
 
 def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
     """
-    Create Pandas dataframe with region IDs to coordinates mapping.
+    Create Pandas DataFrame with region IDs to coordinates mapping.
 
     Parameters
     ----------
@@ -70,7 +70,7 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
     Returns
     -------
 
-    Pandas dataframe with region IDs to coordinates mapping.
+    Pandas DataFrame with region IDs to coordinates mapping.
     """
 
     region_df = (
@@ -95,7 +95,7 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
             # Convert "Start" and "End" string columns to int32 columns.
             pl.col(["Start", "End"]).cast(pl.Int32)
         )
-        # Convert to pandas.
+        # Convert to Pandas.
         .to_pandas()
     )
 
@@ -389,7 +389,7 @@ def read_fragments_to_pyranges(
     Parameters
     ----------
     fragments_bed_filename: Fragments BED filename.
-    use_polars: Use polars instead of pandas for reading the fragments BED file.
+    use_polars: Use Polars instead of Pandas for reading the fragments BED file.
 
     Returns
     -------
@@ -443,7 +443,7 @@ def read_fragments_to_pyranges(
         engine = "pandas"
 
     if engine == "polars":
-        # Read fragments BED file with polars.
+        # Read fragments BED file with Polars.
         df = pl.read_csv(
             fragments_bed_filename,
             has_header=False,
@@ -485,7 +485,7 @@ def read_fragments_to_pyranges(
             ),
         ).to_pandas()
     else:
-        # Read fragments BED file with pandas.
+        # Read fragments BED file with Pandas.
         df = pd.read_table(
             fragments_bed_filename,
             sep="\t",
@@ -503,7 +503,7 @@ def read_fragments_to_pyranges(
             },
         )
 
-    # Convert pandas dataframe to PyRanges dataframe.
+    # Convert Pandas DataFrame to PyRanges DataFrame.
     # This will convert "Chromosome" and "Strand" columns to pd.Categorical.
     return pr.PyRanges(df)
 
@@ -514,17 +514,17 @@ def read_bed_to_polars_df(
     min_column_count: int = 3,
 ) -> pl.DataFrame:
     """
-    Read BED file to a polars dataframe.
+    Read BED file to a Polars DataFrame.
 
     Parameters
     ----------
     bed_filename: BED filename.
-    engine: Use polars or pyarrow to read the BED file (default: pyarrow).
+    engine: Use Polars or pyarrow to read the BED file (default: pyarrow).
     min_column_count: Minimum number of required columns needed in BED file.
 
     Returns
     -------
-    Polars Dataframe with BED entries.
+    Polars DataFrame with BED entries.
     """
 
     bed_column_names = (
@@ -570,11 +570,11 @@ def read_bed_to_polars_df(
             f'"{bed_filename}" contains only {column_count} columns.'
         )
 
-    # Set global string cache so categorical columns from multiple Polars Dataframes can be joined later, if necessary.
+    # Set global string cache so categorical columns from multiple Polars DataFrames can be joined later, if necessary.
     pl.Config.set_global_string_cache()
 
     if engine == "polars":
-        # Read BED file with polars.
+        # Read BED file with Polars.
         bed_df_pl = pl.read_csv(
             bed_filename,
             has_header=False,
@@ -628,7 +628,7 @@ def read_fragments_to_polars_df(
     engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
 ) -> pl.DataFrame:
     """
-    Read fragments BED file to a polars dataframe.
+    Read fragments BED file to a Polars DataFrame.
 
     If fragments don't have a Score column, a Score columns is created by counting
     the number of fragments with the same chromosome, start, end and CB.
@@ -636,11 +636,11 @@ def read_fragments_to_polars_df(
     Parameters
     ----------
     fragments_bed_filename: Fragments BED filename.
-    engine: Use polars or pyarrow to read the fragments BED file (default: pyarrow).
+    engine: Use Polars or pyarrow to read the fragments BED file (default: pyarrow).
 
     Returns
     -------
-    Polars Dataframe with fragments.
+    Polars DataFrame with fragments.
     """
 
     fragments_df_pl = read_bed_to_polars_df(
@@ -663,15 +663,15 @@ def read_fragments_to_polars_df(
 
 def create_pyranges_from_polars_df(df_pl: pl.DataFrame) -> pr.PyRanges:
     """
-    Create PyRanges dataframe from polars Dataframe.
+    Create PyRanges DataFrame from Polars DataFrame.
 
     Parameters
     ----------
-    df_pl: Polars dataframe
+    df_pl: Polars DataFrame
 
     Returns
     -------
-    PyRanges dataframe.
+    PyRanges DataFrame.
     """
 
     # Create empty PyRanges object.
@@ -679,11 +679,11 @@ def create_pyranges_from_polars_df(df_pl: pl.DataFrame) -> pr.PyRanges:
 
     # Create PyArrow schema for Polars DataFrame, where categorical columns are cast from
     # pa.dictionary(pa.uint32(), pa.large_string()) to pa.dictionary(pa.int32(), pa.large_string())
-    # as for the later conversion to a Pandas Dataframe, only the latter is supported by pyarrow.
+    # as for the later conversion to a Pandas DataFrame, only the latter is supported by pyarrow.
     pa_schema_fixed_categoricals_list = []
     for pa_field in df_pl.head(1).to_arrow().schema:
         if pa_field.type == pa.dictionary(pa.uint32(), pa.large_string()):
-            # ArrowTypeError: Converting unsigned dictionary indices to pandas not yet supported, index type: uint32
+            # ArrowTypeError: Converting unsigned dictionary indices to Pandas not yet supported, index type: uint32
             pa_schema_fixed_categoricals_list.append(
                 pa.field(pa_field.name, pa.dictionary(pa.int32(), pa.large_string()))
             )
