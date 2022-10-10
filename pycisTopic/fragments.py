@@ -25,8 +25,10 @@ def read_fragments_to_pyranges(
 
     Parameters
     ----------
-    fragments_bed_filename: Fragments BED filename.
-    use_polars: Use Polars instead of Pandas for reading the fragments BED file.
+    fragments_bed_filename
+        Fragments BED filename.
+    use_polars
+        Use Polars instead of Pandas for reading the fragments BED file.
 
     Returns
     -------
@@ -155,9 +157,12 @@ def read_bed_to_polars_df(
 
     Parameters
     ----------
-    bed_filename: BED filename.
-    engine: Use Polars or pyarrow to read the BED file (default: pyarrow).
-    min_column_count: Minimum number of required columns needed in BED file.
+    bed_filename
+        BED filename.
+    engine
+        Use Polars or pyarrow to read the BED file (default: pyarrow).
+    min_column_count
+        Minimum number of required columns needed in BED file.
 
     Returns
     -------
@@ -279,8 +284,10 @@ def read_fragments_to_polars_df(
 
     Parameters
     ----------
-    fragments_bed_filename: Fragments BED filename.
-    engine: Use Polars or pyarrow to read the fragments BED file (default: pyarrow).
+    fragments_bed_filename
+        Fragments BED filename.
+    engine
+        Use Polars or pyarrow to read the fragments BED file (default: pyarrow).
 
     Returns
     -------
@@ -314,7 +321,8 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
 
     Parameters
     ----------
-    bed_df_pl: Polars DataFrame containing BED entries.
+    bed_df_pl
+        Polars DataFrame containing BED entries.
 
     Returns
     -------
@@ -379,7 +387,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
 
         Parameters
         ----------
-        per_chrom_or_chrom_strand_bed_df_pl:
+        per_chrom_or_chrom_strand_bed_df_pl
             Polars DataFrame partitioned by chromosome (unstranded) or chromosome-strand (stranded).
 
         Returns
