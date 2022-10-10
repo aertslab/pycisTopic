@@ -208,7 +208,7 @@ def read_bed_to_polars_df(
 
     if column_count < min_column_count:
         raise ValueError(
-            f'BED file needs to have at least {min_column_count} columns. '
+            f"BED file needs to have at least {min_column_count} columns. "
             f'"{bed_filename}" contains only {column_count} columns.'
         )
 
@@ -260,7 +260,9 @@ def read_bed_to_polars_df(
             )
         )
     else:
-        raise ValueError(f'Unsupported engine value "{engine}" (allowed: ["polars", "pyarrow"]).')
+        raise ValueError(
+            f'Unsupported engine value "{engine}" (allowed: ["polars", "pyarrow"]).'
+        )
 
     return bed_df_pl
 
@@ -293,10 +295,13 @@ def read_fragments_to_polars_df(
 
     # If no score is provided or score column is ".", generate a score column with the number of fragments which have
     # the same chromosome, start, end and CB.
-    if "Score" not in fragments_df_pl.columns or fragments_df_pl.schema["Score"] == pl.Utf8:
-        fragments_df_pl = fragments_df_pl.groupby(["Chromosome", "Start", "End", "Name"]).agg(
-            pl.count().cast(pl.Int32()).alias("Score")
-        )
+    if (
+        "Score" not in fragments_df_pl.columns
+        or fragments_df_pl.schema["Score"] == pl.Utf8
+    ):
+        fragments_df_pl = fragments_df_pl.groupby(
+            ["Chromosome", "Start", "End", "Name"]
+        ).agg(pl.count().cast(pl.Int32()).alias("Score"))
     else:
         fragments_df_pl = fragments_df_pl.with_column(pl.col("Score").cast(pl.Int32()))
 
@@ -347,9 +352,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
             )
 
     # Add entry for index as last column.
-    pa_schema_fixed_categoricals_list.append(
-        pa.field("__index_level_0__", pa.int64())
-    )
+    pa_schema_fixed_categoricals_list.append(pa.field("__index_level_0__", pa.int64()))
 
     # Create pyarrow schema so categorical columns in chromosome-strand Polars DataFrames or chromosome Polars
     # DataFrames can be cast to a pyarrow supported dictionary type, which can be converted to a Pandas categorical.
@@ -360,13 +363,16 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     bed_with_idx_df_pl = (
         bed_df_pl
         # Add index column and cast it from UInt32 to Int64
-        .with_row_count("__index_level_0__")
-        .with_column(pl.col("__index_level_0__").cast(pl.Int64))
+        .with_row_count("__index_level_0__").with_column(
+            pl.col("__index_level_0__").cast(pl.Int64)
+        )
         # Put index column as last column.
         .select(pl.col(pa_schema_fixed_categoricals.names))
     )
 
-    def create_per_chrom_or_chrom_strand_df_pd(per_chrom_or_chrom_strand_bed_df_pl: pl.DataFrame) -> pd.DataFrame:
+    def create_per_chrom_or_chrom_strand_df_pd(
+        per_chrom_or_chrom_strand_bed_df_pl: pl.DataFrame,
+    ) -> pd.DataFrame:
         """
         Create per chromosome (unstranded) or per chromosome-strand (stranded) Pandas DataFrame for PyRanges from
         equivalent Polars DataFrame.
@@ -385,8 +391,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
         # a pyarrow table and change categoricals dictionary type to Pandas compatible categorical type and convert to
         # a Pandas DataFrame.
         per_chrom_or_chrom_strand_bed_df_pd = (
-            per_chrom_or_chrom_strand_bed_df_pl
-            .to_arrow()
+            per_chrom_or_chrom_strand_bed_df_pl.to_arrow()
             .cast(pa_schema_fixed_categoricals)
             .to_pandas()
         )
@@ -400,13 +405,15 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     if is_stranded:
         # Populate empty PyRanges object directly with per chromosome and strand Pandas DataFrames (stranded).
         df_pr.__dict__["dfs"] = {
-            chrom_strand: create_per_chrom_or_chrom_strand_df_pd(per_chrom_or_chrom_strand_bed_df_pl)
+            chrom_strand: create_per_chrom_or_chrom_strand_df_pd(
+                per_chrom_or_chrom_strand_bed_df_pl
+            )
             for chrom_strand, per_chrom_or_chrom_strand_bed_df_pl in sorted(
                 # Partition Polars DataFrame with BED entries per chromosome-strand (stranded).
                 bed_with_idx_df_pl.partition_by(
                     groups=["Chromosome", "Strand"], maintain_order=False, as_dict=True
                 ).items(),
-                key=itemgetter(0)
+                key=itemgetter(0),
             )
         }
     else:
@@ -418,7 +425,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
                 bed_with_idx_df_pl.partition_by(
                     groups=["Chromosome"], maintain_order=False, as_dict=True
                 ).items(),
-                key=itemgetter(0)
+                key=itemgetter(0),
             )
         }
 
