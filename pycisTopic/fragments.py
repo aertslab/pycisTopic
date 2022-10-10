@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gzip
 from operator import itemgetter
-from typing import Literal, Union
+from typing import Literal, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -441,3 +441,176 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     df_pr.__dict__["statistics"] = pr.statistics.StatisticsMethods
 
     return df_pr
+
+
+def get_fragments_per_cb(
+    fragments_df_pl: pl.DataFrame,
+    min_fragments_per_cb: int = 50,
+    collapse_duplicates: Optional[bool] = True,
+) -> pl.DataFrame:
+    """
+    Get number of fragments and duplication ratio per cell barcode.
+
+    Parameters
+    ----------
+    fragments_df_pl:
+        Polars DataFrame with fragments.
+    min_fragments_per_cb:
+        Minimum number of fragments needed per cell barcode to keep the fragments for those cell barcodes.
+    collapse_duplicates:
+        Collapse duplicate fragments (same chromosomal positions and linked to the same cell barcode).
+
+    Returns
+    -------
+    Polars DataFrame with number of fragments and duplication ratio per cell barcode.
+    """
+
+    fragments_count_column = (
+        "unique_fragments_count" if collapse_duplicates else "total_fragments_count"
+    )
+
+    fragments_stats_per_cell_cb_df_pl = (
+        fragments_df_pl.lazy()
+        .rename({"Name": "CB"})
+        .groupby(by="CB", maintain_order=True)
+        .agg(
+            [
+                pl.col("Score").sum().alias("total_fragments_count"),
+                pl.count().alias("unique_fragments_count"),
+            ]
+        )
+        .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
+        .sort(by=fragments_count_column, reverse=True)
+        .with_row_count(name="barcode_rank", offset=1)
+        .with_column(
+            (pl.col("total_fragments_count") - pl.col("unique_fragments_count")).alias(
+                "duplication_count"
+            )
+        )
+        .with_column(
+            (pl.col("duplication_count") / pl.col("total_fragments_count")).alias(
+                "duplication_ratio"
+            )
+        )
+        .collect()
+    )
+
+    return fragments_stats_per_cell_cb_df_pl
+
+
+def get_cbs_passing_filter(
+    fragments_stats_per_cell_cb_df_pl: pl.DataFrame,
+    cbs: pl.Series | Sequence | None = None,
+    min_fragments_per_cb: int | None = None,
+    min_cbs: int | None = None,
+    collapse_duplicates: bool | None = True,
+) -> (pl.Series, pl.DataFrame):
+    """
+    Get cell barcodes passing the filter.
+
+    Parameters
+    ----------
+    fragments_stats_per_cell_cb_df_pl
+        Polars dataframe with number of fragments and duplication ratio per cell barcode. See `get_fragments_per_cb()`.
+    cbs
+        Cell barcodes to keep. If specified, `min_fragments_per_cb` and `min_cbs` are ignored.
+    min_fragments_per_cb
+        Minimum number of fragments needed per cell barcode to keep the cell barcode.
+        Only used if `cbs` is `None`, `min_cbs` will be ignored.
+    min_cbs
+        Minimum number of cell barcodes needed to keep the cell barcode.
+        Only used in `cbs` is `None` and `min_fragments_per_cb` is `None`.
+    collapse_duplicates
+        Collapse duplicate fragments (same chromosomal positions and linked to the same cell barcode).
+
+    Returns
+    -------
+    (Cell barcodes passing the filter,
+     fragments_stats_per_cell_cb_df_pl filtered by the cell barcodes passing the filter)
+    """
+
+    fragments_count_column = (
+        "unique_fragments_count" if collapse_duplicates else "total_fragments_count"
+    )
+
+    if cbs:
+        if isinstance(cbs, Sequence):
+            cbs_series_pl = pl.Series("CB", cbs, dtype=pl.Categorical)
+        elif isinstance(cbs, pl.Series):
+            if cbs.dtype == pl.Utf8:
+                cbs_series_pl = cbs.cast(pl.Categorical).rename("CB")
+            elif cbs.dtype == pl.Categorical:
+                cbs_series_pl = cbs.rename("CB")
+        else:
+            raise ValueError("Unsupported type for cell barcodes.")
+
+        fragments_stats_per_cb_filtered_df_pl = fragments_stats_per_cell_cb_df_pl.join(
+            other=cbs_series_pl.to_frame(),
+            on="CB",
+            how="inner",
+        )
+    elif isinstance(min_fragments_per_cb, int):
+        fragments_stats_per_cb_filtered_df_pl = (
+            fragments_stats_per_cell_cb_df_pl.lazy()
+            .filter(pl.col(fragments_count_column) >= min_fragments_per_cb)
+            .collect()
+        )
+    elif isinstance(min_cbs, int):
+        fragments_stats_per_cb_filtered_df_pl = (
+            fragments_stats_per_cell_cb_df_pl.lazy()
+            .sort(by=fragments_count_column, reverse=True)
+            .head(min_cbs)
+            .collect()
+        )
+    else:
+        raise ValueError(
+            "Provide a minimal number of barcodes or a minimal number of fragments to select CBs."
+        )
+
+    cbs_selected = fragments_stats_per_cb_filtered_df_pl.get_column("CB")
+
+    return cbs_selected, fragments_stats_per_cb_filtered_df_pl
+
+
+def filter_fragments_by_cb(
+    fragments_df_pl: pl.DataFrame,
+    cbs: pl.Series | Sequence,
+) -> pl.DataFrame:
+    """
+    Filter fragments by cell barcodes.
+
+    Parameters
+    ----------
+    fragments_df_pl
+        Polars DataFrame with fragments.
+    cbs
+        List/Polars Series with Cell barcodes. See `get_cbs_passing_filter()`.
+
+    Returns
+    -------
+    Polars DataFrame with fragments for the requested cell barcodes.
+    """
+
+    if isinstance(cbs, Sequence):
+        if isinstance(cbs[0], str):
+            cbs_series_pl = pl.Series("CB", cbs, dtype=pl.Categorical)
+        else:
+            raise ValueError(
+                "Unsupported type for cell barcodes. First element of cell barcodes is not a string."
+            )
+    elif isinstance(cbs, pl.Series):
+        if cbs.dtype == pl.Utf8:
+            cbs_series_pl = cbs.cast(pl.Categorical).rename("CB")
+        elif cbs.dtype == pl.Categorical:
+            cbs_series_pl = cbs.rename("CB")
+    else:
+        raise ValueError("Unsupported type for cell barcodes.")
+
+    fragments_cb_filtered_df_pl = fragments_df_pl.join(
+        other=cbs_series_pl.to_frame(),
+        left_on="Name",
+        right_on="CB",
+        how="inner",
+    )
+
+    return fragments_cb_filtered_df_pl
