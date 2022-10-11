@@ -9,26 +9,48 @@ def get_tss_profile(
     fragments_df_pl: pl.DataFrame,
     tss_annotation: pl.DataFrame,
     flank_window=1000,
-    window_size=10,
+    smoothing_rolling_window=10,
     minimum_signal_window=100,
     tss_window=50,
     min_norm=0.2,
 ):
     """
-    Get TSS profile.
+    Get TSS profile for Polars DataFrame with fragments filtered by cell barcodes of interest.
 
     Parameters
     ----------
-    fragments_df_pl: pl.DataFrame,
-    tss_annotation: pl.DataFrame,
-    flank_window=1000,
-    window_size=10,
-    minimum_signal_window=100,
-    tss_window=50,
-    min_norm=0.2
+    fragments_df_pl
+        Polars DataFrame with fragments (filtered by cell barcodes of interest). See `filter_fragments_by_cb()`.
+    tss_annotation
+        TSS annotation Polars DataFrame with at least the following columns: ["Chromosome", "Start", "Strand"].
+        The "Start" column is 0-based like a BED file.
+        See `get_tss_annotation_from_ensembl()` and `change_chromosome_source_in_bed()` for ways to get TSS annotation
+        from Ensembl BioMart.
+    flank_window
+        Flanking window around the TSS.
+        Used for intersecting fragments with TSS positions and keeping cut sites.
+        Default: 1000 (+/- 1000 bp).
+    smoothing_rolling_window
+        Rolling window used to smooth the cut sites signal.
+        Default: 10.
+    minimum_signal_window
+        Average signal in the tails of the flanking window around the TSS:
+           - [-flank_window, -flank_window + minimum_signal_window + 1]
+           - [flank_window - minimum_signal_window + 1, flank_window]
+        is used to normalize the TSS enrichment.
+        Default: 100 (average signal in [-1000, -901], [901, 1000] around TSS if `flank_window=1000`).
+    tss_window
+        Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per cell barcode.
+        Default: 50 (+/- 50 bp).
+    min_norm
+        Minimum normalization score.
+        If the average minimum signal value is below this value, this number is used to normalize the TSS signal.
+        This approach penalizes cells with fewer reads.
+        Default: 0.2
 
     Returns
     -------
+    tss_enrichment_per_cb, tss_norm_matrix_sample, tss_norm_matrix_per_cb
 
     Examples
     --------
@@ -69,11 +91,12 @@ def get_tss_profile(
                         )
                         # Filter out TSS annotations without strand info (in case that would ever happen).
                         .filter(pl.col("Strand") != ".")
-                        # Create [-flank_window, flank_window] around TSS and set them as "Start" and "End" column.
+                        # Create [-flank_window, flank_window] around TSS (size: flank_window * 2 + 1)
+                        # and set them as "Start" and "End" column.
                         .with_columns(
                             [
                                 (pl.col("Start") - flank_window).alias("Start"),
-                                (pl.col("Start") + flank_window).alias("End"),
+                                (pl.col("Start") + flank_window + 1).alias("End"),
                             ]
                         )
                     )
@@ -90,12 +113,21 @@ def get_tss_profile(
             "No overlap found between fragments and TSS annotation. Make sure both use the same chromosome name source."
         )
 
-    # Get cut sites (start/end fragments) relative to the TSS position minus flank_window value, so:
-    #   - 0: cut site `flank_window` bp upstream of the TSS.
-    #   - `flank_window`: cut site at the TSS.
-    #   - `flank_window` * 2: cut site `flank_window` bp downstream of the TSS.
+    # Get cut sites (start/end fragments) relative to the TSS position taking into account the strand info of the TSS.
+    #   - `-x`: cut site x bp upstream of TSS.
+    #   - `0`: cut site at TSS.
+    #   - `x`: cut site x bp downstream of TSS.
     cut_sites_tss_start_end = (
         overlap_with_tss_df_pl.clone()
+        .with_columns(
+            [
+                # Fragment start, fragment end and TSS position in 0-based coordinates.
+                pl.col("Start").alias("fragment_start"),
+                (pl.col("End") - 1).alias("fragment_end"),
+                (pl.col("Start_tss_flank") + flank_window).alias("tss"),
+                pl.col("Strand"),
+            ]
+        )
         .with_columns(
             [
                 pl.when(pl.col("Strand") == "-")
@@ -103,11 +135,11 @@ def get_tss_profile(
                     # TSS is for a gene on the negative strand.
                     pl.struct(
                         [
-                            # Calculate relative start and end of cut site to the (TSS - flank_window = End_tss_flank).
-                            (pl.col("End_tss_flank") - pl.col("End")).alias(
+                            # Calculate relative start and end of cut site to the TSS.
+                            (pl.col("tss") - (pl.col("fragment_end"))).alias(
                                 "rel_start"
                             ),
-                            (pl.col("End_tss_flank") - pl.col("Start")).alias(
+                            (pl.col("tss") - pl.col("fragment_start")).alias(
                                 "rel_end"
                             ),
                         ]
@@ -117,11 +149,11 @@ def get_tss_profile(
                     # TSS is for a gene on the positive strand.
                     pl.struct(
                         [
-                            # Calculate relative start and end of cut site to the (TSS - flank_window = Start_tss_flank).
-                            (pl.col("Start") - pl.col("Start_tss_flank")).alias(
+                            # Calculate relative start and end of cut site to the TSS.
+                            (pl.col("fragment_start") - pl.col("tss")).alias(
                                 "rel_start"
                             ),
-                            (pl.col("End") - pl.col("Start_tss_flank")).alias(
+                            (pl.col("fragment_end") - pl.col("tss")).alias(
                                 "rel_end"
                             ),
                         ]
@@ -141,23 +173,27 @@ def get_tss_profile(
     )
 
     # Get TSS matrix:
-    #   - columns: cut site positions relative to (TSS - flank_window).
+    #   - columns: cut site positions relative to TSS (TSS = 0).
     #   - rows: CBs
     #   - values: number of times a cut site position was found for a certain CB.
-    tss_matrix = (
-        # Get all cut sites positions for which have a value between 0 (included) and (flank_window * 2) (included):
+    tss_matrix_tmp = (
+        # Get all cut site positions which fall in [-flank_window, flank_window] (size: flank_window * 2 + 1):
         #   - Some fragments will have both cut sites in this interval.
         #   - Some fragments have only one cut site in this interval (start or end).
         pl.concat(
             [
                 pl.DataFrame(
                     [
+                        # Create [-flank_window, flank_window] range for all possible cut site positions.
                         pl.Series(
                             "Position",
                             pl.arange(
-                                low=0, high=flank_window * 2 + 1, step=1, eager=True
+                                low=-flank_window, high=flank_window + 1, step=1, eager=True
                             ),
                         ).cast(pl.Int32),
+                        # Create a CB column with all "no_CB" values. Needed temporarily so during the pivot operation
+                        # all cut site position values ([-flank_window, flank_window] range) are kept even if there are
+                        # no cut sites for certain positions.
                         pl.Series(
                             "CB",
                             ["no_CB"] * (flank_window * 2 + 1),
@@ -167,8 +203,7 @@ def get_tss_profile(
                 ),
                 # Get all cut sites for the relative start that pass the filter.
                 cut_sites_tss_start_end.filter(
-                    (pl.col("rel_start") >= 0)
-                    & (pl.col("rel_start") <= flank_window * 2)
+                    pl.col("rel_start").abs() <= flank_window
                 ).select(
                     [
                         # Get cut site position and associated CB.
@@ -178,7 +213,7 @@ def get_tss_profile(
                 ),
                 # Get all cut sites for the relative end that pass the filter.
                 cut_sites_tss_start_end.filter(
-                    (pl.col("rel_end") >= 0) & (pl.col("rel_end") <= flank_window * 2)
+                    pl.col("rel_end").abs() <= flank_window
                 ).select(
                     [
                         # Get cut site position and associated CB.
@@ -195,6 +230,7 @@ def get_tss_profile(
             columns="Position",
             aggregate_fn="count",
         )
+        # Remove "no_CB" cell barcode (was only needed for the pivot).
         .filter(pl.col("CB") != "no_CB")
         .with_columns(
             [
@@ -208,24 +244,29 @@ def get_tss_profile(
 
     # Get TSS matrix:
     #   - columns: CBs
-    #   - rows: cut site positions relative to (TSS - flank_window).
+    #   - rows: cut site positions relative to TSS.
     #   - values: number of times a cut site position was found for a certain CB.
     tss_matrix = (
-        tss_matrix.clone()
+        tss_matrix_tmp.clone()
         # Remove "CB" column, so numeric values of the TSS matrix can be transposed.
         .drop("CB")
         # Transpose TSS matrix:
         #    - columns: CBs
-        #    - rows: cut site positions relative to (TSS - flank_window).
+        #    - rows: cut site positions relative to TSS.
         .transpose(
+            # Keep cut sites position values (will be dtype=pl.Utf8) as the first column.
             include_header=True,
             header_name="Position",
-            column_names=tss_matrix.get_column("CB"),
+            # Add old "CB" column as column names.
+            column_names=tss_matrix_tmp.get_column("CB"),
         ).with_column(
             # Convert "Position" column from pl.Utf8 to pl.Int32.
             pl.col("Position").cast(pl.Int32)
         )
     )
+
+    # Remove raw non-transposed TSS matrix.
+    del tss_matrix_tmp
 
     # Smooth TSS matrix per CB by a rolling window.
     tss_smoothed_matrix_per_cb = tss_matrix.with_columns(
@@ -233,7 +274,7 @@ def get_tss_profile(
             pl.col("Position"),
             pl.all()
             .exclude("Position")
-            .rolling_mean(window_size=window_size, min_periods=0),
+            .rolling_mean(window_size=smoothing_rolling_window, min_periods=0),
         ]
     )
 
@@ -305,8 +346,8 @@ def get_tss_profile(
         tss_norm_matrix_per_cb.clone()
         .filter(
             pl.col("Position").is_between(
-                start=flank_window - 1 - tss_window,
-                end=flank_window - 1 + tss_window,
+                start=-tss_window,
+                end=tss_window,
                 include_bounds=[True, True],
             )
         )
