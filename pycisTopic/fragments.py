@@ -336,7 +336,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
         Polars DataFrame containing BED entries.
         e.g.: This can also be a filtered Polars DataFrame with fragments or TSS annotation.
         See `read_bed_to_polars_df()`, `read_fragments_to_polars_df()`, `filter_fragments_by_cb()`,
-        `change_chromosome_source_in_bed` and `get_tss_annotation()` for examples.
+        `change_chromosome_source_in_bed` and `get_tss_annotation_from_ensembl()` for examples.
 
     Returns
     -------

@@ -103,8 +103,8 @@ def get_tss_annotation_from_ensembl(
 
     Examples
     --------
-    >>> get_tss_annotation(biomart_name="hsapiens_gene_ensembl")
-    >>> get_tss_annotation(biomart_name="hsapiens_gene_ensembl", biomart_host="http://jul2022.archive.ensembl.org/")
+    >>> get_tss_annotation_from_ensembl(biomart_name="hsapiens_gene_ensembl")
+    >>> get_tss_annotation_from_ensembl(biomart_name="hsapiens_gene_ensembl", biomart_host="http://jul2022.archive.ensembl.org/")
 
     """
 
@@ -326,7 +326,7 @@ def change_chromosome_source_in_bed(
     >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping(ucsc_assembly="hg38")
 
     Get gene annotation for hg38 from Ensembl BioMart.
-    >>> hg38_gene_annotation_bed_df_pl = get_tss_annotation(biomart_name="hsapiens_gene_ensembl")
+    >>> hg38_gene_annotation_bed_df_pl = get_tss_annotation_from_ensembl(biomart_name="hsapiens_gene_ensembl")
 
     Change Ensembl chromosome names with UCSC chromosome names in gene annotation for hg38.
     >>> hg38_gene_annotation_ucsc_chroms_bed_df_pl = change_chromosome_source_in_bed(
