@@ -18,7 +18,7 @@ def read_fragments_to_pyranges(
     fragments_bed_filename: str,
     engine: Union[
         str, Literal["polars"], Literal["pyarrow"], Literal["pandas"]
-    ] = "polars",
+    ] = "pyarrow",
 ) -> pr.PyRanges:
     """
     Read fragments BED file to PyRanges object.
@@ -27,8 +27,8 @@ def read_fragments_to_pyranges(
     ----------
     fragments_bed_filename
         Fragments BED filename.
-    use_polars
-        Use Polars instead of Pandas for reading the fragments BED file.
+    engine
+        Use Polars, pyarrow or pandas to read the fragments BED file (default: pyarrow).
 
     Returns
     -------
@@ -170,7 +170,10 @@ def read_bed_to_polars_df(
 
     Examples
     --------
+    Read BED file to Polars DataFrame with pyarrow engine.
     >>> bed_df_pl = read_bed_to_polars_df("test.bed", engine="pyarrow")
+
+    Read BED file to Polars DataFrame with pyarrow engine and require that the BED file has at least 4 columns.
     >>> bed_with_at_least_4_columns_df_pl = read_bed_to_polars_df("test.bed", engine="pyarrow", min_column_count=4)
     """
 
@@ -292,6 +295,14 @@ def read_fragments_to_polars_df(
     Returns
     -------
     Polars DataFrame with fragments.
+
+    Examples
+    --------
+    Read gzipped fragments BED file to a Polars DataFrame.
+    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv.gz")
+
+    Read uncompressed fragments BED file to a Polars DataFrame.
+    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv")
     """
 
     fragments_df_pl = read_bed_to_polars_df(
@@ -323,10 +334,21 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     ----------
     bed_df_pl
         Polars DataFrame containing BED entries.
+        e.g.: This can also be a filtered Polars DataFrame with fragments or TSS annotation.
+        See `read_bed_to_polars_df()`, `read_fragments_to_polars_df()`, `filter_fragments_by_cb()`,
+        `change_chromosome_source_in_bed` and `get_tss_annotation()` for examples.
 
     Returns
     -------
     PyRanges DataFrame.
+
+    Examples
+    --------
+    Read BED file to Polars DataFrame with pyarrow engine.
+    >>> bed_df_pl = read_bed_to_polars_df("test.bed", engine="pyarrow")
+
+    Create PyRanges object directly from Polars DataFrame.
+    >>> bed_df_pr = create_pyranges_from_polars_df(bed_df_pl=bed_df_pl)
     """
 
     # Calling the PyRanges init function with a Pandas DataFrame causes too much overhead as it will create categorical
@@ -454,7 +476,7 @@ def get_fragments_per_cb(
     Parameters
     ----------
     fragments_df_pl:
-        Polars DataFrame with fragments.
+        Polars DataFrame with fragments. See `read_fragments_to_polars_df()`.
     min_fragments_per_cb:
         Minimum number of fragments needed per cell barcode to keep the fragments for those cell barcodes.
     collapse_duplicates:
@@ -463,6 +485,20 @@ def get_fragments_per_cb(
     Returns
     -------
     Polars DataFrame with number of fragments and duplication ratio per cell barcode.
+
+    Examples
+    --------
+
+    Read gzipped fragments BED file to a Polars DataFrame.
+    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv.gz")
+
+    Get number of fragments and duplication ratio per cell barcode
+    (which have 50 fragments or more after collapsing duplicates).
+    >>> fragments_stats_per_cell_cb_df_pl = get_fragments_per_cb(
+    ...     fragments_df_pl=fragments_df_pl,
+    ...     min_fragments_per_cb=50,
+    ...     collapse_duplicates=True,
+    ... )
     """
 
     fragments_count_column = (
@@ -502,7 +538,7 @@ def get_cbs_passing_filter(
     fragments_stats_per_cell_cb_df_pl: pl.DataFrame,
     cbs: pl.Series | Sequence | None = None,
     min_fragments_per_cb: int | None = None,
-    min_cbs: int | None = None,
+    keep_top_x_cbs: int | None = None,
     collapse_duplicates: bool | None = True,
 ) -> (pl.Series, pl.DataFrame):
     """
@@ -517,9 +553,9 @@ def get_cbs_passing_filter(
     min_fragments_per_cb
         Minimum number of fragments needed per cell barcode to keep the cell barcode.
         Only used if `cbs` is `None`, `min_cbs` will be ignored.
-    min_cbs
-        Minimum number of cell barcodes needed to keep the cell barcode.
-        Only used in `cbs` is `None` and `min_fragments_per_cb` is `None`.
+    keep_top_x_cbs
+        Keep the x most abundant cell barcodes based on the number of fragments.
+        Only used if `cbs` is `None` and `min_fragments_per_cb` is `None`.
     collapse_duplicates
         Collapse duplicate fragments (same chromosomal positions and linked to the same cell barcode).
 
@@ -527,6 +563,33 @@ def get_cbs_passing_filter(
     -------
     (Cell barcodes passing the filter,
      fragments_stats_per_cell_cb_df_pl filtered by the cell barcodes passing the filter)
+
+    Examples
+    --------
+    Read gzipped fragments BED file to a Polars DataFrame.
+    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv.gz")
+
+    Get number of fragments and duplication ratio per cell barcode
+    (which have 50 fragments or more after collapsing duplicates).
+    >>> fragments_stats_per_cell_cb_df_pl = get_fragments_per_cb(
+    ...     fragments_df_pl=fragments_df_pl,
+    ...     min_fragments_per_cb=50,
+    ...     collapse_duplicates=True,
+    ... )
+
+    Keep only cell barcodes which have 1000 or more fragments.
+    >>> cbs_selected, fragments_stats_per_cb_filtered_df_pl = get_cbs_passing_filter(
+    ...     fragments_stats_per_cell_cb_df_pl=fragments_stats_per_cell_cb_df_pl,
+    ...     min_fragments_per_cb=1000,
+    ...     collapse_duplicates=True,
+    ... )
+
+    Keep only the 4000 most abundant cell barcodes based on the number of fragments after collapsing duplicates.
+    >>> cbs_selected, fragments_stats_per_cb_filtered_df_pl = get_cbs_passing_filter(
+    ...     fragments_stats_per_cell_cb_df_pl=fragments_stats_per_cell_cb_df_pl,
+    ...     keep_top_x_cbs=4000,
+    ...     collapse_duplicates=True,
+    ... )
     """
 
     fragments_count_column = (
@@ -555,11 +618,11 @@ def get_cbs_passing_filter(
             .filter(pl.col(fragments_count_column) >= min_fragments_per_cb)
             .collect()
         )
-    elif isinstance(min_cbs, int):
+    elif isinstance(keep_top_x_cbs, int):
         fragments_stats_per_cb_filtered_df_pl = (
             fragments_stats_per_cell_cb_df_pl.lazy()
             .sort(by=fragments_count_column, reverse=True)
-            .head(min_cbs)
+            .head(keep_top_x_cbs)
             .collect()
         )
     else:
@@ -589,6 +652,27 @@ def filter_fragments_by_cb(
     Returns
     -------
     Polars DataFrame with fragments for the requested cell barcodes.
+
+    Examples
+    --------
+    Read gzipped fragments BED file to a Polars DataFrame.
+    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv.gz")
+
+    List of cell barcodes for which to retain fragments.
+    >>> cbs = ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"]
+    Polars DataFrame with fragments for the requested cell barcodes.
+    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(fragments_df_pl=fragments_df_pl, cbs=cbs)
+
+    List of cell barcodes for which to retain fragments.
+    >>> cbs = ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"]
+    Polars DataFrame with fragments for the requested cell barcodes.
+    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(fragments_df_pl=fragments_df_pl, cbs=cbs)
+
+    List of cell barcodes as a Polars categorical Series for which to retain fragments.
+    See `get_cbs_passing_filter()` for a way to get a filtered list of cell barcodes (`selected_cbs` variable).
+    >>> cbs = pl.Series("CB", ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"], dtype=pl.Categorical)
+    Polars DataFrame with fragments for the requested cell barcodes.
+    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(fragments_df_pl=fragments_df_pl, cbs=cbs)
     """
 
     if isinstance(cbs, Sequence):
