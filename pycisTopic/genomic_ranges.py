@@ -444,6 +444,10 @@ def intersection(
                 how=how,
             )
 
+            # Skip empty intersections.
+            if regions1_indexes.shape[0] == 0:
+                continue
+
             # Get all regions from first and second per chromosome dataframe for the index positions calculated above.
             intersection_chrom_df_pl = (
                 regions1_per_chrom_dfs_pl.pop(chrom)[regions1_indexes]
