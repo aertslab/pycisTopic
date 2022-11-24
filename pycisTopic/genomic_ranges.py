@@ -653,6 +653,10 @@ def overlap(
                 how=how,
             )
 
+            # Skip empty intersections.
+            if regions1_indexes.shape[0] == 0:
+                continue
+
             overlap_chrom_dfs_pl[chrom] = (
                 # Get inverse selection of regions from first dataframe for the overlap.
                 regions1_per_chrom_dfs_pl.pop(chrom)
