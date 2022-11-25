@@ -4,10 +4,29 @@ from pycisTopic.lda_models import CistopicLDAModel
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
+from typing import Tuple
 
 def lda_model_object_to_mudata(
     lda_model_obj: CistopicLDAModel) -> MuData:
     """
+    Converts an lda model object to MuData
+
+    Parameters
+    ----------
+        lda_model_obj: CistopicLDAModel An LDA model object
+    
+    Returns
+    -------
+        Mudata object with topic model
+
+    Examples
+    --------
+        >>> lda_model_object_to_mudata(cistopic_obj.selected_model)
+            MuData object with n_obs × n_vars = 22 × 339284
+            obs: 'Log10_Assignments', 'Assignments', 'Regions_in_binarized_topic', 'Coherence', 'Marginal_topic_dist', 'Gini_index'
+            2 modalities
+                cell_topic:	22 x 4792
+                region_topic:	22 x 334492
     """
     #construct obs
     obs = lda_model_obj.topic_qc_metrics.copy()
@@ -41,11 +60,35 @@ def lda_model_object_to_mudata(
 
 
 def cistopic_object_to_mudata(
-    cistopic_obj: CistopicObject) -> MuData:
+    cistopic_obj: CistopicObject) -> Tuple(MuData, MuData):
     """
-    project: <class 'str'>
-    path_to_fragments: <class 'dict'>
-    selected_model: <class 'pycisTopic.lda_models.CistopicLDAModel'>
+    Converts a cistopic object into mudata,
+
+    Parameters
+    ----------
+        cistopic_obj: CistopicObject A cistopic object
+    
+    Returns
+    -------
+        A tuple of a mudata for accessibility and a mudata for topics.
+    
+    Examples
+    --------
+        >>> mudata_accessibility, mudata_lda_model = cistopic_object_to_mudata(cistopic_obj)
+        >>> mudata_accessibility
+            MuData object with n_obs × n_vars = 4792 × 668984
+            obs:	'TSS_enrichment', 'Log_total_nr_frag', 'cisTopic_log_nr_acc', 'cisTopic_nr_acc', 'barcode', 'cisTopic_nr_frag', 'cisTopic_log_nr_frag', 'Total_nr_frag', 'FRIP', 'Total_nr_frag_in_regions', 'Unique_nr_frag', 'Dupl_nr_frag', 'Dupl_rate', 'Unique_nr_frag_in_regions', 'Log_unique_nr_frag', 'BARCODE', 'NUM.SNPS', 'NUM.READS', 'DROPLET.TYPE', 'BEST.GUESS', 'BEST.LLK', 'NEXT.GUESS', 'NEXT.LLK', 'DIFF.LLK.BEST.NEXT', 'BEST.POSTERIOR', 'SNG.POSTERIOR', 'SNG.BEST.GUESS', 'SNG.BEST.LLK', 'SNG.NEXT.GUESS', 'SNG.NEXT.LLK', 'SNG.ONLY.POSTERIOR', 'DBL.BEST.GUESS', 'DBL.BEST.LLK', 'DIFF.LLK.SNG.DBL', 'sample_id', 'line', 'state'
+            var:	'Chromosome', 'Start', 'End', 'Width', 'cisTopic_nr_frag', 'cisTopic_log_nr_frag', 'cisTopic_nr_acc', 'cisTopic_log_nr_acc', 'is_promoter'
+            obsm:	'UMAP'
+            2 modalities
+                fragment_counts:	4792 x 334492
+                binary_fragment_counts:	4792 x 334492
+        >>> mudata_lda_model
+            MuData object with n_obs × n_vars = 22 × 339284
+            obs:	'Log10_Assignments', 'Assignments', 'Regions_in_binarized_topic', 'Coherence', 'Marginal_topic_dist', 'Gini_index'
+            2 modalities
+                cell_topic:	22 x 4792
+                region_topic:	22 x 334492
     """
     #construct var field
     var = cistopic_obj.region_data.loc[cistopic_obj.region_names].infer_objects()
