@@ -1,6 +1,7 @@
 from mudata import MuData, AnnData
 from pycisTopic.cistopic_class import CistopicObject
 from pycisTopic.lda_models import CistopicLDAModel
+from pycisTopic.diff_features import CistopicImputedFeatures
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
@@ -57,7 +58,6 @@ def lda_model_object_to_mudata(
     uns['parameters'] = lda_model_obj.parameters.T.loc['Parameter'].to_dict()
 
     return MuData(mudata_constructor, obs = obs, uns = uns)
-
 
 def cistopic_object_to_mudata(
     cistopic_obj: CistopicObject) -> Tuple(MuData, MuData):
@@ -135,4 +135,27 @@ def cistopic_object_to_mudata(
     mudata_accessibility = MuData(mudata_constructor, obs = obs, var = var, obsm = obsm, varm = varm)
 
     return mudata_accessibility, mudata_lda_model
+
+def imputed_accessibility_object_to_anndata(
+    imputed_accessibility_obj: CistopicImputedFeatures) -> AnnData:
+    """
+    Converts an imputed accessibility object into an AnnData
+
+    Parameters
+    ----------
+        imputed_accessibility_obj: CistopicImputedFeatures An imputed accessibility object
     
+    Returns
+    -------
+        AnnData containing imputed accessibility data
+    
+    Examples
+    --------
+        >>> imputed_accessibility_object_to_anndata(imputed_acc_obj)
+            AnnData object with n_obs × n_vars = 4792 × 327812
+
+    """
+    return AnnData(
+        X = imputed_accessibility_obj.mtx.T, dtype = np.int32,
+        obs = pd.DataFrame(index = imputed_accessibility_obj.cell_names),
+        var = pd.DataFrame(index = imputed_accessibility_obj.feature_names))
