@@ -40,6 +40,15 @@ def make_argument_parser():
                         default=None, help='TMP directory')
     return parser
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def main():
     """
@@ -64,13 +73,13 @@ def main():
     alpha=args.alpha
     print('Alpha:', alpha)
     
-    alpha_by_topic=args.alpha_by_topic
+    alpha_by_topic=str2bool(args.alpha_by_topic)
     print('Divide alpha by the number of topics:', alpha_by_topic)
     
     eta=args.eta
     print('Eta:', eta)
     
-    eta_by_topic=args.eta_by_topic
+    eta_by_topic=str2bool(args.eta_by_topic)
     print('Divide eta by the number of topics:', eta_by_topic)
     
     n_iter=args.n_iter

@@ -36,8 +36,19 @@ def make_argument_parser():
                         default=555, help='Seed for ensuring reproducibility')
     parser.add_argument('--temp_dir', '-td', type=str, required=False,
                         default=None, help='Path to TMP directory')
+    parser.add_argument('--reuse_corpus', '-rc', type=str, required=False, default=False,
+                        help = 'Whether to reuse the corpus from Mallet')
     return parser
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def main():
     """
@@ -62,13 +73,13 @@ def main():
     alpha=args.alpha
     print('Alpha:', alpha)
     
-    alpha_by_topic=args.alpha_by_topic
+    alpha_by_topic=str2bool(args.alpha_by_topic)
     print('Divide alpha by the number of topics:', alpha_by_topic)
     
     eta=args.eta
     print('Eta:', eta)
     
-    eta_by_topic=args.eta_by_topic
+    eta_by_topic=str2bool(args.eta_by_topic)
     print('Divide eta by the number of topics:', eta_by_topic)
     
     n_iter=args.n_iter
@@ -87,6 +98,9 @@ def main():
     
     temp_dir=args.temp_dir
     print('Path to TMP dir:', temp_dir)
+    
+    reuse_corpus=args.reuse_corpus
+    print('Reuse Mallet corpus:', reuse_corpus)
 
     # Run models
     print('Running models')
@@ -105,7 +119,8 @@ def main():
                                  eta_by_topic=eta_by_topic,
                                  save_path=save_path,
                                  top_topics_coh=5,
-                                 tmp_path=temp_dir)
+                                 tmp_path=temp_dir,
+                                 reuse_corpus=reuse_corpus)
 
     # Save
     with open(output, 'wb') as f:
