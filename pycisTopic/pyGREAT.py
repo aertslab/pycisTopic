@@ -260,7 +260,7 @@ def pyGREAT_oneset(
         "twoDistance": two_distance,
         "oneDistance": one_distance,
         "includeCuratedRegDoms": include_curated_reg_doms,
-        "bgChoice": "file" if (bg_choice != 'wholeGenome') else bg_choice,
+        "bgChoice": "file" if (bg_choice != 'wholeGenome') else 'wholeGenome',
         "fgChoice": "file",
     }
 
