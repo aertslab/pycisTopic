@@ -260,11 +260,15 @@ def pyGREAT_oneset(
         "twoDistance": two_distance,
         "oneDistance": one_distance,
         "includeCuratedRegDoms": include_curated_reg_doms,
-        "bgChoice": bg_choice,
+        "bgChoice": "file" if (bg_choice != 'wholeGenome') else 'wholeGenome',
         "fgChoice": "file",
     }
 
-    files = {"fgFile": open(bed_file, "r")}
+    if bg_choice == 'wholeGenome':
+        files = {"fgFile": open(bed_file, "r")}
+    else:
+        files = {"fgFile": open(bed_file, "r"), "bgFile": open(bg_choice, "r")}
+
     # Launch job
     r = requests.post(url, data=params, files=files)
     # Get results
