@@ -522,7 +522,7 @@ def macs_call_peak(
         q_value=q_value,
         nolambda=nolambda,
     )
-    log.info(name + " done!")
+    log.info(f"{name} done!")
     return MACS_peak_calling
 
 @ray.remote
@@ -646,7 +646,7 @@ class MACSCallPeak:
     ):
         self.macs_path = macs_path
         self.treatment = bed_path
-        self.name = name
+        self.name = str(name)
         self.outdir = outdir
         self.input_format = input_format
         self.gsize = genome_size
@@ -708,7 +708,7 @@ class MACSCallPeak:
         Load MACS2 narrow peak files as :class:`pr.PyRanges`.
         """
         narrow_peak = pd.read_csv(
-            os.path.join(self.outdir, self.name + "_peaks.narrowPeak"),
+            os.path.join(self.outdir, f"{self.name}_peaks.narrowPeak"),
             sep="\t",
             header=None,
         )
