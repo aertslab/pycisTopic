@@ -64,7 +64,8 @@ def export_pseudobulk(
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str, optional
-            Pattern to split cell barcode from sample id. Default: ___ .
+            Pattern to split cell barcode from sample id. Default: '___'. Note, if `split_pattern` is not None, then `export_pseudobulk` will
+            attempt to infer `sample_id` from the index of `input_data` and ignore `sample_id_col`.
     use_polars: bool, optional
             Whether to use polars to read fragments files. Default: True.
     **kwargs
