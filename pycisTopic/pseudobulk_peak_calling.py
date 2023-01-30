@@ -691,7 +691,7 @@ class MACSCallPeak:
             self.ext_size,
             self.keep_dup,
         )
-        log.info("Calling peaks for " + self.name + " with %s", cmd)
+        log.info(f"Calling peaks for {self.name} with {cmd}")
         try:
             subprocess.check_output(args=cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
