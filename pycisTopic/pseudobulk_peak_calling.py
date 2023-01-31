@@ -64,7 +64,8 @@ def export_pseudobulk(
     remove_duplicates: bool, optional
             Whether duplicates should be removed before converting the data to bigwig.
     split_pattern: str, optional
-            Pattern to split cell barcode from sample id. Default: ___ .
+            Pattern to split cell barcode from sample id. Default: '___'. Note, if `split_pattern` is not None, then `export_pseudobulk` will
+            attempt to infer `sample_id` from the index of `input_data` and ignore `sample_id_col`.
     use_polars: bool, optional
             Whether to use polars to read fragments files. Default: True.
     **kwargs
@@ -521,7 +522,7 @@ def macs_call_peak(
         q_value=q_value,
         nolambda=nolambda,
     )
-    log.info(name + " done!")
+    log.info(f"{name} done!")
     return MACS_peak_calling
 
 @ray.remote
@@ -645,7 +646,7 @@ class MACSCallPeak:
     ):
         self.macs_path = macs_path
         self.treatment = bed_path
-        self.name = name
+        self.name = str(name)
         self.outdir = outdir
         self.input_format = input_format
         self.gsize = genome_size
@@ -691,7 +692,7 @@ class MACSCallPeak:
             self.ext_size,
             self.keep_dup,
         )
-        log.info("Calling peaks for " + self.name + " with %s", cmd)
+        log.info(f"Calling peaks for {self.name} with {cmd}")
         try:
             subprocess.check_output(args=cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
@@ -707,7 +708,7 @@ class MACSCallPeak:
         Load MACS2 narrow peak files as :class:`pr.PyRanges`.
         """
         narrow_peak = pd.read_csv(
-            os.path.join(self.outdir, self.name + "_peaks.narrowPeak"),
+            os.path.join(self.outdir, f"{self.name}_peaks.narrowPeak"),
             sep="\t",
             header=None,
         )

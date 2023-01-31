@@ -394,7 +394,7 @@ def read_fragments_from_file(
         df = (
             pl.read_csv(
                 fragments_bed_filename,
-                has_headers=False,
+                has_header=False,
                 skip_rows=skip_rows,
                 sep="\t",
                 use_pyarrow=True,
