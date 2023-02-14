@@ -351,7 +351,7 @@ def change_chromosome_source_in_bed(
             right_on=from_chrom_source_name,
             how="left",
         )
-        .with_column(
+        .with_columns(
             pl.when(pl.col(to_chrom_source_name).is_null())
             .then(pl.col("Chromosome"))
             .otherwise(pl.col(to_chrom_source_name))

@@ -220,8 +220,8 @@ def read_bed_to_polars_df(
             f'"{bed_filename}" contains only {column_count} columns.'
         )
 
-    # Set global string cache so categorical columns from multiple Polars DataFrames can be joined later, if necessary.
-    pl.Config.set_global_string_cache()
+    # Enable global string cache so categorical columns from multiple Polars DataFrames can be joined later, if necessary.
+    pl.toggle_string_cache(True)
 
     if engine == "polars":
         # Read BED file with Polars.
@@ -321,7 +321,7 @@ def read_fragments_to_polars_df(
             ["Chromosome", "Start", "End", "Name"]
         ).agg(pl.count().cast(pl.Int32()).alias("Score"))
     else:
-        fragments_df_pl = fragments_df_pl.with_column(pl.col("Score").cast(pl.Int32()))
+        fragments_df_pl = fragments_df_pl.with_columns(pl.col("Score").cast(pl.Int32()))
 
     return fragments_df_pl
 
@@ -393,9 +393,8 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     bed_with_idx_df_pl = (
         bed_df_pl
         # Add index column and cast it from UInt32 to Int64
-        .with_row_count("__index_level_0__").with_column(
-            pl.col("__index_level_0__").cast(pl.Int64)
-        )
+        .with_row_count("__index_level_0__")
+        .with_columns(pl.col("__index_level_0__").cast(pl.Int64))
         # Put index column as last column.
         .select(pl.col(pa_schema_fixed_categoricals.names))
     )
@@ -518,12 +517,12 @@ def get_fragments_per_cb(
         .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
         .sort(by=fragments_count_column, reverse=True)
         .with_row_count(name="barcode_rank", offset=1)
-        .with_column(
+        .with_columns(
             (pl.col("total_fragments_count") - pl.col("unique_fragments_count")).alias(
                 "duplication_count"
             )
         )
-        .with_column(
+        .with_columns(
             (pl.col("duplication_count") / pl.col("total_fragments_count")).alias(
                 "duplication_ratio"
             )

@@ -259,7 +259,7 @@ def get_tss_profile(
             header_name="Position",
             # Add old "CB" column as column names.
             column_names=tss_matrix_tmp.get_column("CB"),
-        ).with_column(
+        ).with_columns(
             # Convert "Position" column from pl.Utf8 to pl.Int32.
             pl.col("Position").cast(pl.Int32)
         )

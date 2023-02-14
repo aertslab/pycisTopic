@@ -87,7 +87,7 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
         )
         # Unpack "RegionIDsFields" struct column and create Chromosome", "Start" and "End" columns.
         .unnest("RegionIDsFields")
-        .with_column(
+        .with_columns(
             # Convert "Start" and "End" string columns to int32 columns.
             pl.col(["Start", "End"]).cast(pl.Int32)
         )
