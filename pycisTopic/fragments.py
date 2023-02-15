@@ -16,9 +16,9 @@ from pycisTopic.utils import format_path
 
 def read_fragments_to_pyranges(
     fragments_bed_filename: str,
-    engine: Union[
-        str, Literal["polars"], Literal["pyarrow"], Literal["pandas"]
-    ] = "pyarrow",
+    engine: (
+        str | Literal["polars"] | Literal["pyarrow"] | Literal["pandas"]
+    ) = "pyarrow",
 ) -> pr.PyRanges:
     """
     Read fragments BED file to PyRanges object.
@@ -28,13 +28,14 @@ def read_fragments_to_pyranges(
     fragments_bed_filename
         Fragments BED filename.
     engine
-        Use Polars, pyarrow or pandas to read the fragments BED file (default: pyarrow).
+        Use Polars, pyarrow or pandas to read the fragments BED file
+        (default: `pyarrow`).
 
     Returns
     -------
     PyRanges object of fragments.
-    """
 
+    """
     bed_column_names = (
         "Chromosome",
         "Start",
@@ -52,7 +53,8 @@ def read_fragments_to_pyranges(
 
     fragments_bed_filename = format_path(fragments_bed_filename)
 
-    # Set the correct open function, depending upon if the fragments BED file is gzip compressed or not.
+    # Set the correct open function, depending upon if the fragments BED file is gzip
+    # compressed or not.
     open_fn = gzip.open if fragments_bed_filename.endswith(".gz") else open
 
     skip_rows = 0
@@ -63,7 +65,8 @@ def read_fragments_to_pyranges(
             line = line.strip()
 
             if not line or line.startswith("#"):
-                # Count number of empty lines and lines which start with a comment before the actual data.
+                # Count number of empty lines and lines which start with a comment
+                # before the actual data.
                 skip_rows += 1
             else:
                 # Get number of columns from the first real BED entry.
@@ -74,8 +77,8 @@ def read_fragments_to_pyranges(
 
     if nbr_columns < 4:
         raise ValueError(
-            f'Fragments BED file needs to have at least 4 columns. "{fragments_bed_filename}" contains only '
-            f"{nbr_columns} columns."
+            "Fragments BED file needs to have at least 4 columns. "
+            f'"{fragments_bed_filename}" contains only {nbr_columns} columns.'
         )
 
     if not engine:
@@ -160,7 +163,7 @@ def read_bed_to_polars_df(
     bed_filename
         BED filename.
     engine
-        Use Polars or pyarrow to read the BED file (default: pyarrow).
+        Use Polars or pyarrow to read the BED file (default: `pyarrow`).
     min_column_count
         Minimum number of required columns needed in BED file.
 
@@ -168,15 +171,24 @@ def read_bed_to_polars_df(
     -------
     Polars DataFrame with BED entries.
 
+    See Also
+    --------
+    pycisTopic.fragments.read_fragments_to_polars_df
+
     Examples
     --------
     Read BED file to Polars DataFrame with pyarrow engine.
     >>> bed_df_pl = read_bed_to_polars_df("test.bed", engine="pyarrow")
 
-    Read BED file to Polars DataFrame with pyarrow engine and require that the BED file has at least 4 columns.
-    >>> bed_with_at_least_4_columns_df_pl = read_bed_to_polars_df("test.bed", engine="pyarrow", min_column_count=4)
-    """
+    Read BED file to Polars DataFrame with pyarrow engine and require that the BED
+    file has at least 4 columns.
+    >>> bed_with_at_least_4_columns_df_pl = read_bed_to_polars_df(
+    ...     "test.bed",
+    ...     engine="pyarrow",
+    ...     min_column_count=4,
+    ... )
 
+    """
     bed_column_names = (
         "Chromosome",
         "Start",
@@ -194,7 +206,8 @@ def read_bed_to_polars_df(
 
     bed_filename = format_path(bed_filename)
 
-    # Set the correct open function, depending upon if the fragments BED file is gzip compressed or not.
+    # Set the correct open function, depending upon if the fragments BED file is gzip
+    # compressed or not.
     open_fn = gzip.open if bed_filename.endswith(".gz") else open
 
     skip_rows = 0
@@ -205,7 +218,8 @@ def read_bed_to_polars_df(
             line = line.strip()
 
             if not line or line.startswith("#"):
-                # Count number of empty lines and lines which start with a comment before the actual data.
+                # Count number of empty lines and lines which start with a comment
+                # before the actual data.
                 skip_rows += 1
             else:
                 # Get number of columns from the first real BED entry.
@@ -220,7 +234,8 @@ def read_bed_to_polars_df(
             f'"{bed_filename}" contains only {column_count} columns.'
         )
 
-    # Enable global string cache so categorical columns from multiple Polars DataFrames can be joined later, if necessary.
+    # Enable global string cache so categorical columns from multiple Polars DataFrames
+    # can be joined later, if necessary.
     pl.toggle_string_cache(True)
 
     if engine == "polars":
@@ -296,23 +311,31 @@ def read_fragments_to_polars_df(
     -------
     Polars DataFrame with fragments.
 
+    See Also
+    --------
+    pycisTopic.fragments.read_bed_to_polars_df
+
     Examples
     --------
     Read gzipped fragments BED file to a Polars DataFrame.
-    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv.gz")
+    >>> fragments_df_pl = read_fragments_to_polars_df(
+    ...     fragments_bed_filename="fragments.tsv.gz",
+    ... )
 
     Read uncompressed fragments BED file to a Polars DataFrame.
-    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv")
-    """
+    >>> fragments_df_pl = read_fragments_to_polars_df(
+    ...     fragments_bed_filename="fragments.tsv",
+    ... )
 
+    """
     fragments_df_pl = read_bed_to_polars_df(
         bed_filename=fragments_bed_filename,
         engine=engine,
         min_column_count=4,
     )
 
-    # If no score is provided or score column is ".", generate a score column with the number of fragments which have
-    # the same chromosome, start, end and CB.
+    # If no score is provided or score column is ".", generate a score column with the
+    # number of fragments which have the same chromosome, start, end and CB.
     if (
         "Score" not in fragments_df_pl.columns
         or fragments_df_pl.schema["Score"] == pl.Utf8
@@ -334,13 +357,19 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     ----------
     bed_df_pl
         Polars DataFrame containing BED entries.
-        e.g.: This can also be a filtered Polars DataFrame with fragments or TSS annotation.
-        See `read_bed_to_polars_df()`, `read_fragments_to_polars_df()`, `filter_fragments_by_cb()`,
-        `change_chromosome_source_in_bed` and `get_tss_annotation_from_ensembl()` for examples.
+        e.g.: This can also be a filtered Polars DataFrame with fragments or
+              TSS annotation.
 
     Returns
     -------
     PyRanges DataFrame.
+
+    See Also
+    --------
+    pycisTopic.fragments.filter_fragments_by_cb
+    pycisTopic.fragments.read_bed_to_polars_df
+    pycisTopic.fragments.read_fragments_to_polars_df
+    pycisTopic.gene_annotation.change_chromosome_source_in_bed
 
     Examples
     --------
@@ -349,12 +378,14 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
 
     Create PyRanges object directly from Polars DataFrame.
     >>> bed_df_pr = create_pyranges_from_polars_df(bed_df_pl=bed_df_pl)
-    """
 
-    # Calling the PyRanges init function with a Pandas DataFrame causes too much overhead as it will create categorical
-    # columns for Chromosome and Strand columns, even if they are already categorical. It will also create a Pandas
-    # DataFrame per chromosome-strand (stranded) combination or a Pandas DataFrame per chromosome (unstranded).
-    # So instead, create the PyRanges object manually with the use of Polars and pyarrow.
+    """
+    # Calling the PyRanges init function with a Pandas DataFrame causes too much
+    # overhead as it will create categorical columns for Chromosome and Strand columns,
+    # even if they are already categorical. It will also create a Pandas DataFrame per
+    # chromosome-strand (stranded) combination or a Pandas DataFrame per chromosome
+    # (unstranded). So instead, create the PyRanges object manually with the use of
+    # Polars and pyarrow.
 
     # Create empty PyRanges object, which will be populated later.
     df_pr = pr.PyRanges()
@@ -366,13 +397,16 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
         else False
     )
 
-    # Create PyArrow schema for Polars DataFrame, where categorical columns are cast from
-    # pa.dictionary(pa.uint32(), pa.large_string()) to pa.dictionary(pa.int32(), pa.large_string())
-    # as for the later conversion to a Pandas DataFrame, only the latter is supported by pyarrow.
+    # Create PyArrow schema for Polars DataFrame, where categorical columns are cast
+    # from pa.dictionary(pa.uint32(), pa.large_string())
+    # to pa.dictionary(pa.int32(), pa.large_string())
+    # as for the later conversion to a Pandas DataFrame, only the latter is supported
+    # by pyarrow.
     pa_schema_fixed_categoricals_list = []
     for pa_field in bed_df_pl.head(1).to_arrow().schema:
         if pa_field.type == pa.dictionary(pa.uint32(), pa.large_string()):
-            # ArrowTypeError: Converting unsigned dictionary indices to Pandas not yet supported, index type: uint32
+            # ArrowTypeError: Converting unsigned dictionary indices to Pandas not yet
+            # supported, index type: uint32
             pa_schema_fixed_categoricals_list.append(
                 pa.field(pa_field.name, pa.dictionary(pa.int32(), pa.large_string()))
             )
@@ -384,12 +418,14 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     # Add entry for index as last column.
     pa_schema_fixed_categoricals_list.append(pa.field("__index_level_0__", pa.int64()))
 
-    # Create pyarrow schema so categorical columns in chromosome-strand Polars DataFrames or chromosome Polars
-    # DataFrames can be cast to a pyarrow supported dictionary type, which can be converted to a Pandas categorical.
+    # Create pyarrow schema so categorical columns in chromosome-strand Polars
+    # DataFrames or chromosome Polars DataFrames can be cast to a pyarrow supported
+    # dictionary type, which can be converted to a Pandas categorical.
     pa_schema_fixed_categoricals = pa.schema(pa_schema_fixed_categoricals_list)
 
-    # Add (row) index column to Polars DataFrame with BED entries so original row indexes of BED entries can be tracked
-    # by PyRanges (not sure if pyranges uses those index values or not).
+    # Add (row) index column to Polars DataFrame with BED entries so original row
+    # indexes of BED entries can be tracked by PyRanges (not sure if pyranges uses
+    # those index values or not).
     bed_with_idx_df_pl = (
         bed_df_pl
         # Add index column and cast it from UInt32 to Int64
@@ -403,22 +439,25 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
         per_chrom_or_chrom_strand_bed_df_pl: pl.DataFrame,
     ) -> pd.DataFrame:
         """
-        Create per chromosome (unstranded) or per chromosome-strand (stranded) Pandas DataFrame for PyRanges from
-        equivalent Polars DataFrame.
+        Create per chromosome (unstranded) or per chromosome-strand (stranded) Pandas
+        DataFrame for PyRanges from equivalent Polars DataFrame.
 
         Parameters
         ----------
         per_chrom_or_chrom_strand_bed_df_pl
-            Polars DataFrame partitioned by chromosome (unstranded) or chromosome-strand (stranded).
+            Polars DataFrame partitioned by chromosome (unstranded) or
+            chromosome-strand (stranded).
 
         Returns
         -------
-        Pandas DataFrame partitioned by chromosome (unstranded) or chromosome-strand (stranded).
-        """
+        Pandas DataFrame partitioned by chromosome (unstranded) or
+        chromosome-strand (stranded).
 
-        # Convert per chromosome (unstranded) or per chromosome-strand (stranded) Polars DataFrame with BED entries to
-        # a pyarrow table and change categoricals dictionary type to Pandas compatible categorical type and convert to
-        # a Pandas DataFrame.
+        """
+        # Convert per chromosome (unstranded) or per chromosome-strand (stranded)
+        # Polars DataFrame with BED entries to a pyarrow table and change categoricals
+        # dictionary type to Pandas compatible categorical type and convert to a
+        # Pandas DataFrame.
         per_chrom_or_chrom_strand_bed_df_pd = (
             per_chrom_or_chrom_strand_bed_df_pl.to_arrow()
             .cast(pa_schema_fixed_categoricals)
@@ -432,13 +471,15 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
         return per_chrom_or_chrom_strand_bed_df_pd
 
     if is_stranded:
-        # Populate empty PyRanges object directly with per chromosome and strand Pandas DataFrames (stranded).
+        # Populate empty PyRanges object directly with per chromosome and strand
+        # Pandas DataFrames (stranded).
         df_pr.__dict__["dfs"] = {
             chrom_strand: create_per_chrom_or_chrom_strand_df_pd(
                 per_chrom_or_chrom_strand_bed_df_pl
             )
             for chrom_strand, per_chrom_or_chrom_strand_bed_df_pl in sorted(
-                # Partition Polars DataFrame with BED entries per chromosome-strand (stranded).
+                # Partition Polars DataFrame with BED entries per chromosome-strand
+                # (stranded).
                 bed_with_idx_df_pl.partition_by(
                     groups=["Chromosome", "Strand"], maintain_order=False, as_dict=True
                 ).items(),
@@ -446,11 +487,13 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
             )
         }
     else:
-        # Populate empty PyRanges object directly with per chromosome Pandas DataFrames (unstranded).
+        # Populate empty PyRanges object directly with per chromosome
+        # Pandas DataFrames (unstranded).
         df_pr.__dict__["dfs"] = {
             chrom: create_per_chrom_or_chrom_strand_df_pd(per_chrom_bed_df_pl)
             for chrom, per_chrom_bed_df_pl in sorted(
-                # Partition Polars DataFrame with BED entries per chromosome (unstranded).
+                # Partition Polars DataFrame with BED entries per chromosome
+                # (unstranded).
                 bed_with_idx_df_pl.partition_by(
                     groups=["Chromosome"], maintain_order=False, as_dict=True
                 ).items(),
@@ -475,21 +518,29 @@ def get_fragments_per_cb(
     Parameters
     ----------
     fragments_df_pl:
-        Polars DataFrame with fragments. See `read_fragments_to_polars_df()`.
+        Polars DataFrame with fragments.
+        See :func:`pycisTopic.fragments.read_fragments_to_polars_df`.
     min_fragments_per_cb:
-        Minimum number of fragments needed per cell barcode to keep the fragments for those cell barcodes.
+        Minimum number of fragments needed per cell barcode to keep the fragments
+        for those cell barcodes.
     collapse_duplicates:
-        Collapse duplicate fragments (same chromosomal positions and linked to the same cell barcode).
+        Collapse duplicate fragments (same chromosomal positions and linked to the
+        same cell barcode).
 
     Returns
     -------
     Polars DataFrame with number of fragments and duplication ratio per cell barcode.
 
+    See Also
+    --------
+    pycisTopic.fragments.read_fragments_to_polars_df
+
     Examples
     --------
-
     Read gzipped fragments BED file to a Polars DataFrame.
-    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv.gz")
+    >>> fragments_df_pl = read_fragments_to_polars_df(
+    ...    fragments_bed_filename="fragments.tsv.gz",
+    ... )
 
     Get number of fragments and duplication ratio per cell barcode
     (which have 50 fragments or more after collapsing duplicates).
@@ -498,8 +549,8 @@ def get_fragments_per_cb(
     ...     min_fragments_per_cb=50,
     ...     collapse_duplicates=True,
     ... )
-    """
 
+    """
     fragments_count_column = (
         "unique_fragments_count" if collapse_duplicates else "total_fragments_count"
     )
@@ -546,27 +597,37 @@ def get_cbs_passing_filter(
     Parameters
     ----------
     fragments_stats_per_cell_cb_df_pl
-        Polars dataframe with number of fragments and duplication ratio per cell barcode. See `get_fragments_per_cb()`.
+        Polars DataFrame with number of fragments and duplication ratio per cell
+        barcode. See :func"`pycisTopic.fragments.get_fragments_per_cb`.
     cbs
-        Cell barcodes to keep. If specified, `min_fragments_per_cb` and `min_cbs` are ignored.
+        Cell barcodes to keep. If specified, ``min_fragments_per_cb`` and ``min_cbs``
+        are ignored.
     min_fragments_per_cb
         Minimum number of fragments needed per cell barcode to keep the cell barcode.
-        Only used if `cbs` is `None`, `min_cbs` will be ignored.
+        Only used if ``cbs`` is ``None``, ``min_cbs`` will be ignored.
     keep_top_x_cbs
         Keep the x most abundant cell barcodes based on the number of fragments.
-        Only used if `cbs` is `None` and `min_fragments_per_cb` is `None`.
+        Only used if ``cbs`` is ``None`` and ``min_fragments_per_cb`` is ``None``.
     collapse_duplicates
-        Collapse duplicate fragments (same chromosomal positions and linked to the same cell barcode).
+        Collapse duplicate fragments (same chromosomal positions and linked to the same
+        cell barcode).
 
     Returns
     -------
     (Cell barcodes passing the filter,
      fragments_stats_per_cell_cb_df_pl filtered by the cell barcodes passing the filter)
 
+    See Also
+    --------
+    pycisTopic.fragments.filter_fragments_by_cb
+    pycisTopic.fragments.get_fragments_per_cb
+
     Examples
     --------
     Read gzipped fragments BED file to a Polars DataFrame.
-    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv.gz")
+    >>> fragments_df_pl = read_fragments_to_polars_df(
+    ...     fragments_bed_filename="fragments.tsv.gz",
+    ... )
 
     Get number of fragments and duplication ratio per cell barcode
     (which have 50 fragments or more after collapsing duplicates).
@@ -583,14 +644,15 @@ def get_cbs_passing_filter(
     ...     collapse_duplicates=True,
     ... )
 
-    Keep only the 4000 most abundant cell barcodes based on the number of fragments after collapsing duplicates.
+    Keep only the 4000 most abundant cell barcodes based on the number of fragments
+    after collapsing duplicates.
     >>> cbs_selected, fragments_stats_per_cb_filtered_df_pl = get_cbs_passing_filter(
     ...     fragments_stats_per_cell_cb_df_pl=fragments_stats_per_cell_cb_df_pl,
     ...     keep_top_x_cbs=4000,
     ...     collapse_duplicates=True,
     ... )
-    """
 
+    """
     fragments_count_column = (
         "unique_fragments_count" if collapse_duplicates else "total_fragments_count"
     )
@@ -646,11 +708,17 @@ def filter_fragments_by_cb(
     fragments_df_pl
         Polars DataFrame with fragments.
     cbs
-        List/Polars Series with Cell barcodes. See `get_cbs_passing_filter()`.
+        List/Polars Series with Cell barcodes.
+        See :func:`pycisTopic.fragments.get_cbs_passing_filter` for a way to get a
+        filtered list of cell barcodes (``selected_cbs`` variable).
 
     Returns
     -------
     Polars DataFrame with fragments for the requested cell barcodes.
+
+    See Also
+    --------
+    pycisTopic.fragments.get_cbs_passing_filter
 
     Examples
     --------
@@ -668,7 +736,6 @@ def filter_fragments_by_cb(
     >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(fragments_df_pl=fragments_df_pl, cbs=cbs)
 
     List of cell barcodes as a Polars categorical Series for which to retain fragments.
-    See `get_cbs_passing_filter()` for a way to get a filtered list of cell barcodes (`selected_cbs` variable).
     >>> cbs = pl.Series("CB", ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"], dtype=pl.Categorical)
     Polars DataFrame with fragments for the requested cell barcodes.
     >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(fragments_df_pl=fragments_df_pl, cbs=cbs)
