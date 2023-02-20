@@ -227,27 +227,97 @@ def get_chrom_alias_mapping(
         # Get chromosome alias file from UCSC genome browser.
         chrom_alias_tsv_url_filename = f"https://hgdownload.soe.ucsc.edu/goldenPath/{ucsc_assembly}/bigZips/{ucsc_assembly}.chromAlias.txt"
         chrom_alias_df_pl = pl.read_csv(
-            chrom_alias_tsv_url_filename, sep="\t", has_header=False, comment_char="#"
+            chrom_alias_tsv_url_filename,
+            sep="\t",
+            has_header=False,
+            comment_char="#",
+            # Read all columns as strings.
+            infer_schema_length=0,
         )
 
-        # Set column headers for Polars DataFrame.
-        if chrom_alias_df_pl.width == 5:
-            # hg38
-            chrom_alias_df_pl.columns = [
-                "ucsc",
-                "assembly",
-                "ensembl",
-                "genbank",
-                "refseq",
-            ]
-        elif chrom_alias_df_pl.width == 4:
-            # mm10 and dm6.
-            # Wrong header: "# sequenceName	alias names	UCSC database: mm10".
-            chrom_alias_df_pl.columns = ["ucsc", "refseq", "genbank", "ensembl"]
-        else:
-            raise ValueError(
-                f"Chromosome alias TSV file with unsupported number of columns ({chrom_alias_df_pl.width})."
+        def find_chrom_source_column(chrom_alias_df_pl, chrom_source):
+            if chrom_source == "ucsc":
+                # Get UCSC chromosome column number by assuming it is the column which
+                # contains the most chromosome names that start with "chr".
+                chrom_source_expr = pl.col("^column_[1-9]$").str.starts_with("chr")
+            elif chrom_source == "ensembl":
+                # Get Ensembl chromosome column number by assuming it is the column
+                # which is the most similar to the UCSC chromosome column, but without
+                # "chr". Requires that UCSC chromosome column was found before.
+                chrom_source_expr = pl.col("^column_[1-9]$") == pl.col(
+                    "ucsc"
+                ).str.replace("^chr", "")
+            elif chrom_source == "refseq":
+                chrom_source_expr = pl.col("^column_[1-9]$").str.contains("^N[CTW]_")
+            elif chrom_source == "genbank":
+                chrom_source_expr = (
+                    pl.col("^column_[1-9]$")
+                    .str.contains("^[A-Z]{1,2}[0-9]{5,6}\\.[0-9]{1,3}")
+                    .sum()
+                )
+            else:
+                raise ValueError(
+                    'Only "ucsc", "ensembl", "refseq" and "genbank" are supported as '
+                    "chromosome source."
+                )
+
+            no_unresolved_columns = len(
+                [
+                    column_name
+                    for column_name in chrom_alias_df_pl.columns
+                    if column_name.startswith("column_")
+                ]
             )
+
+            if no_unresolved_columns == 0:
+                # All "column_x" names are already assigned to a chromosome source name.
+                return chrom_alias_df_pl
+
+            # Get all column names that match the filter the best.
+            chromosome_column_names = (
+                chrom_alias_df_pl.select(
+                    # Count how many times a chromosome name in a chromosome column
+                    # confirmed to the chrom_source_expr filter.
+                    chrom_source_expr.sum(),
+                )
+                .transpose(include_header=True)
+                .filter(pl.col("column_0") != 0)
+                .filter(pl.col("column_0").max() == pl.col("column_0"))
+                .to_series()
+                .to_list()
+            )
+
+            if len(chromosome_column_names) == 0:
+                # No suitable chromosome column found.
+                return chrom_alias_df_pl
+            elif len(chromosome_column_names) == 1:
+                # On suitable chromosome column found.
+                chromosome_column_name = chromosome_column_names[0]
+            else:
+                # Multiple suitable chromosome columns found with the same score.
+                # Sort by number of null values and take the first column name.
+                chromosome_column_name = (
+                    chrom_alias_df_pl.select(
+                        pl.col(chromosome_column_names).is_null().sum(),
+                    )
+                    .transpose(include_header=True)
+                    .sort(by="column_0", reverse=True)
+                    .head(1)
+                    .to_series()
+                    .item()
+                )
+
+            return chrom_alias_df_pl.rename({chromosome_column_name: chrom_source})
+
+        # Find out which columns contain which chromosome source as the UCSC chromosome
+        # alias file does not have a proper header or has the columns always in the
+        # same order.
+        chrom_alias_df_pl = find_chrom_source_column(chrom_alias_df_pl, "ucsc")
+        # Find the Ensembl column after the UCSC column as it's filter needs the UCSC
+        # column.
+        chrom_alias_df_pl = find_chrom_source_column(chrom_alias_df_pl, "ensembl")
+        chrom_alias_df_pl = find_chrom_source_column(chrom_alias_df_pl, "refseq")
+        chrom_alias_df_pl = find_chrom_source_column(chrom_alias_df_pl, "genbank")
 
         if chrom_alias_tsv_filename and isinstance(
             chrom_alias_tsv_filename, (str, Path)
@@ -321,11 +391,9 @@ def find_most_likely_chromosome_source_in_bed(
     )
 
     # Get the best chromosome source.
-    best_chrom_source_name = (
-        chrom_source_stats_df_pl.transpose(include_header=True)
-        .filter(pl.col("column_0") == pl.col("column_0").max())
-        .item()
-    )
+    best_chrom_source_name = chrom_source_stats_df_pl.transpose(
+        include_header=True
+    ).filter(pl.col("column_0") == pl.col("column_0").max())[0, 0]
 
     return best_chrom_source_name, chrom_source_stats_df_pl
 
