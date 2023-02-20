@@ -15,17 +15,20 @@ def get_tss_profile(
     min_norm=0.2,
 ):
     """
-    Get TSS profile for Polars DataFrame with fragments filtered by cell barcodes of interest.
+    Get TSS profile for Polars DataFrame with fragments filtered by cell barcodes.
 
     Parameters
     ----------
     fragments_df_pl
-        Polars DataFrame with fragments (filtered by cell barcodes of interest). See `filter_fragments_by_cb()`.
+        Polars DataFrame with fragments (filtered by cell barcodes of interest).
+        See :func:`pycisTopic.fragments.filter_fragments_by_cb`.
     tss_annotation
-        TSS annotation Polars DataFrame with at least the following columns: ["Chromosome", "Start", "Strand"].
+        TSS annotation Polars DataFrame with at least the following columns:
+        `["Chromosome", "Start", "Strand"]`.
         The "Start" column is 0-based like a BED file.
-        See `get_tss_annotation_from_ensembl()` and `change_chromosome_source_in_bed()` for ways to get TSS annotation
-        from Ensembl BioMart.
+        See :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl` and
+        :func:`pycisTopic.gene_annotation.change_chromosome_source_in_bed` for ways
+        to get TSS annotation from Ensembl BioMart.
     flank_window
         Flanking window around the TSS.
         Used for intersecting fragments with TSS positions and keeping cut sites.
@@ -35,26 +38,48 @@ def get_tss_profile(
         Default: 10.
     minimum_signal_window
         Average signal in the tails of the flanking window around the TSS:
-           - [-flank_window, -flank_window + minimum_signal_window + 1]
-           - [flank_window - minimum_signal_window + 1, flank_window]
+           - `[-flank_window, -flank_window + minimum_signal_window + 1]`
+           - `[flank_window - minimum_signal_window + 1, flank_window]`
         is used to normalize the TSS enrichment.
-        Default: 100 (average signal in [-1000, -901], [901, 1000] around TSS if `flank_window=1000`).
+        Default: `100` (average signal in `[-1000, -901]`, `[901, 1000]`
+        around TSS if `flank_window=1000`).
     tss_window
-        Window around the TSS used to count fragments in the TSS when calculating the TSS enrichment per cell barcode.
-        Default: 50 (+/- 50 bp).
+        Window around the TSS used to count fragments in the TSS when calculating
+        the TSS enrichment per cell barcode.
+        Default: `50` (+/- 50 bp).
     min_norm
         Minimum normalization score.
-        If the average minimum signal value is below this value, this number is used to normalize the TSS signal.
-        This approach penalizes cells with fewer reads.
-        Default: 0.2
+        If the average minimum signal value is below this value, this number is used
+        to normalize the TSS signal. This approach penalizes cells with fewer reads.
+        Default: `0.2`
 
     Returns
     -------
     tss_enrichment_per_cb, tss_norm_matrix_sample, tss_norm_matrix_per_cb
 
+    See Also
+    --------
+    pycisTopic.fragments.filter_fragments_by_cb
+    pycisTopic.gene_annotation.change_chromosome_source_in_bed
+    pycisTopic.gene_annotation.get_tss_annotation_from_ensembl
+
     Examples
     --------
+    Get TSS annotation for requested transcript types from Ensembl BioMart.
+    >>> ensembl_tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
+    ...     biomart_name="hsapiens_gene_ensembl"
+    )
 
+    Get TSS profile for Polars DataFrame with fragments filtered by cell barcodes.
+    >>> get_tss_profile(
+    ...     fragments_df_pl=fragments_cb_filtered_df_pl,
+    ...     tss_annotation=ensembl_tss_annotation_bed_df_pl,
+    ...     flank_window=1000,
+    ...     smoothing_rolling_window=10,
+    ...     minimum_signal_window=100,
+    ...     tss_window=50,
+    ...     min_norm=0.2,
+    ... )
     """
 
     # Get chromosome names which are found in the TSS annotation.
@@ -64,11 +89,13 @@ def get_tss_profile(
         .get_column("Chromosome")
     )
 
-    # Filter out fragments which are located on chromosomes not found in the TSS annotation and remove unneeded columns.
+    # Filter out fragments which are located on chromosomes not found in the TSS
+    # annotation and remove unneeded columns.
     filtered_fragments_df_pl = (
         fragments_df_pl.clone()
         .filter(
-            # Filter out fragments which are located on chromosomes not found in the TSS annotation.
+            # Filter out fragments which are located on chromosomes not found in
+            # the TSS annotation.
             pl.col("Chromosome").is_in(annotation_chromosomes)
         )
         .select(
@@ -77,22 +104,27 @@ def get_tss_profile(
         )
     )
 
-    # Get overlap between fragments and TSS positions with [-flank_window, flank_window].
+    # Get overlap between fragments and TSS positions
+    # with [-flank_window, flank_window].
     overlap_with_tss_df_pl = pl.from_pandas(
         (
-            # Create PyRanges object from filtered fragments file and overlap with TSS annotation BED file.
+            # Create PyRanges object from filtered fragments file and overlap with TSS
+            # annotation BED file.
             create_pyranges_from_polars_df(filtered_fragments_df_pl).join(
-                # Create PyRanges object from TSS annotation BED file after extending TSS position with flanking window.
+                # Create PyRanges object from TSS annotation BED file after extending
+                # TSS position with flanking window.
                 create_pyranges_from_polars_df(
                     (
                         tss_annotation.select(
                             # Only keep needed columns for faster PyRanges join.
                             pl.col(["Chromosome", "Start", "Strand"])
                         )
-                        # Filter out TSS annotations without strand info (in case that would ever happen).
+                        # Filter out TSS annotations without strand info
+                        # (in case that would ever happen).
                         .filter(pl.col("Strand") != ".")
-                        # Create [-flank_window, flank_window] around TSS (size: flank_window * 2 + 1)
-                        # and set them as "Start" and "End" column.
+                        # Create [-flank_window, flank_window] around TSS
+                        # (size: flank_window * 2 + 1) and set them as
+                        # "Start" and "End" column.
                         .with_columns(
                             [
                                 (pl.col("Start") - flank_window).alias("Start"),
@@ -101,7 +133,8 @@ def get_tss_profile(
                         )
                     )
                 ),
-                # Add "_tss_flank" suffix for joined output that comes from the TSS annotation BED file.
+                # Add "_tss_flank" suffix for joined output that comes from the TSS
+                # annotation BED file.
                 suffix="_tss_flank",
                 apply_strand_suffix=False,
             )
@@ -113,7 +146,8 @@ def get_tss_profile(
             "No overlap found between fragments and TSS annotation. Make sure both use the same chromosome name source."
         )
 
-    # Get cut sites (start/end fragments) relative to the TSS position taking into account the strand info of the TSS.
+    # Get cut sites (start/end fragments) relative to the TSS position taking into
+    # account the strand info of the TSS.
     #   - `-x`: cut site x bp upstream of TSS.
     #   - `0`: cut site at TSS.
     #   - `x`: cut site x bp downstream of TSS.
@@ -323,7 +357,8 @@ def get_tss_profile(
             (
                 pl.col(CB)
                 / (
-                    # Calculate background value from start and end over minimum_signal_window length.
+                    # Calculate background value from start and end over
+                    # minimum_signal_window length.
                     (
                         (
                             pl.col(CB).head(minimum_signal_window).mean()
