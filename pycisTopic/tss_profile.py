@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import genomic_ranges
 import polars as pl
-
 from fragments import create_pyranges_from_polars_df
 
 
@@ -13,6 +13,7 @@ def get_tss_profile(
     minimum_signal_window=100,
     tss_window=50,
     min_norm=0.2,
+    use_genomic_ranges=True,
 ):
     """
     Get TSS profile for Polars DataFrame with fragments filtered by cell barcodes.
@@ -52,6 +53,9 @@ def get_tss_profile(
         If the average minimum signal value is below this value, this number is used
         to normalize the TSS signal. This approach penalizes cells with fewer reads.
         Default: `0.2`
+    use_genomic_ranges
+        Use genomic ranges implementation for calculating intersections, instead of
+        using pyranges.
 
     Returns
     -------
@@ -106,35 +110,71 @@ def get_tss_profile(
 
     # Get overlap between fragments and TSS positions
     # with [-flank_window, flank_window].
-    overlap_with_tss_df_pl = pl.from_pandas(
-        (
+    overlap_with_tss_df_pl = (
+        # Use genomic_ranges to calculate the intersection.
+        genomic_ranges.intersection(
             # Create PyRanges object from filtered fragments file and overlap with TSS
             # annotation BED file.
-            create_pyranges_from_polars_df(filtered_fragments_df_pl).join(
-                # Create PyRanges object from TSS annotation BED file after extending
-                # TSS position with flanking window.
-                create_pyranges_from_polars_df(
-                    tss_annotation.select(
-                        # Only keep needed columns for faster PyRanges join.
-                        pl.col(["Chromosome", "Start", "Strand"])
-                    )
-                    # Filter out TSS annotations without strand info
-                    # (in case that would ever happen).
-                    .filter(pl.col("Strand") != ".")
-                    # Create [-flank_window, flank_window] around TSS
-                    # (size: flank_window * 2 + 1) and set them as
-                    # "Start" and "End" column.
-                    .with_columns(
-                        (pl.col("Start") - flank_window).alias("Start"),
-                        (pl.col("Start") + flank_window + 1).alias("End"),
-                    )
-                ),
-                # Add "_tss_flank" suffix for joined output that comes from the TSS
+            regions1_df_pl=filtered_fragments_df_pl,
+            # Create PyRanges object from TSS annotation BED file after extending TSS
+            # position with flanking window.
+            regions2_df_pl=(
+                tss_annotation.select(
+                    # Only keep needed columns for faster PyRanges join.
+                    pl.col(["Chromosome", "Start", "Strand"])
+                )
+                # Filter out TSS annotations without strand info
+                # (in case that would ever happen).
+                .filter(pl.col("Strand") != ".")
+                # Create [-flank_window, flank_window] around TSS
+                # (size: flank_window * 2 + 1) and set them as "Start" and "End" column.
+                .with_columns(
+                    (pl.col("Start") - flank_window).alias("Start"),
+                    (pl.col("Start") + flank_window + 1).alias("End"),
+                )
+            ),
+            regions1_info=True,
+            regions2_info=False,
+            regions1_coord=True,
+            regions2_coord=False,
+            regions1_suffix="_fragment",
+            # Add "_tss_flank" suffix for joined output that comes from the TSS annotation
+            # BED file.
+            regions2_suffix="_tss_flank",
+        )
+        if use_genomic_ranges
+        else
+        # Use pyranges to calculate the intersection.
+        pl.from_pandas(
+            (
+                # Create PyRanges object from filtered fragments file and overlap with TSS
                 # annotation BED file.
-                suffix="_tss_flank",
-                apply_strand_suffix=False,
-            )
-        ).df
+                create_pyranges_from_polars_df(filtered_fragments_df_pl).join(
+                    # Create PyRanges object from TSS annotation BED file after extending
+                    # TSS position with flanking window.
+                    create_pyranges_from_polars_df(
+                        tss_annotation.select(
+                            # Only keep needed columns for faster PyRanges join.
+                            pl.col(["Chromosome", "Start", "Strand"])
+                        )
+                        # Filter out TSS annotations without strand info
+                        # (in case that would ever happen).
+                        .filter(pl.col("Strand") != ".")
+                        # Create [-flank_window, flank_window] around TSS
+                        # (size: flank_window * 2 + 1) and set them as
+                        # "Start" and "End" column.
+                        .with_columns(
+                            (pl.col("Start") - flank_window).alias("Start"),
+                            (pl.col("Start") + flank_window + 1).alias("End"),
+                        )
+                    ),
+                    # Add "_tss_flank" suffix for joined output that comes from the TSS
+                    # annotation BED file.
+                    suffix="_tss_flank",
+                    apply_strand_suffix=False,
+                )
+            ).df
+        )
     )
 
     if overlap_with_tss_df_pl.shape == (0, 0):
