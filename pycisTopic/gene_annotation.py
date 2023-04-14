@@ -301,7 +301,7 @@ def get_chrom_alias_mapping(
                         pl.col(chromosome_column_names).is_null().sum(),
                     )
                     .transpose(include_header=True)
-                    .sort(by="column_0", reverse=True)
+                    .sort(by="column_0", descending=True)
                     .head(1)
                     .to_series()
                     .item()
@@ -323,11 +323,11 @@ def get_chrom_alias_mapping(
             chrom_alias_tsv_filename, (str, Path)
         ):
             chrom_alias_df_pl.write_csv(
-                file=chrom_alias_tsv_filename, sep="\t", has_header=True
+                file=chrom_alias_tsv_filename, separator="\t", has_header=True
             )
     elif chrom_alias_tsv_filename and isinstance(chrom_alias_tsv_filename, (str, Path)):
         chrom_alias_df_pl = pl.read_csv(
-            chrom_alias_tsv_filename, sep="\t", has_header=True, comment_char="#"
+            chrom_alias_tsv_filename, separator="\t", has_header=True, comment_char="#"
         )
     else:
         raise ValueError(

@@ -485,7 +485,7 @@ def intersection(
                     ]
                 )
                 .pipe(
-                    func=_filter_intersection_output_columns,
+                    function=_filter_intersection_output_columns,
                     regions1_info=regions1_info,
                     regions2_info=regions2_info,
                     regions1_coord=regions1_coord,

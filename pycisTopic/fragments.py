@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gzip
 from operator import itemgetter
-from typing import Literal, Optional, Sequence, Union
+from typing import Literal, Sequence
 
 import numpy as np
 import pandas as pd
@@ -90,7 +90,7 @@ def read_fragments_to_pyranges(
             fragments_bed_filename,
             has_header=False,
             skip_rows=skip_rows,
-            sep="\t",
+            separator="\t",
             use_pyarrow=False,
             new_columns=bed_column_names[:nbr_columns],
             dtypes={
@@ -236,7 +236,7 @@ def read_bed_to_polars_df(
 
     # Enable global string cache so categorical columns from multiple Polars DataFrames
     # can be joined later, if necessary.
-    pl.toggle_string_cache(True)
+    pl.enable_string_cache(True)
 
     if engine == "polars":
         # Read BED file with Polars.
@@ -244,7 +244,7 @@ def read_bed_to_polars_df(
             bed_filename,
             has_header=False,
             skip_rows=skip_rows,
-            sep="\t",
+            separator="\t",
             use_pyarrow=False,
             new_columns=bed_column_names[:column_count],
             dtypes={
@@ -429,8 +429,9 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     bed_with_idx_df_pl = (
         bed_df_pl
         # Add index column and cast it from UInt32 to Int64
-        .with_row_count("__index_level_0__")
-        .with_columns(pl.col("__index_level_0__").cast(pl.Int64))
+        .with_row_count("__index_level_0__").with_columns(
+            pl.col("__index_level_0__").cast(pl.Int64)
+        )
         # Put index column as last column.
         .select(pl.col(pa_schema_fixed_categoricals.names))
     )
@@ -481,7 +482,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
                 # Partition Polars DataFrame with BED entries per chromosome-strand
                 # (stranded).
                 bed_with_idx_df_pl.partition_by(
-                    groups=["Chromosome", "Strand"], maintain_order=False, as_dict=True
+                    by=["Chromosome", "Strand"], maintain_order=False, as_dict=True
                 ).items(),
                 key=itemgetter(0),
             )
@@ -495,7 +496,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
                 # Partition Polars DataFrame with BED entries per chromosome
                 # (unstranded).
                 bed_with_idx_df_pl.partition_by(
-                    groups=["Chromosome"], maintain_order=False, as_dict=True
+                    by=["Chromosome"], maintain_order=False, as_dict=True
                 ).items(),
                 key=itemgetter(0),
             )
@@ -510,7 +511,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
 def get_fragments_per_cb(
     fragments_df_pl: pl.DataFrame,
     min_fragments_per_cb: int = 50,
-    collapse_duplicates: Optional[bool] = True,
+    collapse_duplicates: bool | None = True,
 ) -> pl.DataFrame:
     """
     Get number of fragments and duplication ratio per cell barcode.
@@ -566,7 +567,7 @@ def get_fragments_per_cb(
             ]
         )
         .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
-        .sort(by=fragments_count_column, reverse=True)
+        .sort(by=fragments_count_column, descending=True)
         .with_row_count(name="barcode_rank", offset=1)
         .with_columns(
             (pl.col("total_fragments_count") - pl.col("unique_fragments_count")).alias(
@@ -682,7 +683,7 @@ def get_cbs_passing_filter(
     elif isinstance(keep_top_x_cbs, int):
         fragments_stats_per_cb_filtered_df_pl = (
             fragments_stats_per_cell_cb_df_pl.lazy()
-            .sort(by=fragments_count_column, reverse=True)
+            .sort(by=fragments_count_column, decending=True)
             .head(keep_top_x_cbs)
             .collect()
         )
@@ -723,24 +724,39 @@ def filter_fragments_by_cb(
     Examples
     --------
     Read gzipped fragments BED file to a Polars DataFrame.
-    >>> fragments_df_pl = read_fragments_to_polars_df(fragments_bed_filename="fragments.tsv.gz")
+    >>> fragments_df_pl = read_fragments_to_polars_df(
+    ...    fragments_bed_filename="fragments.tsv.gz"
+    ... )
 
     List of cell barcodes for which to retain fragments.
     >>> cbs = ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"]
     Polars DataFrame with fragments for the requested cell barcodes.
-    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(fragments_df_pl=fragments_df_pl, cbs=cbs)
+    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(
+    ...     fragments_df_pl=fragments_df_pl,
+    ...     cbs=cbs,
+    ... )
 
     List of cell barcodes for which to retain fragments.
     >>> cbs = ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"]
     Polars DataFrame with fragments for the requested cell barcodes.
-    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(fragments_df_pl=fragments_df_pl, cbs=cbs)
+    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(
+    ...     fragments_df_pl=fragments_df_pl,
+    ...     cbs=cbs,
+    ... )
 
     List of cell barcodes as a Polars categorical Series for which to retain fragments.
-    >>> cbs = pl.Series("CB", ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"], dtype=pl.Categorical)
+    >>> cbs = pl.Series(
+    ...     "CB",
+    ...     ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"],
+    ...     dtype=pl.Categorical
+    ... )
     Polars DataFrame with fragments for the requested cell barcodes.
-    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(fragments_df_pl=fragments_df_pl, cbs=cbs)
-    """
+    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(
+    ...     fragments_df_pl=fragments_df_pl,
+    ...     cbs=cbs,
+    ... )
 
+    """
     if isinstance(cbs, Sequence):
         if isinstance(cbs[0], str):
             cbs_series_pl = pl.Series("CB", cbs, dtype=pl.Categorical)
