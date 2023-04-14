@@ -11,7 +11,7 @@ import pyarrow as pa
 import pyarrow.csv
 import pyranges as pr
 
-from pycisTopic.utils import format_path
+from pycisTopic.utils import normalise_filepath
 
 
 def read_fragments_to_pyranges(
@@ -51,7 +51,7 @@ def read_fragments_to_pyranges(
         "BlockStarts",
     )
 
-    fragments_bed_filename = format_path(fragments_bed_filename)
+    fragments_bed_filename = normalise_filepath(fragments_bed_filename)
 
     # Set the correct open function, depending upon if the fragments BED file is gzip
     # compressed or not.
@@ -204,7 +204,7 @@ def read_bed_to_polars_df(
         "BlockStarts",
     )
 
-    bed_filename = format_path(bed_filename)
+    bed_filename = normalise_filepath(bed_filename)
 
     # Set the correct open function, depending upon if the fragments BED file is gzip
     # compressed or not.

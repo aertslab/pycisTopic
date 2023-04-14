@@ -20,12 +20,15 @@ from scipy import sparse
 from pycisTopic.lda_models import CistopicLDAModel
 
 
-def format_path(path: str | Path) -> str:
+def normalise_filepath(path: str | Path, check_not_directory: bool = True) -> str:
     """
     Create a string path, expanding the home directory if present.
-    """
 
-    return os.path.expanduser(path)
+    """
+    path = os.path.expanduser(path)
+    if check_not_directory and os.path.exists(path) and os.path.isdir(path):
+        raise IsADirectoryError(f"Expected a file path; {path!r} is a directory")
+    return path
 
 
 def coord_to_region_names(df_pl: pl.DataFrame) -> list[str]:
