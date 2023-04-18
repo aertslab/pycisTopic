@@ -134,13 +134,17 @@ def get_tss_profile(
                 )
             ),
             regions1_info=True,
-            regions2_info=False,
+            regions2_info=True,
             regions1_coord=True,
-            regions2_coord=False,
+            regions2_coord=True,
             regions1_suffix="_fragment",
             # Add "_tss_flank" suffix for joined output that comes from the TSS annotation
             # BED file.
             regions2_suffix="_tss_flank",
+        ).rename(
+            {
+                "Strand_tss_flank": "Strand",
+            }
         )
         if use_genomic_ranges
         else
