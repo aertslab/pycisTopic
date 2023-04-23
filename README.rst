@@ -1,3 +1,6 @@
+.. image:: https://zenodo.org/badge/329905726.svg
+   :target: https://zenodo.org/badge/latestdoi/329905726
+
 pycisTopic
 ==========
 
