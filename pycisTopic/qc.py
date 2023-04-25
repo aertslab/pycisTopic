@@ -935,6 +935,7 @@ def compute_qc_stats(
     min_norm: Optional[int] = 0.2,
     check_for_duplicates: Optional[bool] = True,
     remove_duplicates: Optional[bool] = True,
+    use_polars: Optional[bool] = True,
     **kwargs,
 ):
     """ "
@@ -975,6 +976,8 @@ def compute_qc_stats(
             If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
     remove_duplicates: bool, optional
             Whether to remove duplicates. Default: True.
+    use_polars: bool, optional
+            Whether to use polars to read fragments files. Default: True.
     **kwargs
             Additional parameters for ray.init.
 
@@ -1020,6 +1023,7 @@ def compute_qc_stats(
                     partition=partition,
                     check_for_duplicates=check_for_duplicates,
                     remove_duplicates=remove_duplicates,
+                    use_polars=use_polars,
                 )
                 for i in range(len(fragments_list))
             ]
@@ -1044,6 +1048,7 @@ def compute_qc_stats(
                     partition=partition,
                     check_for_duplicates=check_for_duplicates,
                     remove_duplicates=remove_duplicates,
+                    use_polars=use_polars,
                 )
                 for i in range(len(fragments_list))
             ]
