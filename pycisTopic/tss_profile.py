@@ -8,12 +8,12 @@ from fragments import create_pyranges_from_polars_df
 def get_tss_profile(
     fragments_df_pl: pl.DataFrame,
     tss_annotation: pl.DataFrame,
-    flank_window=1000,
-    smoothing_rolling_window=10,
-    minimum_signal_window=100,
-    tss_window=50,
-    min_norm=0.2,
-    use_genomic_ranges=True,
+    flank_window: int = 1000,
+    smoothing_rolling_window: int = 10,
+    minimum_signal_window: int = 100,
+    tss_window: int = 50,
+    min_norm: float = 0.2,
+    use_genomic_ranges: bool = True,
 ):
     """
     Get TSS profile for Polars DataFrame with fragments filtered by cell barcodes.
@@ -246,15 +246,13 @@ def get_tss_profile(
                 pl.DataFrame(
                     [
                         # Create [-flank_window, flank_window] range for all possible cut site positions.
-                        pl.Series(
-                            "Position",
-                            pl.arange(
-                                low=-flank_window,
-                                high=flank_window + 1,
-                                step=1,
-                                eager=True,
-                            ),
-                        ).cast(pl.Int32),
+                        pl.arange(
+                            start=-flank_window,
+                            end=flank_window + 1,
+                            step=1,
+                            eager=True,
+                            dtype=pl.Int32,
+                        ).alias("Position"),
                         # Create a CB column with all "no_CB" values. Needed temporarily so during the pivot operation
                         # all cut site position values ([-flank_window, flank_window] range) are kept even if there are
                         # no cut sites for certain positions.

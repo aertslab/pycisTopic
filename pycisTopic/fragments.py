@@ -683,7 +683,7 @@ def get_cbs_passing_filter(
     elif isinstance(keep_top_x_cbs, int):
         fragments_stats_per_cb_filtered_df_pl = (
             fragments_stats_per_cell_cb_df_pl.lazy()
-            .sort(by=fragments_count_column, decending=True)
+            .sort(by=fragments_count_column, descending=True)
             .head(keep_top_x_cbs)
             .collect()
         )
