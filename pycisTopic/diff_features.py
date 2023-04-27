@@ -326,14 +326,13 @@ def impute_accessibility(
     selected_cells: Optional[List[str]] = None,
     selected_regions: Optional[List[str]] = None,
     scale_factor: Optional[int] = 10**6,
-    sparsity_thr: Optional[float] = 0.67,
     project: Optional[str] = "cisTopic_Impute",
 ):
     """
     Impute region accessibility.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
         A cisTopic object with a model in `class::CistopicObject.selected_model`.
     selected_cells: list, optional
@@ -341,17 +340,16 @@ def impute_accessibility(
     selected_regions: list, optional
         A list with selected regions to impute accessibility for. Default: None
     scale_factor: int, optional
-        A number to multiply the imputed values for. This is useful to convert low probabilities to 0, making the matrix more sparse. Default: 10**6.
-    sparsity_thr: float, optional
-        Minimum sparsity ratio in matrix to be converted to sparse matrix. Default: 0.67.
+        A number to multiply the imputed values for. This is useful to convert low
+        probabilities to 0, making the matrix more sparse. Default: 10**6.
     project: str, optional
-            Name of the cisTopic imputation project. Default: 'cisTopic_impute.'
+        Name of the cisTopic imputation project. Default: `"cisTopic_impute"`.
 
     Return
     ------
     CistopicImputedFeatures
-    """
 
+    """
     # Create cisTopic logger
     level = logging.INFO
     log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
@@ -374,30 +372,79 @@ def impute_accessibility(
     # multiplying them uses 4 times less memory than with np.float64
     cell_topic = cell_topic.to_numpy().astype(np.float32)
     topic_region = topic_region.to_numpy().astype(np.float32)
-    log.info("Imputing drop-outs")
-    imputed_acc = topic_region @ cell_topic
-    imputed_acc = imputed_acc.astype(np.float32)
-    if isinstance(scale_factor, int):
-        if scale_factor != 1:
-            log.info("Scaling")
-            # Only multiply non-zero data of sparse matrix.
-            imputed_acc *= np.int32(scale_factor)
-            imputed_acc = imputed_acc.astype(np.int32)
-            log.info("Keep non zero rows")
-            keep_regions_index = non_zero_rows(imputed_acc)
-            imputed_acc = imputed_acc[
-                keep_regions_index,
-            ]
-            region_names = subset_list(region_names, keep_regions_index)
-    sparsity = 1.0 - (count_nonzero(imputed_acc) / float(imputed_acc.size))
-    log.info(f"Imputed accessibility sparsity: {sparsity}")
-    log.info("Create CistopicImputedFeatures object")
+
+    log.info("Imputing region accessibility")
+
+    # Create empty imputed accessibility matrix which will be filled in,
+    # in chunks by calculate_imputed_accessibility function.
+    imputed_acc = np.empty(
+        (topic_region.shape[0], cell_topic.shape[1]),
+        dtype=(
+            np.int32
+            if isinstance(scale_factor, int) and scale_factor != 1
+            else np.float32
+        ),
+    )
+
+    def calculate_imputed_accessibility(
+        topic_region: np.ndarray,
+        cell_topic:  np.ndarray,
+        scale_factor: Optional[int],
+        chunk_size: int
+    ) -> None:
+        """
+        Calculate imputed accessibility in chunks of chunk_size and fill `imputed_acc`.
+
+        Parameters
+        ----------
+        topic_region:
+            Topic region matrix (regions x topics).
+        cell_topic:
+            Cell topic matrix (topic x cells).
+        scale_factor:
+
+        chunk_size:
+            Chunk size used (number of regions for which imputed accessibility is
+            calculated at once).
+
+        Returns
+        -------
+        None. Empty `imputed_acc` matrix is filled in instead.
+
+        """
+        for chunk_start in range(0, topic_region.shape[0], chunk_size):
+            chunk_end = chunk_start + chunk_size
+            log.info(
+                f"Impute region accessibility for regions {chunk_start}-{chunk_end}"
+            )
+            topic_region_chunk = topic_region[chunk_start:chunk_start + chunk_size]
+            imputed_acc_chunk = topic_region_chunk @ cell_topic
+
+            if isinstance(scale_factor, int) and scale_factor != 1:
+                # Scale imputed accessibility matrix chunk.
+                imputed_acc_chunk *= np.float32(scale_factor)
+                # Convert from float32 to int32 and fill in the values in the full
+                # imputed accessibility matrix.
+                imputed_acc[chunk_start:chunk_end, :] = imputed_acc_chunk.astype(
+                    np.int32
+                )
+            else:
+                # Fill in the values in the correct place in the full imputed
+                # accessibility matrix.
+                imputed_acc[chunk_start:chunk_end, :] = imputed_acc_chunk
+
+    # Fill `imputed_acc` matrix in chunks of 20000.
+    calculate_imputed_accessibility(
+        topic_region=topic_region,
+        cell_topic=cell_topic,
+        scale_factor=scale_factor,
+        chunk_size=20000
+    )
+
     imputed_acc_obj = CistopicImputedFeatures(
         imputed_acc, region_names, cell_names, project
     )
-    if sparsity > sparsity_thr:
-        log.info("Making matrix sparse")
-        imputed_acc_obj.mtx = sparse.csr_matrix(imputed_acc_obj.mtx)
+
     log.info("Done!")
     return imputed_acc_obj
 
