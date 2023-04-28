@@ -10,9 +10,7 @@ import ray
 import scipy
 import scipy.sparse as sparse
 import sklearn
-from numpy import array, count_nonzero
 from scipy.stats import ranksums
-from sklearn.preprocessing import normalize
 
 from .cistopic_class import *
 from .utils import *
@@ -450,23 +448,24 @@ def impute_accessibility(
 
 
 def normalize_scores(
-    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
-    scale_factor: Optional[int] = 10**4,
+    imputed_acc: Union[pd.DataFrame, "CistopicImputedFeatures"],
+    scale_factor: int = 10**4,
 ):
     """
     Log-normalize imputation data. Feature counts for each cell are divided by the total counts for that cell and multiplied by the scale_factor.
 
     Parameters
-    ---------
-    input_mat: pd.DataFrame or :class:`CistopicImputedFeatures`
-        A dataframe with values to be normalize or cisTopic imputation data.
-    scale_factor: int, optional
+    ----------
+    imputed_acc: pd.DataFrame or :class:`CistopicImputedFeatures`
+        A dataframe with values to be normalized or cisTopic imputation data.
+    scale_factor: int
         Scale factor for cell-level normalization. Default: 10**4
 
     Return
     ------
     pd.DataFrame or CistopicImputedFeatures
         The output class will be the same as the used as input.
+
     """
     # Create cisTopic logger
     level = logging.INFO
@@ -476,17 +475,39 @@ def normalize_scores(
     log = logging.getLogger("cisTopic")
 
     log.info("Normalizing imputed data")
-    if isinstance(input_mat, CistopicImputedFeatures):
-        mtx = normalize(input_mat.mtx, norm="l1", axis=0)
-        mtx *= scale_factor
-        mtx = np.log1p(mtx)
+
+    def calculate_normalized_scores(imputed_acc: np.ndarray, scale_factor: int):
+        # Divide each imputed accessibility by sum of imputed accessibility for the
+        # whole cell column and multiply then by the scale factor.
+        # To avoid a big extra memory allocation matrix for applying the scale factor,
+        # imputed_acc is divided by (np.sum(imputed_acc, axis=0) / scale_factor),
+        # instead of doing `imputed_acc / np.sum(imputed_acc, axis=0) * scale_factor`.
+        normalized_acc = imputed_acc / (np.sum(imputed_acc, axis=0) / scale_factor)
+        # Apply log1p element wise in place, to avoid a big memory allocation.
+        return np.log1p(normalized_acc, out=normalized_acc)
+
+    if isinstance(imputed_acc, CistopicImputedFeatures):
         output = CistopicImputedFeatures(
-            mtx, input_mat.feature_names, input_mat.cell_names, input_mat.project
+            calculate_normalized_scores(
+                imputed_acc=(
+                    imputed_acc.mtx.toarray()
+                    if scipy.sparse.issparse(imputed_acc.mtx)
+                    else imputed_acc.mtx
+                ),
+                scale_factor=scale_factor
+            ),
+            imputed_acc.feature_names,
+            imputed_acc.cell_names,
+            imputed_acc.project,
         )
-    elif isinstance(input_mat, pd.DataFrame):
-        output = np.log1p(input_mat.values / input_mat.values.sum(0) * scale_factor)
+    elif isinstance(imputed_acc, pd.DataFrame):
         output = pd.DataFrame(
-            output, index=input_mat.index.tolist(), columns=input_mat.columns
+            calculate_normalized_scores(
+                imputed_acc=imputed_acc.to_numpy(),
+                scale_factor=scale_factor
+            ),
+            index=imputed_acc.index,
+            columns=imputed_acc.columns,
         )
     log.info("Done!")
     return output
