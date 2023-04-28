@@ -324,6 +324,7 @@ def impute_accessibility(
     selected_cells: Optional[List[str]] = None,
     selected_regions: Optional[List[str]] = None,
     scale_factor: Optional[int] = 10**6,
+    chunk_size: int = 20000,
     project: Optional[str] = "cisTopic_Impute",
 ):
     """
@@ -340,6 +341,9 @@ def impute_accessibility(
     scale_factor: int, optional
         A number to multiply the imputed values for. This is useful to convert low
         probabilities to 0, making the matrix more sparse. Default: 10**6.
+    chunk_size:
+        Chunk size used (number of regions for which imputed accessibility is
+        calculated at the same time).
     project: str, optional
         Name of the cisTopic imputation project. Default: `"cisTopic_impute"`.
 
@@ -373,25 +377,15 @@ def impute_accessibility(
 
     log.info("Imputing region accessibility")
 
-    # Create empty imputed accessibility matrix which will be filled in,
-    # in chunks by calculate_imputed_accessibility function.
-    imputed_acc = np.empty(
-        (topic_region.shape[0], cell_topic.shape[1]),
-        dtype=(
-            np.int32
-            if isinstance(scale_factor, int) and scale_factor != 1
-            else np.float32
-        ),
-    )
-
     def calculate_imputed_accessibility(
         topic_region: np.ndarray,
-        cell_topic:  np.ndarray,
+        cell_topic: np.ndarray,
+        region_names: list,
         scale_factor: Optional[int],
         chunk_size: int
-    ) -> None:
+    ) -> Tuple[np.ndarray, list]:
         """
-        Calculate imputed accessibility in chunks of chunk_size and fill `imputed_acc`.
+        Calculate imputed accessibility in chunks of chunk_size.
 
         Parameters
         ----------
@@ -399,48 +393,97 @@ def impute_accessibility(
             Topic region matrix (regions x topics).
         cell_topic:
             Cell topic matrix (topic x cells).
+        region_names:
+            List of all region names.
         scale_factor:
-
+            A number to multiply the imputed values for. This is useful to convert
+            low probabilities to 0, making the matrix more sparse. Default: 10**6.
         chunk_size:
             Chunk size used (number of regions for which imputed accessibility is
-            calculated at once).
+            calculated at the same time).
 
         Returns
         -------
-        None. Empty `imputed_acc` matrix is filled in instead.
+        Numpy array with imputed accessibility for each region and a list of region
+        names (some regions for which all row values were 0 are filtered out).
+        (imputed_acc, region_names_to_keep)
 
         """
-        for chunk_start in range(0, topic_region.shape[0], chunk_size):
-            chunk_end = chunk_start + chunk_size
+        output_chunk_end = 0
+        region_names_to_keep = []
+
+        # Create empty imputed accessibility matrix which will be filled in chunks.
+        imputed_acc = np.empty(
+            (topic_region.shape[0], cell_topic.shape[1]),
+            dtype=(
+                np.int32
+                if isinstance(scale_factor, int) and scale_factor != 1
+                else np.float32
+            ),
+        )
+
+        for input_chunk_start in range(0, topic_region.shape[0], chunk_size):
+            input_chunk_end = input_chunk_start + chunk_size
+
+            # Set correct output chunk start position.
+            output_chunk_start = output_chunk_end
+
             log.info(
-                f"Impute region accessibility for regions {chunk_start}-{chunk_end}"
+                "Impute region accessibility for regions "
+                f"{input_chunk_start}-{input_chunk_end}"
             )
-            topic_region_chunk = topic_region[chunk_start:chunk_start + chunk_size]
+            topic_region_chunk = topic_region[
+                input_chunk_start:input_chunk_start + chunk_size
+            ]
             imputed_acc_chunk = topic_region_chunk @ cell_topic
 
             if isinstance(scale_factor, int) and scale_factor != 1:
                 # Scale imputed accessibility matrix chunk.
                 imputed_acc_chunk *= np.float32(scale_factor)
-                # Convert from float32 to int32 and fill in the values in the full
-                # imputed accessibility matrix.
-                imputed_acc[chunk_start:chunk_end, :] = imputed_acc_chunk.astype(
-                    np.int32
+
+                # Convert from float32 to int32.
+                # This will convert very small values to zero.
+                imputed_acc_chunk = imputed_acc_chunk.astype(np.int32)
+
+            # Get all region index positions of the matrix for which
+            # the whole row is not completely zero.
+            region_idx_to_keep_chunk = non_zero_rows(imputed_acc_chunk)
+
+            # Get all region names that need to be kept for this chunk
+            region_names_to_keep.extend(
+                subset_list(
+                    region_names[input_chunk_start:input_chunk_end],
+                    region_idx_to_keep_chunk,
                 )
-            else:
-                # Fill in the values in the correct place in the full imputed
-                # accessibility matrix.
-                imputed_acc[chunk_start:chunk_end, :] = imputed_acc_chunk
+            )
+
+            # Set correct output chunk end position by taking into account
+            # that rows with all zeros will be filtered out.
+            output_chunk_end = output_chunk_start + len(region_idx_to_keep_chunk)
+
+            # Convert from float32 to int32 and fill in the values in the full
+            # imputed accessibility matrix.
+            imputed_acc[
+                output_chunk_start:output_chunk_end, :
+            ] = imputed_acc_chunk[region_idx_to_keep_chunk]
+
+        # Only retain that part of the imputed accessibility matrix that was actually
+        # filled in.
+        imputed_acc = imputed_acc[0:output_chunk_end]
+
+        return imputed_acc, region_names_to_keep
 
     # Fill `imputed_acc` matrix in chunks of 20000.
-    calculate_imputed_accessibility(
+    imputed_acc, region_names_to_keep = calculate_imputed_accessibility(
         topic_region=topic_region,
         cell_topic=cell_topic,
+        region_names=region_names,
         scale_factor=scale_factor,
-        chunk_size=20000
+        chunk_size=chunk_size,
     )
 
     imputed_acc_obj = CistopicImputedFeatures(
-        imputed_acc, region_names, cell_names, project
+        imputed_acc, region_names_to_keep, cell_names, project
     )
 
     log.info("Done!")
