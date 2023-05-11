@@ -10,9 +10,7 @@ import ray
 import scipy
 import scipy.sparse as sparse
 import sklearn
-from numpy import array, count_nonzero
 from scipy.stats import ranksums
-from sklearn.preprocessing import normalize
 
 from .cistopic_class import *
 from .utils import *
@@ -326,14 +324,14 @@ def impute_accessibility(
     selected_cells: Optional[List[str]] = None,
     selected_regions: Optional[List[str]] = None,
     scale_factor: Optional[int] = 10**6,
-    sparsity_thr: Optional[float] = 0.67,
+    chunk_size: int = 20000,
     project: Optional[str] = "cisTopic_Impute",
 ):
     """
     Impute region accessibility.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
         A cisTopic object with a model in `class::CistopicObject.selected_model`.
     selected_cells: list, optional
@@ -341,17 +339,19 @@ def impute_accessibility(
     selected_regions: list, optional
         A list with selected regions to impute accessibility for. Default: None
     scale_factor: int, optional
-        A number to multiply the imputed values for. This is useful to convert low probabilities to 0, making the matrix more sparse. Default: 10**6.
-    sparsity_thr: float, optional
-        Minimum sparsity ratio in matrix to be converted to sparse matrix. Default: 0.67.
+        A number to multiply the imputed values for. This is useful to convert low
+        probabilities to 0, making the matrix more sparse. Default: 10**6.
+    chunk_size:
+        Chunk size used (number of regions for which imputed accessibility is
+        calculated at the same time).
     project: str, optional
-            Name of the cisTopic imputation project. Default: 'cisTopic_impute.'
+        Name of the cisTopic imputation project. Default: `"cisTopic_impute"`.
 
     Return
     ------
     CistopicImputedFeatures
-    """
 
+    """
     # Create cisTopic logger
     level = logging.INFO
     log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
@@ -374,52 +374,141 @@ def impute_accessibility(
     # multiplying them uses 4 times less memory than with np.float64
     cell_topic = cell_topic.to_numpy().astype(np.float32)
     topic_region = topic_region.to_numpy().astype(np.float32)
-    log.info("Imputing drop-outs")
-    imputed_acc = topic_region @ cell_topic
-    imputed_acc = imputed_acc.astype(np.float32)
-    if isinstance(scale_factor, int):
-        if scale_factor != 1:
-            log.info("Scaling")
-            # Only multiply non-zero data of sparse matrix.
-            imputed_acc *= np.int32(scale_factor)
-            imputed_acc = imputed_acc.astype(np.int32)
-            log.info("Keep non zero rows")
-            keep_regions_index = non_zero_rows(imputed_acc)
-            imputed_acc = imputed_acc[
-                keep_regions_index,
+
+    log.info("Imputing region accessibility")
+
+    def calculate_imputed_accessibility(
+        topic_region: np.ndarray,
+        cell_topic: np.ndarray,
+        region_names: list,
+        scale_factor: Optional[int],
+        chunk_size: int
+    ) -> Tuple[np.ndarray, list]:
+        """
+        Calculate imputed accessibility in chunks of chunk_size.
+
+        Parameters
+        ----------
+        topic_region:
+            Topic region matrix (regions x topics).
+        cell_topic:
+            Cell topic matrix (topic x cells).
+        region_names:
+            List of all region names.
+        scale_factor:
+            A number to multiply the imputed values for. This is useful to convert
+            low probabilities to 0, making the matrix more sparse. Default: 10**6.
+        chunk_size:
+            Chunk size used (number of regions for which imputed accessibility is
+            calculated at the same time).
+
+        Returns
+        -------
+        Numpy array with imputed accessibility for each region and a list of region
+        names (some regions for which all row values were 0 are filtered out).
+        (imputed_acc, region_names_to_keep)
+
+        """
+        output_chunk_end = 0
+        region_names_to_keep = []
+
+        # Create empty imputed accessibility matrix which will be filled in chunks.
+        imputed_acc = np.empty(
+            (topic_region.shape[0], cell_topic.shape[1]),
+            dtype=(
+                np.int32
+                if isinstance(scale_factor, int) and scale_factor != 1
+                else np.float32
+            ),
+        )
+
+        for input_chunk_start in range(0, topic_region.shape[0], chunk_size):
+            input_chunk_end = input_chunk_start + chunk_size
+
+            # Set correct output chunk start position.
+            output_chunk_start = output_chunk_end
+
+            log.info(
+                "Impute region accessibility for regions "
+                f"{input_chunk_start}-{input_chunk_end}"
+            )
+            topic_region_chunk = topic_region[
+                input_chunk_start:input_chunk_start + chunk_size
             ]
-            region_names = subset_list(region_names, keep_regions_index)
-    sparsity = 1.0 - (count_nonzero(imputed_acc) / float(imputed_acc.size))
-    log.info(f"Imputed accessibility sparsity: {sparsity}")
-    log.info("Create CistopicImputedFeatures object")
-    imputed_acc_obj = CistopicImputedFeatures(
-        imputed_acc, region_names, cell_names, project
+            imputed_acc_chunk = topic_region_chunk @ cell_topic
+
+            if isinstance(scale_factor, int) and scale_factor != 1:
+                # Scale imputed accessibility matrix chunk.
+                imputed_acc_chunk *= np.float32(scale_factor)
+
+                # Convert from float32 to int32.
+                # This will convert very small values to zero.
+                imputed_acc_chunk = imputed_acc_chunk.astype(np.int32)
+
+            # Get all region index positions of the matrix for which
+            # the whole row is not completely zero.
+            region_idx_to_keep_chunk = non_zero_rows(imputed_acc_chunk)
+
+            # Get all region names that need to be kept for this chunk
+            region_names_to_keep.extend(
+                subset_list(
+                    region_names[input_chunk_start:input_chunk_end],
+                    region_idx_to_keep_chunk,
+                )
+            )
+
+            # Set correct output chunk end position by taking into account
+            # that rows with all zeros will be filtered out.
+            output_chunk_end = output_chunk_start + len(region_idx_to_keep_chunk)
+
+            # Convert from float32 to int32 and fill in the values in the full
+            # imputed accessibility matrix.
+            imputed_acc[
+                output_chunk_start:output_chunk_end, :
+            ] = imputed_acc_chunk[region_idx_to_keep_chunk]
+
+        # Only retain that part of the imputed accessibility matrix that was actually
+        # filled in.
+        imputed_acc = imputed_acc[0:output_chunk_end]
+
+        return imputed_acc, region_names_to_keep
+
+    # Fill `imputed_acc` matrix in chunks of 20000.
+    imputed_acc, region_names_to_keep = calculate_imputed_accessibility(
+        topic_region=topic_region,
+        cell_topic=cell_topic,
+        region_names=region_names,
+        scale_factor=scale_factor,
+        chunk_size=chunk_size,
     )
-    if sparsity > sparsity_thr:
-        log.info("Making matrix sparse")
-        imputed_acc_obj.mtx = sparse.csr_matrix(imputed_acc_obj.mtx)
+
+    imputed_acc_obj = CistopicImputedFeatures(
+        imputed_acc, region_names_to_keep, cell_names, project
+    )
+
     log.info("Done!")
     return imputed_acc_obj
 
 
 def normalize_scores(
-    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
-    scale_factor: Optional[int] = 10**4,
+    imputed_acc: Union[pd.DataFrame, "CistopicImputedFeatures"],
+    scale_factor: int = 10**4,
 ):
     """
     Log-normalize imputation data. Feature counts for each cell are divided by the total counts for that cell and multiplied by the scale_factor.
 
     Parameters
-    ---------
-    input_mat: pd.DataFrame or :class:`CistopicImputedFeatures`
-        A dataframe with values to be normalize or cisTopic imputation data.
-    scale_factor: int, optional
+    ----------
+    imputed_acc: pd.DataFrame or :class:`CistopicImputedFeatures`
+        A dataframe with values to be normalized or cisTopic imputation data.
+    scale_factor: int
         Scale factor for cell-level normalization. Default: 10**4
 
     Return
     ------
     pd.DataFrame or CistopicImputedFeatures
         The output class will be the same as the used as input.
+
     """
     # Create cisTopic logger
     level = logging.INFO
@@ -429,17 +518,39 @@ def normalize_scores(
     log = logging.getLogger("cisTopic")
 
     log.info("Normalizing imputed data")
-    if isinstance(input_mat, CistopicImputedFeatures):
-        mtx = normalize(input_mat.mtx, norm="l1", axis=0)
-        mtx *= scale_factor
-        mtx = np.log1p(mtx)
+
+    def calculate_normalized_scores(imputed_acc: np.ndarray, scale_factor: int):
+        # Divide each imputed accessibility by sum of imputed accessibility for the
+        # whole cell column and multiply then by the scale factor.
+        # To avoid a big extra memory allocation matrix for applying the scale factor,
+        # imputed_acc is divided by (np.sum(imputed_acc, axis=0) / scale_factor),
+        # instead of doing `imputed_acc / np.sum(imputed_acc, axis=0) * scale_factor`.
+        normalized_acc = imputed_acc / (np.sum(imputed_acc, axis=0) / scale_factor)
+        # Apply log1p element wise in place, to avoid a big memory allocation.
+        return np.log1p(normalized_acc, out=normalized_acc)
+
+    if isinstance(imputed_acc, CistopicImputedFeatures):
         output = CistopicImputedFeatures(
-            mtx, input_mat.feature_names, input_mat.cell_names, input_mat.project
+            calculate_normalized_scores(
+                imputed_acc=(
+                    imputed_acc.mtx.toarray()
+                    if scipy.sparse.issparse(imputed_acc.mtx)
+                    else imputed_acc.mtx
+                ),
+                scale_factor=scale_factor
+            ),
+            imputed_acc.feature_names,
+            imputed_acc.cell_names,
+            imputed_acc.project,
         )
-    elif isinstance(input_mat, pd.DataFrame):
-        output = np.log1p(input_mat.values / input_mat.values.sum(0) * scale_factor)
+    elif isinstance(imputed_acc, pd.DataFrame):
         output = pd.DataFrame(
-            output, index=input_mat.index.tolist(), columns=input_mat.columns
+            calculate_normalized_scores(
+                imputed_acc=imputed_acc.to_numpy(),
+                scale_factor=scale_factor
+            ),
+            index=imputed_acc.index,
+            columns=imputed_acc.columns,
         )
     log.info("Done!")
     return output
