@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numba
 import numpy as np
 import pandas as pd
 import ray
@@ -828,7 +829,7 @@ def markers(
     Find differential imputed features.
 
     Parameters
-    ---------
+    ----------
     input_mat: :class:`pd.DataFrame` or :class:`CistopicImputedFeatures`
         A data frame or a cisTopic imputation data object.
     barcode_group: List
@@ -880,8 +881,8 @@ def markers(
         fg_mat = mat[:, fg_cells_index].toarray()
         bg_mat = mat[:, bg_cells_index].toarray()
     else:
-        fg_mat = mat[:, fg_cells_index]
-        bg_mat = mat[:, bg_cells_index]
+        fg_mat = subset_array_second_axis(arr=mat, col_indices=fg_cells_index)
+        bg_mat = subset_array_second_axis(arr=mat, col_indices=bg_cells_index)
 
     log.info(f"Computing p-value for {contrast_name}")
 
@@ -977,3 +978,37 @@ def p_adjust_bh(p: float):
     steps = float(len(p)) / np.arange(len(p), 0, -1)
     q = np.minimum(1, np.minimum.accumulate(steps * p[by_descend]))
     return q[by_orig]
+
+
+@numba.njit(parallel=True)
+def subset_array_second_axis(arr, col_indices):
+    """
+    Subset array by second axis based on provided `col_indices`.
+
+    Returns the same as `arr[:, col_indices]`, but is much faster
+    when arr and col_indices are big.
+
+    Parameters
+    ----------
+    arr
+        2D-numpy array to subset by provided column indices.
+    col_indices
+        1D-numpy array (preferably with np.int64 as dtype) with column indices.
+
+    """
+    if np.max(col_indices) >= arr.shape[1]:
+        raise IndexError(f"index {np.max(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
+    if np.min(col_indices) < -arr.shape[1]:
+        raise IndexError(f"index {np.min(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
+
+    # Create empty subset array of correct dimensions and dtype.
+    subset_arr = np.empty(
+        (arr.shape[0], col_indices.shape[0]),
+        dtype=arr.dtype,
+    )
+
+    for i in numba.prange(arr.shape[0]):
+        subset_arr[i, :] = arr[i, :][col_indices]
+
+    return subset_arr
+
