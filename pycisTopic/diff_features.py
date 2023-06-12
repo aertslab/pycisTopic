@@ -946,7 +946,22 @@ def markers(
 
 
 def get_wilcox_test_pvalues(fg_mat, bg_mat):
-    assert fg_mat.shape[0] == bg_mat.shape[0]
+    """
+    Calculate wilcox test p-values between foreground and background matrix.
+
+    Parameters
+    ----------
+    fg_mat
+        2D-numpy foreground matrix.
+    bg_mat
+        2D-numpy background matrix.
+
+    """
+    if fg_mat.shape[0] != bg_mat.shape[0]:
+        raise ValueError(
+            "Foreground matrix and background matrix have a different first dimension:"
+            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
+        )
 
     wilcox_test_pvalues = [
         wilcox_test.pvalue
@@ -961,6 +976,26 @@ def get_wilcox_test_pvalues(fg_mat, bg_mat):
 
 @ray.remote
 def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
+    """
+    Calculate wilcox test p-values with ray between a subset of foreground and background matrix.
+
+    Parameters
+    ----------
+    fg_mat
+        2D-numpy foreground matrix.
+    bg_mat
+        2D-numpy background matrix.
+    start
+        Starting row index (included).
+    end
+        Ending row index (excluded).
+    """
+    if fg_mat.shape[0] != bg_mat.shape[0]:
+        raise ValueError(
+            "Foreground matrix and background matrix have a different first dimension:"
+            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
+        )
+
     wilcox_test_pvalues_part = [
         wilcox_test.pvalue
         for wilcox_test in [
@@ -973,7 +1008,10 @@ def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
 
 
 def p_adjust_bh(p: float):
-    """Benjamini-Hochberg p-value correction for multiple hypothesis testing."""
+    """
+    Benjamini-Hochberg p-value correction for multiple hypothesis testing.
+
+    """
     p = np.asfarray(p)
     by_descend = p.argsort()[::-1]
     by_orig = by_descend.argsort()
