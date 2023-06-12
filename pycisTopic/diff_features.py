@@ -863,9 +863,19 @@ def markers(
         features = input_mat.feature_names
         samples = input_mat.cell_names
 
-    fg_cells_index = get_position_index(barcode_group[0], samples)
-    bg_cells_index = get_position_index(barcode_group[1], samples)
-    log.info("Formatting data for " + contrast_name)
+    # Get foreground and background cell indices and convert to numpy arrays
+    # (int64 is fastest for indexing arrays).
+    fg_cells_index = np.array(
+        get_position_index(barcode_group[0], samples),
+        dtype=np.int64,
+    )
+    bg_cells_index = np.array(
+        get_position_index(barcode_group[1], samples),
+        dtype=np.int64,
+    )
+
+    log.info(f"Subsetting data for {contrast_name} ({fg_cells_index.shape[0]} of {mat.shape[1]})")
+
     if sparse.issparse(mat):
         fg_mat = mat[:, fg_cells_index].toarray()
         bg_mat = mat[:, bg_cells_index].toarray()
@@ -873,7 +883,7 @@ def markers(
         fg_mat = mat[:, fg_cells_index]
         bg_mat = mat[:, bg_cells_index]
 
-    log.info("Computing p-value for " + contrast_name)
+    log.info(f"Computing p-value for {contrast_name}")
 
     if n_cpu > 1:
         # Put foreground and background matrix in ray object store and get a reference.
@@ -906,7 +916,7 @@ def markers(
     else:
         wilcox_test_pvalues = get_wilcox_test_pvalues(fg_mat, bg_mat)
 
-    log.info("Computing log2FC for " + contrast_name)
+    log.info(f"Computing log2FC for {contrast_name}")
     log2_fc = np.log2(
         (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
     )
@@ -921,11 +931,14 @@ def markers(
     markers_dataframe = markers_dataframe.loc[
         markers_dataframe["Adjusted_pval"] <= adjpval_thr
     ]
-    markers_dataframe = markers_dataframe.loc[markers_dataframe["Log2FC"] >= log2fc_thr]
+    markers_dataframe = markers_dataframe.loc[
+        markers_dataframe["Log2FC"] >= log2fc_thr
+    ]
     markers_dataframe = markers_dataframe.sort_values(
-        ["Log2FC", "Adjusted_pval"], ascending=[False, True]
+        ["Log2FC", "Adjusted_pval"],
+        ascending=[False, True],
     )
-    log.info(contrast_name + " done!")
+    log.info(f"{contrast_name} done!")
     return markers_dataframe
 
 
