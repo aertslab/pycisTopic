@@ -922,13 +922,17 @@ def markers(
         (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
     )
 
-    adj_pvalue = p_adjust_bh(wilcox_test_pvalues)
-    name = [contrast_name] * len(adj_pvalue)
+    adj_pvalues = p_adjust_bh(wilcox_test_pvalues)
+
     markers_dataframe = pd.DataFrame(
-        [log2_fc, adj_pvalue, name],
-        index=["Log2FC", "Adjusted_pval", "Contrast"],
-        columns=features,
-    ).transpose()
+        {
+            "Log2FC": log2_fc,
+            "Adjusted_pval": adj_pvalues,
+            "Contrast": [contrast_name] * adj_pvalues.shape[0]
+        },
+        index=features,
+    )
+
     markers_dataframe = markers_dataframe.loc[
         markers_dataframe["Adjusted_pval"] <= adjpval_thr
     ]
