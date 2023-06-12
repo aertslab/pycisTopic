@@ -918,9 +918,7 @@ def markers(
         wilcox_test_pvalues = get_wilcox_test_pvalues(fg_mat, bg_mat)
 
     log.info(f"Computing log2FC for {contrast_name}")
-    log2_fc = np.log2(
-        (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
-    )
+    log2_fc = get_log2_fc(fg_mat, bg_mat)
 
     adj_pvalues = p_adjust_bh(wilcox_test_pvalues)
 
@@ -1012,7 +1010,53 @@ def subset_array_second_axis(arr, col_indices):
     )
 
     for i in numba.prange(arr.shape[0]):
+        # Get requested column values for each row.
         subset_arr[i, :] = arr[i, :][col_indices]
 
     return subset_arr
 
+
+@numba.njit(parallel=True)
+def mean_axis1(arr):
+    """
+    Calculate column wise mean of 2D-numpy matrix with numba, mimicking `np.mean(x, axis=1)`.
+
+    Parameters
+    ----------
+    arr
+        2D-numpy array to calculate the mean per column for.
+    """
+
+    mean_axis1_array = np.empty(arr.shape[0], dtype=np.float64)
+    for i in numba.prange(arr.shape[0]):
+        mean_axis1_array[i] = np.mean(arr[i, :])
+    return mean_axis1_array
+
+
+@numba.njit
+def get_log2_fc(fg_mat, bg_mat):
+    """
+    Calculate log2 fold change between foreground and background matrix.
+
+    Parameters
+    ----------
+    fg_mat
+        2D-numpy foreground matrix.
+    bg_mat
+        2D-numpy background matrix.
+    """
+
+    if fg_mat.shape[0] != bg_mat.shape[0]:
+        raise ValueError(
+            "Foreground matrix and background matrix have a different first dimension:"
+            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
+        )
+
+    # Calculate log2 fold change between foreground and background matrix with numba in
+    # a similar way as the following numpy code:
+    #    np.log2(
+    #        (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
+    #    )
+    return np.log2(
+        (mean_axis1(fg_mat) + 10**-12) / (mean_axis1(bg_mat) + 10**-12)
+    )
