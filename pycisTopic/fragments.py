@@ -780,3 +780,61 @@ def filter_fragments_by_cb(
     )
 
     return fragments_cb_filtered_df_pl
+
+
+def get_insert_size_distribution(
+    fragments_df_pl: pl.DataFrame,
+):
+    """
+    Get insert size distribution of fragments.
+
+    Parameters
+    ----------
+    fragments_df_pl
+        Polars DataFrame with fragments.
+    cbs
+        List/Polars Series with Cell barcodes.
+        See :func:`pycisTopic.fragments.get_cbs_passing_filter` for a way to get a
+        filtered list of cell barcodes (``selected_cbs`` variable).
+
+    Returns
+    -------
+    Polars DataFrame with fragment counts and fragment ratios for each found insert
+    size.
+
+    See Also
+    --------
+    pycisTopic.fragments.filter_fragments_by_cb
+
+    Examples
+    --------
+    As input get a Polars DataFrame with fragments for the cell barcodes of interest.
+    See `pycisTopic.fragments.filter_fragments_by_cb`
+    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(
+    ...     fragments_df_pl=fragments_df_pl,
+    ...     cbs=cbs,
+    ... )
+
+    Polars DataFrame with insert size distribution of fragments.
+    >>> insert_size_dist_df_pl = get_insert_size_distribution(
+    ...     fragments_df_pl=fragments_cb_filtered_df_pl
+    ... )
+
+    """
+    insert_size_distribution_pl_df = (
+        fragments_df_pl.lazy()
+        .with_columns(
+            (pl.col("End") - pl.col("Start")).abs().alias("insert_size"),
+        )
+        .groupby("insert_size")
+        .agg([pl.count().alias("fragments_count")])
+        .sort(by="insert_size", descending=True)
+        .with_columns(
+            (pl.col("fragments_count") / pl.col("fragments_count").sum()).alias(
+                "fragments_ratio"
+            ),
+        )
+        .collect()
+    )
+
+    return insert_size_distribution_pl_df
