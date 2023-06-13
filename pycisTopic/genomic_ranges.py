@@ -72,6 +72,12 @@ def _intersect_per_chrom(
           - "containment": only overlaps where region of first set is contained within region of second set.
           - "first": first overlap with second set of regions.
           - "last": last overlap with second set of regions.
+          - "outer": all regions for first and all regions of second (outer join).
+            If no overlap was found for a region, the other region set will contain None for that entry.
+          - "left": all first set of regions and overlap with second set of regions (left join).
+            If no overlap was found for a region in the first set, the second region set will contain None for that entry.
+          - "right": all second set of regions and overlap with first set of regions (right join).
+            If no overlap was found for a region in the second set, the first region set will contain None for that entry.
 
     Returns
     -------
@@ -86,6 +92,8 @@ def _intersect_per_chrom(
     )
 
     oncls = NCLS(starts2, ends2, indexes2)
+
+    indexes2_length = len(indexes2)
 
     del starts2, ends2, indexes2
 
@@ -110,8 +118,60 @@ def _intersect_per_chrom(
         regions1_indexes, regions2_indexes = oncls.last_overlap_both(
             starts1, ends1, indexes1
         )
+    elif how in {"outer", "left", "right"}:
+        regions1_indexes, regions2_indexes = oncls.all_overlaps_both(
+            starts1, ends1, indexes1
+        )
 
-    del starts1, ends1, indexes1
+        indexes1_length = len(indexes1)
+
+        del starts1, ends1, indexes1, oncls
+
+        regions1_indexes = pl.Series("idx", regions1_indexes, dtype=pl.get_index_type())
+        regions2_indexes = pl.Series("idx", regions2_indexes, dtype=pl.get_index_type())
+
+        regions1_all_indexes = pl.arange(0, indexes1_length, dtype=pl.get_index_type(), eager=True).alias("idx")
+        regions2_all_indexes = pl.arange(0, indexes2_length, dtype=pl.get_index_type(), eager=True).alias("idx")
+
+        regions1_missing_indexes = (
+            regions1_all_indexes.to_frame()
+            .join(
+                regions1_indexes.to_frame(),
+                on="idx",
+                how="anti",
+            )
+            .to_series()
+        )
+
+        regions2_missing_indexes = (
+            regions2_all_indexes.to_frame()
+            .join(
+                regions2_indexes.to_frame(),
+                on="idx",
+                how="anti",
+            )
+            .to_series()
+        )
+
+        regions1_none_indexes = pl.repeat(None, regions2_missing_indexes.len(), name="idx", eager=True).cast(pl.get_index_type())
+        regions2_none_indexes = pl.repeat(None, regions1_missing_indexes.len(), name="idx", eager=True).cast(pl.get_index_type())
+
+        if how == "outer":
+            regions1_indexes = pl.concat([regions1_indexes, regions1_missing_indexes, regions1_none_indexes,])
+            regions2_indexes = pl.concat([regions2_indexes, regions2_none_indexes, regions2_missing_indexes,])
+        elif how == "left":
+            regions1_indexes = pl.concat([regions1_indexes, regions1_missing_indexes])
+            regions2_indexes = pl.concat([regions2_indexes, regions2_none_indexes])
+        elif how == "right":
+            regions1_indexes = pl.concat([regions1_indexes, regions1_none_indexes])
+            regions2_indexes = pl.concat([regions2_indexes, regions2_missing_indexes])
+
+        return regions1_indexes, regions2_indexes
+
+    del starts1, ends1, indexes1, oncls
+
+    regions1_indexes = pl.Series("idx", regions1_indexes, dtype=pl.get_index_type())
+    regions2_indexes = pl.Series("idx", regions2_indexes, dtype=pl.get_index_type())
 
     return regions1_indexes, regions2_indexes
 
@@ -286,6 +346,12 @@ def intersection(
           - "containment": only overlaps where region of first set is contained within region of second set.
           - "first": first overlap with second set of regions.
           - "last": last overlap with second set of regions.
+          - "outer": all regions for first and all regions of second (outer join).
+            If no overlap was found for a region, the other region set will contain None for that entry.
+          - "left": all first set of regions and overlap with second set of regions (left join).
+            If no overlap was found for a region in the first set, the second region set will contain None for that entry.
+          - "right": all second set of regions and overlap with first set of regions (right join).
+            If no overlap was found for a region in the second set, the first region set will contain None for that entry.
     regions1_info
         Add non-coordinate columns from first set of regions to output of intersection.
     regions2_info
@@ -465,14 +531,22 @@ def intersection(
                 .with_columns(
                     [
                         # Chromosome name for intersection.
-                        pl.col(f"Chromosome{regions1_suffix}").alias("Chromosome"),
+                        pl.coalesce(
+                            pl.col(f"Chromosome{regions1_suffix}"),
+                            pl.col(f"Chromosome{regions2_suffix}"),
+                        ).alias("Chromosome"),
                         # Calculate start coordinate for intersection.
                         pl.when(
                             pl.col(f"Start{regions1_suffix}")
                             > pl.col(f"Start{regions2_suffix}")
                         )
                         .then(pl.col(f"Start{regions1_suffix}"))
-                        .otherwise(pl.col(f"Start{regions2_suffix}"))
+                        .otherwise(
+                            pl.coalesce(
+                                pl.col(f"Start{regions2_suffix}"),
+                                pl.col(f"Start{regions1_suffix}"),
+                            )
+                        )
                         .alias("Start"),
                         # Calculate end coordinate for intersection.
                         pl.when(
@@ -480,7 +554,12 @@ def intersection(
                             < pl.col(f"End{regions2_suffix}")
                         )
                         .then(pl.col(f"End{regions1_suffix}"))
-                        .otherwise(pl.col(f"End{regions2_suffix}"))
+                        .otherwise(
+                            pl.coalesce(
+                                pl.col(f"End{regions2_suffix}"),
+                                pl.col(f"End{regions1_suffix}"),
+                            )
+                        )
                         .alias("End"),
                     ]
                 )
