@@ -4,6 +4,7 @@ import gzip
 from operator import itemgetter
 from typing import Literal, Sequence
 
+import genomic_ranges
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -725,7 +726,7 @@ def filter_fragments_by_cb(
     --------
     Read gzipped fragments BED file to a Polars DataFrame.
     >>> fragments_df_pl = read_fragments_to_polars_df(
-    ...    fragments_bed_filename="fragments.tsv.gz"
+    ...    fragments_bed_filename="fragments.tsv.gz",
     ... )
 
     List of cell barcodes for which to retain fragments.
@@ -748,7 +749,7 @@ def filter_fragments_by_cb(
     >>> cbs = pl.Series(
     ...     "CB",
     ...     ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"],
-    ...     dtype=pl.Categorical
+    ...     dtype=pl.Categorical,
     ... )
     Polars DataFrame with fragments for the requested cell barcodes.
     >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(
@@ -817,7 +818,7 @@ def get_insert_size_distribution(
 
     Polars DataFrame with insert size distribution of fragments.
     >>> insert_size_dist_df_pl = get_insert_size_distribution(
-    ...     fragments_df_pl=fragments_cb_filtered_df_pl
+    ...     fragments_df_pl=fragments_cb_filtered_df_pl,
     ... )
 
     """
@@ -838,3 +839,79 @@ def get_insert_size_distribution(
     )
 
     return insert_size_distribution_pl_df
+
+
+def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.DataFrame):
+    """
+    Get number of total and unique fragments in peaks.
+
+    Parameters
+    ----------
+    fragments_df_pl
+        Polars DataFrame with fragments.
+    regions_df_pl
+        Polars DataFrame with peak regions (consensus peaks or SCREEN regions).
+        See :func:`pycisTopic.fragments.read_bed_to_polars_df` for a way to read a BED
+        file with peak regsions.
+
+    Returns
+    -------
+    Polars DataFrame with total fragment counts and unique fragment counts per region.
+
+    See Also
+    --------
+    pycisTopic.fragments.filter_fragments_by_cb
+
+    Examples
+    --------
+    As input get a Polars DataFrame with fragments for the cell barcodes of interest.
+    See `pycisTopic.fragments.filter_fragments_by_cb`
+    >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(
+    ...     fragments_df_pl=fragments_df_pl,
+    ...     cbs=cbs,
+    ... )
+
+    Read BED file with consensus peaks or SCREEN regions (get first 3 columns only).
+    >>> regions_df_pl = read_bed_to_polars_df(
+    ...     bed_filename=screen_regions_bed_filename,
+    ...     min_column_count=3,
+    ... )
+
+    Polars DataFrame with number of total and unique fragments in peaks.
+    >>> fragments_in_peaks_df_pl = get_fragments_in_peaks(
+    ...     fragments_df_pl=fragments_cb_filtered_df_pl,
+    ...     regions_df_pl=regions_df_pl,
+    ... )
+
+    """
+    fragments_in_peaks_df_pl = (
+        # Get all fragments that overlap with at least one region.
+        genomic_ranges.intersection(
+            regions1_df_pl=fragments_df_pl,
+            regions2_df_pl=regions_df_pl,
+            how="first",
+            regions1_info=True,
+            regions2_info=False,
+            regions1_coord=True,
+            regions2_coord=False,
+            regions1_suffix="@1",
+            regions2_suffix="@2",
+        )
+        # Get all fragment file related columns.
+        .select(
+            pl.col("Chromosome"),
+            pl.col("Start@1").alias("Start"),
+            pl.col("End@1").alias("End"),
+            pl.col("Name").alias("CB"),
+            pl.col("Score"),
+        )
+        .groupby(by="CB", maintain_order=True)
+        .agg(
+            [
+                pl.col("Score").sum().alias("total_fragments_in_peaks_count"),
+                pl.count().alias("unique_fragments_in_peaks_count"),
+            ]
+        )
+    )
+
+    return fragments_in_peaks_df_pl
