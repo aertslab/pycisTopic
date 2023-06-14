@@ -9,18 +9,21 @@ import polars as pl
 
 def get_all_gene_annotation_ensembl_biomart_dataset_names(
     biomart_host: str = "http://www.ensembl.org",
+    use_cache: bool = True,
 ) -> pd.DataFrame:
     """
     Get all avaliable gene annotation Ensembl BioMart dataset names.
 
     Parameters
     ----------
-    biomart_host:
+    biomart_host
         BioMart host URL to use.
           - Default: `http://www.ensembl.org`
           - Archived Ensembl BioMart URLs:
             https://www.ensembl.org/info/website/archives/index.html
             (List of currently available archives)
+    use_cache
+        Whether to cache requests to Ensembl BioMart server.
 
     Returns
     -------
@@ -42,7 +45,7 @@ def get_all_gene_annotation_ensembl_biomart_dataset_names(
     """
     import pybiomart as pbm
 
-    biomart_server = pbm.Server(host=biomart_host)
+    biomart_server = pbm.Server(host=biomart_host, use_cache=use_cache)
     biomart = biomart_server["ENSEMBL_MART_ENSEMBL"]
 
     biomart_datasets = biomart.list_datasets()
@@ -51,17 +54,18 @@ def get_all_gene_annotation_ensembl_biomart_dataset_names(
 
 
 def get_biomart_dataset_name_for_species(
-    biomart_datasets: pd.DataFrame, species: str
+    biomart_datasets: pd.DataFrame,
+    species: str,
 ) -> pd.DataFrame:
     """
     Get Ensembl BioMart dataset names for species of interest.
 
     Parameters
     ----------
-    biomart_datasets:
+    biomart_datasets
         All gene annotation Ensembl BioMart datasets
         See :func:`pycisTopic.gene_annotation.get_all_gene_annotation_ensembl_biomart_dataset_names`.
-    species:
+    species
         Species name to search for.
 
     Returns
@@ -93,6 +97,7 @@ def get_tss_annotation_from_ensembl(
     biomart_name: str,
     biomart_host: str = "http://www.ensembl.org",
     transcript_type: Sequence[str] | None = ["protein_coding"],
+    use_cache: bool = True,
 ) -> pl.DataFrame:
     """
     Get TSS annotation for requested transcript types from Ensembl BioMart.
@@ -114,6 +119,8 @@ def get_tss_annotation_from_ensembl(
     transcript_type
         Only keep list of specified transcript types (e.g.: `["protein_coding"]`) or
         all (``None``).
+    use_cache
+        Whether to cache requests to Ensembl BioMart server.
 
     Returns
     -------
@@ -134,7 +141,7 @@ def get_tss_annotation_from_ensembl(
     """
     import pybiomart as pbm
 
-    dataset = pbm.Dataset(name=biomart_name, host=biomart_host)
+    dataset = pbm.Dataset(name=biomart_name, host=biomart_host, use_cache=use_cache)
 
     ensembl_tss_annotation = dataset.query(
         attributes=[
