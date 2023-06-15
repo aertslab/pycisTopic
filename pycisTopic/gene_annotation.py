@@ -129,11 +129,15 @@ def get_tss_annotation_from_ensembl(
     See Also
     --------
     pycisTopic.gene_annotation.get_biomart_dataset_name_for_species
+    pycisTopic.gene_annotation.read_tss_annotation_from_bed
+    pycisTopic.gene_annotation.write_tss_annotation_to_bed
 
     Examples
     --------
-    >>> get_tss_annotation_from_ensembl(biomart_name="hsapiens_gene_ensembl")
-    >>> get_tss_annotation_from_ensembl(
+    >>> tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
+    ...     biomart_name="hsapiens_gene_ensembl"
+    ... )
+    >>> tss_annotation_jul2022_bed_df_pl = get_tss_annotation_from_ensembl(
     ...     biomart_name="hsapiens_gene_ensembl",
     ...     biomart_host="http://jul2022.archive.ensembl.org/",
     ... )
@@ -179,6 +183,143 @@ def get_tss_annotation_from_ensembl(
     )
 
     return ensembl_tss_annotation_bed_df_pl
+
+
+def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFrame:
+    """
+    Read TSS annotation BED file to Polars DataFrame.
+
+    Read TSS annotation BED file created by
+    :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl`
+    and :func:`pycisTopic.gene_annotation.write_tss_annotation_to_bed`
+    to Polars DataFrame with TSS positions in BED format.
+
+    Parameters
+    ----------
+    tss_annotation_bed_filename
+        TSS annotation BED file to read.
+        TSS annotation BED files can be written with
+        :func:`pycisTopic.gene_annotation.write_tss_annotation_to_bed`.
+        and will have the following header line:
+            `# Chromosome Start End Gene Score Strand Transcript_type`
+        Minimum required columns for :func:`pycisTopic.tss_profile.get_tss_profile`:
+            `Chromosome, Start (0-based BED), Strand`
+
+    See Also
+    --------
+    pycisTopic.gene_annotation.change_chromosome_source_in_bed
+    pycisTopic.gene_annotation.get_tss_annotation_from_ensembl
+    pycisTopic.gene_annotation.write_tss_annotation_to_bed
+
+    Examples
+    --------
+    Get TSS annotation from Ensembl.
+    >>> tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
+    ...     biomart_name="hsapiens_gene_ensembl"
+    ... )
+
+    If your fragments files use a different chromosome convention than
+    the one used by Ensembl, take a look at
+    :func:`pycisTopic.gene_annotation.change_chromosome_source_in_bed`
+    to convert the Ensembl chromosome names to UCSC, Ensembl, GenBank
+    or RefSeq chromosome names.
+
+    Write TSS annotation to a file.
+    >>> write_tss_annotation_to_bed(
+    ...     tss_annotation_bed_df_pl=tss_annotation_bed_df_pl,
+    ...     tss_annotation_bed_filename="hg38.tss.bed",
+    ... )
+
+    Read TSS annotation from a file.
+    >>> tss_annotation_bed_df_pl = read_tss_annotation_from_bed(
+    ...     tss_annotation_bed_filename="hg38.tss.bed"
+    ... )
+
+    Returns
+    -------
+    Polars DataFrame with TSS positions in BED format.
+
+    """
+    tss_annotation_bed_df_pl = pl.read_csv(
+        tss_annotation_bed_filename,
+        separator="\t",
+        # Use 0-bytes as comment character so the header can start with "# Chromosome".
+        comment_char="\0",
+        dtypes={
+            # Convert Chromosome, Start and End column to the correct datatypes.
+            "Chromosome": pl.Categorical,
+            "# Chromosome": pl.Categorical,
+            "Start": pl.Int32,
+            "End": pl.Int32,
+        },
+    ).rename({"# Chromosome": "Chromosome"})
+
+    return tss_annotation_bed_df_pl
+
+
+def write_tss_annotation_to_bed(
+    tss_annotation_bed_df_pl, tss_annotation_bed_filename: str
+) -> None:
+    """
+    Write TSS annotation Polars DataFrame to a BED file.
+
+    Write TSS annotation Polars DataFrame with TSS positions in BED format.
+    to a BED file.
+
+    Parameters
+    ----------
+    tss_annotation_bed_df_pl
+        TSS annotation Polars DataFrame with TSS positions in BED format
+        created with
+        :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl`.
+    tss_annotation_bed_filename
+        TSS annotation BED file to write to.
+        TSS annotation BED files from
+        :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl`
+        will have the following header line:
+            `# Chromosome Start End Gene Score Strand Transcript_type`
+        Minimum required columns for :func:`pycisTopic.tss_profile.get_tss_profile`:
+            `Chromosome, Start (0-based BED), Strand`
+
+    See Also
+    --------
+    pycisTopic.gene_annotation.change_chromosome_source_in_bed
+    pycisTopic.gene_annotation.get_tss_annotation_from_ensembl
+    pycisTopic.gene_annotation.read_tss_annotation_from_bed
+
+    Examples
+    --------
+    Get TSS annotation from Ensembl.
+    >>> tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
+    ...     biomart_name="hsapiens_gene_ensembl"
+    ... )
+
+    If your fragments files use a different chromosome convention than
+    the one used by Ensembl, take a look at
+    :func:`pycisTopic.gene_annotation.change_chromosome_source_in_bed`
+    to convert the Ensembl chromosome names to UCSC, Ensembl, GenBank
+    or RefSeq chromosome names.
+
+    Write TSS annotation to a file.
+    >>> write_tss_annotation_to_bed(
+    ...     tss_annotation_bed_df_pl=tss_annotation_bed_df_pl,
+    ...     tss_annotation_bed_filename="hg38.tss.bed",
+    ... )
+
+    Read TSS annotation from a file.
+    >>> tss_annotation_bed_df_pl = read_tss_annotation_from_bed(
+    ...     tss_annotation_bed_filename="hg38.tss.bed"
+    ... )
+
+    Returns
+    -------
+    Polars DataFrame with TSS positions in BED format.
+
+    """
+    tss_annotation_bed_df_pl.rename({"Chromosome": "# Chromosome"}).write_csv(
+        tss_annotation_bed_filename,
+        separator="\t",
+    )
 
 
 def get_chrom_alias_mapping(
@@ -422,7 +563,8 @@ def change_chromosome_source_in_bed(
     bed_df_pl
         Polars DataFrame with BED entries for which chromosome names need to be
         remapped from ``from_chrom_source_name`` to ``to_chrom_source_name``.
-        See :func:`pycisTopic.fragments.read_bed_to_polars_df`.
+        See :func:`pycisTopic.fragments.read_bed_to_polars_df` and
+        :func:`pycisTopic.gene_annotation.read_tss_annotation_from_bed`
     from_chrom_source_name
         Current chromosome source name for the input BED file: `ucsc`, `ensembl`,
         `genbank` or `refseq`.
@@ -442,6 +584,8 @@ def change_chromosome_source_in_bed(
     pycisTopic.fragments.read_bed_to_polars_df
     pycisTopic.gene_annotation.find_most_likely_chromosome_source_in_bed
     pycisTopic.gene_annotation.get_chrom_alias_mapping
+    pycisTopic.gene_annotation.read_tss_annotation_from_bed
+    pycisTopic.gene_annotation.write_tss_annotation_to_bed
 
     Examples
     --------
@@ -449,19 +593,19 @@ def change_chromosome_source_in_bed(
     >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping(ucsc_assembly="hg38")
 
     Get gene annotation for hg38 from Ensembl BioMart.
-    >>> hg38_gene_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
+    >>> hg38_tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
     ...     biomart_name="hsapiens_gene_ensembl",
     ... )
-    >>> hg38_gene_annotation_bed_df_pl
+    >>> hg38_tss_annotation_bed_df_pl
 
     Replace Ensembl chromosome names with UCSC chromosome names in gene annotation for hg38.
-    >>> hg38_gene_annotation_ucsc_chroms_bed_df_pl = change_chromosome_source_in_bed(
+    >>> hg38_tss_annotation_ucsc_chroms_bed_df_pl = change_chromosome_source_in_bed(
     ...     chrom_alias_df_pl=chrom_alias_hg38_df_pl,
-    ...     bed_df_pl=hg38_gene_annotation_bed_df_pl,
+    ...     bed_df_pl=hg38_tss_annotation_bed_df_pl,
     ...     from_chrom_source_name="ensembl",
     ...     to_chrom_source_name="ucsc",
     ... )
-    >>> hg38_gene_annotation_ucsc_chroms_bed_df_pl
+    >>> hg38_tss_annotation_ucsc_chroms_bed_df_pl
 
     """  # noqa: W505
     chrom_source_stats_df_pl = (
