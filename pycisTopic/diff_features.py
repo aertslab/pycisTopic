@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numba
 import numpy as np
 import pandas as pd
 import ray
@@ -702,8 +703,8 @@ def find_diff_features(
     contrasts: Optional[List[List[str]]] = None,
     adjpval_thr: Optional[float] = 0.05,
     log2fc_thr: Optional[float] = np.log2(1.5),
-    n_cpu: Optional[int] = 1,
     split_pattern: Optional[str] = "___",
+    n_cpu: Optional[int] = 1,
     **kwargs,
 ):
     """
@@ -719,7 +720,7 @@ def find_diff_features(
         Name of the group variable to do comparison. It must be included in `class::CistopicObject.cell_data`
     var_features: list, optional
         A list of features to use (e.g. variable features from `find_highly_variable_features()`)
-    contrast: List, optional
+    contrasts: List, optional
         A list including contrasts to make in the form of lists with foreground and background, e.g.
         [[['Group_1'], ['Group_2, 'Group_3']], []['Group_2'], ['Group_1, 'Group_3']], []['Group_1'], ['Group_2, 'Group_3']]].
         Default: None.
@@ -727,6 +728,8 @@ def find_diff_features(
         Adjusted p-values threshold. Default: 0.05
     log2fc_thr: float, optional
         Log2FC threshold. Default: np.log2(1.5)
+    split_pattern: str
+        Pattern to split cell barcode from sample id. Default: `___`
     n_cpu: int, optional
         Number of cores to use. Default: 1
     **kwargs
@@ -737,7 +740,7 @@ def find_diff_features(
     List
         List of `class::pd.DataFrame` per contrast with the selected features and logFC and adjusted p-values.
     """
-    # Create cisTopic logger
+    # Create cisTopic logger.
     level = logging.INFO
     log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
     handlers = [logging.StreamHandler(stream=sys.stdout)]
@@ -761,67 +764,72 @@ def find_diff_features(
             "_".join(contrasts[i][0]) + "_VS_" + "_".join(contrasts[i][1])
             for i in range(len(contrasts))
         ]
-    # Get barcodes in each class per contrats
+
+    # Get barcodes in each class per contrasts.
     barcode_groups = [
         [
-            group_var[group_var.isin(contrasts[x][0])].index.tolist(),
-            group_var[group_var.isin(contrasts[x][1])].index.tolist(),
+            group_var[group_var.isin(contrasts[i][0])].index.tolist(),
+            group_var[group_var.isin(contrasts[i][1])].index.tolist(),
         ]
-        for x in range(len(contrasts))
+        for i in range(len(contrasts))
     ]
-    # Subset imputed accessibility matrix
+
+    # Subset imputed accessibility matrix.
     subset_imputed_features_obj = imputed_features_obj.subset(
         cells=None, features=var_features, copy=True, split_pattern=split_pattern
     )
-    # Convert to csc
-    if sparse.issparse(subset_imputed_features_obj.mtx):
-        mtx = subset_imputed_features_obj.mtx.tocsc()
-    # Compute p-val and log2FC
+
+    # Compute p-val and log2FC.
     if n_cpu > 1:
         ray.init(num_cpus=n_cpu, **kwargs)
-        markers_list = ray.get(
-            [
-                markers_ray.remote(
-                    subset_imputed_features_obj,
-                    barcode_groups[i],
-                    contrasts_names[i],
-                    adjpval_thr=adjpval_thr,
-                    log2fc_thr=log2fc_thr,
-                )
-                for i in range(len(contrasts))
-            ]
-        )
-        ray.shutdown()
-    else:
+
         markers_list = [
-            markers_one(
+            markers(
                 subset_imputed_features_obj,
                 barcode_groups[i],
                 contrasts_names[i],
                 adjpval_thr=adjpval_thr,
                 log2fc_thr=log2fc_thr,
+                n_cpu=n_cpu,
             )
             for i in range(len(contrasts))
         ]
+
+        ray.shutdown()
+    else:
+        markers_list = [
+            markers(
+                subset_imputed_features_obj,
+                barcode_groups[i],
+                contrasts_names[i],
+                adjpval_thr=adjpval_thr,
+                log2fc_thr=log2fc_thr,
+                n_cpu=1,
+            )
+            for i in range(len(contrasts))
+        ]
+
     markers_dict = {
-        contrasts_names[i]: markers_list[i] for i in range(len(markers_list))
+        contrasts_name: marker
+        for contrasts_name, marker in zip(contrasts_names, markers_list)
     }
+
     return markers_dict
 
 
-@ray.remote
-def markers_ray(
+def markers(
     input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
     barcode_group: List[List[str]],
     contrast_name: str,
     adjpval_thr: Optional[float] = 0.05,
     log2fc_thr: Optional[float] = 1,
+    n_cpu: Optional[int] = 1,
 ):
     """
     Find differential imputed features.
 
     Parameters
-    ---------
+    ----------
     input_mat: :class:`pd.DataFrame` or :class:`CistopicImputedFeatures`
         A data frame or a cisTopic imputation data object.
     barcode_group: List
@@ -832,37 +840,8 @@ def markers_ray(
         Adjusted p-values threshold. Default: 0.05
     log2fc_thr: float, optional
         Log2FC threshold. Default: np.log2(1.5)
-
-    Return
-    ------
-    List
-        `class::pd.DataFrame` with the selected features and logFC and adjusted p-values.
-    """
-    return markers_one(input_mat, barcode_group, contrast_name, adjpval_thr, log2fc_thr)
-
-
-def markers_one(
-    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
-    barcode_group: List[List[str]],
-    contrast_name: str,
-    adjpval_thr: Optional[float] = 0.05,
-    log2fc_thr: Optional[float] = 1,
-):
-    """
-    Find differential imputed features.
-
-    Parameters
-    ---------
-    input_mat: :class:`pd.DataFrame` or :class:`CistopicImputedFeatures`
-        A data frame or a cisTopic imputation data object.
-    barcode_group: List
-        List of length 2, including foreground cells on the first slot and background on the second.
-    contrast_name: str
-        Name of the contrast
-    adjpval_thr: float, optional
-        Adjusted p-values threshold. Default: 0.05
-    log2fc_thr: float, optional
-        Log2FC threshold. Default: np.log2(1.5)
+    n_cpu: int, optional
+        Number of cores to use. Default: 1
 
     Return
     ------
@@ -885,47 +864,237 @@ def markers_one(
         features = input_mat.feature_names
         samples = input_mat.cell_names
 
-    fg_cells_index = get_position_index(barcode_group[0], samples)
-    bg_cells_index = get_position_index(barcode_group[1], samples)
-    log.info("Formatting data for " + contrast_name)
+    # Get foreground and background cell indices and convert to numpy arrays
+    # (int64 is fastest for indexing arrays).
+    fg_cells_index = np.array(
+        get_position_index(barcode_group[0], samples),
+        dtype=np.int64,
+    )
+    bg_cells_index = np.array(
+        get_position_index(barcode_group[1], samples),
+        dtype=np.int64,
+    )
+
+    log.info(f"Subsetting data for {contrast_name} ({fg_cells_index.shape[0]} of {mat.shape[1]})")
+
     if sparse.issparse(mat):
         fg_mat = mat[:, fg_cells_index].toarray()
         bg_mat = mat[:, bg_cells_index].toarray()
     else:
-        fg_mat = mat[:, fg_cells_index]
-        bg_mat = mat[:, bg_cells_index]
+        fg_mat = subset_array_second_axis(arr=mat, col_indices=fg_cells_index)
+        bg_mat = subset_array_second_axis(arr=mat, col_indices=bg_cells_index)
 
-    log.info("Computing p-value for " + contrast_name)
-    wilcox_test = [ranksums(fg_mat[x], y=bg_mat[x]) for x in range(mat.shape[0])]
-    log.info("Computing log2FC for " + contrast_name)
-    logFC = np.log2(
-        (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
-    ).tolist()
+    log.info(f"Computing p-value for {contrast_name}")
 
-    pvalue = [wilcox_test[x].pvalue for x in range(len(wilcox_test))]
-    adj_pvalue = p_adjust_bh(pvalue)
-    name = [contrast_name] * len(adj_pvalue)
+    if n_cpu > 1:
+        # Put foreground and background matrix in ray object store and get a reference.
+        fg_mat_ref = ray.put(fg_mat)
+        bg_mat_ref = ray.put(bg_mat)
+
+        chunk_size = 3000
+
+        # Calculate wilcox test for each region in multiple ray processes (3000 regions per process).
+        wilcox_test_pvalues_nested_list = ray.get(
+            [
+                get_wilcox_test_pvalues_ray.remote(
+                    fg_mat_ref,
+                    bg_mat_ref,
+                    start=start,
+                    end=min(start + chunk_size, fg_mat.shape[0])
+                )
+                for start in range(0, fg_mat.shape[0], chunk_size)
+            ]
+        )
+
+        # Remove foreground and background matrix from ray object store.
+        del fg_mat_ref, bg_mat_ref
+
+        # Flatten wilcox tests pvalues nested list.
+        wilcox_test_pvalues = []
+
+        for wilcox_test_pvalues_part in wilcox_test_pvalues_nested_list:
+            wilcox_test_pvalues.extend(wilcox_test_pvalues_part)
+    else:
+        wilcox_test_pvalues = get_wilcox_test_pvalues(fg_mat, bg_mat)
+
+    log.info(f"Computing log2FC for {contrast_name}")
+    log2_fc = get_log2_fc(fg_mat, bg_mat)
+
+    adj_pvalues = p_adjust_bh(wilcox_test_pvalues)
+
     markers_dataframe = pd.DataFrame(
-        [logFC, adj_pvalue, name],
-        index=["Log2FC", "Adjusted_pval", "Contrast"],
-        columns=features,
-    ).transpose()
+        {
+            "Log2FC": log2_fc,
+            "Adjusted_pval": adj_pvalues,
+            "Contrast": [contrast_name] * adj_pvalues.shape[0]
+        },
+        index=features,
+    )
+
     markers_dataframe = markers_dataframe.loc[
         markers_dataframe["Adjusted_pval"] <= adjpval_thr
     ]
-    markers_dataframe = markers_dataframe.loc[markers_dataframe["Log2FC"] >= log2fc_thr]
+    markers_dataframe = markers_dataframe.loc[
+        markers_dataframe["Log2FC"] >= log2fc_thr
+    ]
     markers_dataframe = markers_dataframe.sort_values(
-        ["Log2FC", "Adjusted_pval"], ascending=[False, True]
+        ["Log2FC", "Adjusted_pval"],
+        ascending=[False, True],
     )
-    log.info(contrast_name + " done!")
+    log.info(f"{contrast_name} done!")
     return markers_dataframe
 
 
+def get_wilcox_test_pvalues(fg_mat, bg_mat):
+    """
+    Calculate wilcox test p-values between foreground and background matrix.
+
+    Parameters
+    ----------
+    fg_mat
+        2D-numpy foreground matrix.
+    bg_mat
+        2D-numpy background matrix.
+
+    """
+    if fg_mat.shape[0] != bg_mat.shape[0]:
+        raise ValueError(
+            "Foreground matrix and background matrix have a different first dimension:"
+            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
+        )
+
+    wilcox_test_pvalues = [
+        wilcox_test.pvalue
+        for wilcox_test in [
+            ranksums(fg_mat[i], y=bg_mat[i])
+            for i in range(fg_mat.shape[0])
+        ]
+    ]
+
+    return wilcox_test_pvalues
+
+
+@ray.remote
+def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
+    """
+    Calculate wilcox test p-values with ray between a subset of foreground and background matrix.
+
+    Parameters
+    ----------
+    fg_mat
+        2D-numpy foreground matrix.
+    bg_mat
+        2D-numpy background matrix.
+    start
+        Starting row index (included).
+    end
+        Ending row index (excluded).
+    """
+    if fg_mat.shape[0] != bg_mat.shape[0]:
+        raise ValueError(
+            "Foreground matrix and background matrix have a different first dimension:"
+            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
+        )
+
+    wilcox_test_pvalues_part = [
+        wilcox_test.pvalue
+        for wilcox_test in [
+            ranksums(fg_mat[i], y=bg_mat[i])
+            for i in range(start, end)
+        ]
+    ]
+
+    return wilcox_test_pvalues_part
+
+
 def p_adjust_bh(p: float):
-    """Benjamini-Hochberg p-value correction for multiple hypothesis testing."""
+    """
+    Benjamini-Hochberg p-value correction for multiple hypothesis testing.
+
+    """
     p = np.asfarray(p)
     by_descend = p.argsort()[::-1]
     by_orig = by_descend.argsort()
     steps = float(len(p)) / np.arange(len(p), 0, -1)
     q = np.minimum(1, np.minimum.accumulate(steps * p[by_descend]))
     return q[by_orig]
+
+
+@numba.njit(parallel=True)
+def subset_array_second_axis(arr, col_indices):
+    """
+    Subset array by second axis based on provided `col_indices`.
+
+    Returns the same as `arr[:, col_indices]`, but is much faster
+    when arr and col_indices are big.
+
+    Parameters
+    ----------
+    arr
+        2D-numpy array to subset by provided column indices.
+    col_indices
+        1D-numpy array (preferably with np.int64 as dtype) with column indices.
+
+    """
+    if np.max(col_indices) >= arr.shape[1]:
+        raise IndexError(f"index {np.max(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
+    if np.min(col_indices) < -arr.shape[1]:
+        raise IndexError(f"index {np.min(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
+
+    # Create empty subset array of correct dimensions and dtype.
+    subset_arr = np.empty(
+        (arr.shape[0], col_indices.shape[0]),
+        dtype=arr.dtype,
+    )
+
+    for i in numba.prange(arr.shape[0]):
+        # Get requested column values for each row.
+        subset_arr[i, :] = arr[i, :][col_indices]
+
+    return subset_arr
+
+
+@numba.njit(parallel=True)
+def mean_axis1(arr):
+    """
+    Calculate column wise mean of 2D-numpy matrix with numba, mimicking `np.mean(x, axis=1)`.
+
+    Parameters
+    ----------
+    arr
+        2D-numpy array to calculate the mean per column for.
+    """
+
+    mean_axis1_array = np.empty(arr.shape[0], dtype=np.float64)
+    for i in numba.prange(arr.shape[0]):
+        mean_axis1_array[i] = np.mean(arr[i, :])
+    return mean_axis1_array
+
+
+@numba.njit
+def get_log2_fc(fg_mat, bg_mat):
+    """
+    Calculate log2 fold change between foreground and background matrix.
+
+    Parameters
+    ----------
+    fg_mat
+        2D-numpy foreground matrix.
+    bg_mat
+        2D-numpy background matrix.
+    """
+
+    if fg_mat.shape[0] != bg_mat.shape[0]:
+        raise ValueError(
+            "Foreground matrix and background matrix have a different first dimension:"
+            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
+        )
+
+    # Calculate log2 fold change between foreground and background matrix with numba in
+    # a similar way as the following numpy code:
+    #    np.log2(
+    #        (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
+    #    )
+    return np.log2(
+        (mean_axis1(fg_mat) + 10**-12) / (mean_axis1(bg_mat) + 10**-12)
+    )
