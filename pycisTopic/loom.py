@@ -1057,7 +1057,7 @@ def add_markers(loom: SCopeLoom, markers_dict: Dict[str, Dict[str, pd.DataFrame]
                 num_genes = len(gene_names)
 
                 # Replace
-                cluster_markers.loc[gene_names, i] = np.int(1)
+                cluster_markers.loc[gene_names, i] = 1
                 cluster_markers_avg_logfc.loc[gene_names, i] = logfoldchanges
                 cluster_markers_pval.loc[gene_names, i] = pvals_adj
             except BaseException:
