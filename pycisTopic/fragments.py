@@ -63,7 +63,7 @@ def read_fragments_to_pyranges(
     open_fn = gzip.open if fragments_bed_filename.endswith(".gz") else open
 
     skip_rows = 0
-    nbr_columns = 0
+    column_count = 0
     with open_fn(fragments_bed_filename, "rt") as fragments_bed_fh:
         for line in fragments_bed_fh:
             # Remove newlines and spaces.
@@ -75,15 +75,15 @@ def read_fragments_to_pyranges(
                 skip_rows += 1
             else:
                 # Get number of columns from the first real BED entry.
-                nbr_columns = len(line.split("\t"))
+                column_count = len(line.split("\t"))
 
                 # Stop reading the BED file.
                 break
 
-    if nbr_columns < 4:
+    if column_count < 4:
         raise ValueError(
             "Fragments BED file needs to have at least 4 columns. "
-            f'"{fragments_bed_filename}" contains only {nbr_columns} columns.'
+            f'"{fragments_bed_filename}" contains only {column_count} columns.'
         )
 
     if not engine:
@@ -97,13 +97,17 @@ def read_fragments_to_pyranges(
             skip_rows=skip_rows,
             separator="\t",
             use_pyarrow=False,
-            new_columns=bed_column_names[:nbr_columns],
+            new_columns=bed_column_names[:column_count],
             dtypes={
-                "Chromosome": pl.Categorical,
-                "Start": pl.Int32,
-                "End": pl.Int32,
-                "Name": pl.Categorical,
-                "Strand": pl.Categorical,
+                bed_column: dtype
+                for bed_column, dtype in {
+                    "Chromosome": pl.Categorical,
+                    "Start": pl.Int32,
+                    "End": pl.Int32,
+                    "Name": pl.Categorical,
+                    "Strand": pl.Categorical,
+                }.items()
+                if bed_column in bed_column_names[:column_count]
             },
         ).to_pandas()
     elif engine == "pyarrow":
@@ -113,7 +117,7 @@ def read_fragments_to_pyranges(
             read_options=pa.csv.ReadOptions(
                 use_threads=True,
                 skip_rows=skip_rows,
-                column_names=bed_column_names[:nbr_columns],
+                column_names=bed_column_names[:column_count],
             ),
             parse_options=pa.csv.ParseOptions(
                 delimiter="\t",
@@ -138,7 +142,7 @@ def read_fragments_to_pyranges(
             sep="\t",
             skiprows=skip_rows,
             header=None,
-            names=bed_column_names[:nbr_columns],
+            names=bed_column_names[:column_count],
             doublequote=False,
             engine="c",
             dtype={
@@ -253,11 +257,15 @@ def read_bed_to_polars_df(
             use_pyarrow=False,
             new_columns=bed_column_names[:column_count],
             dtypes={
-                "Chromosome": pl.Categorical,
-                "Start": pl.Int32,
-                "End": pl.Int32,
-                "Name": pl.Categorical,
-                "Strand": pl.Categorical,
+                bed_column: dtype
+                for bed_column, dtype in {
+                    "Chromosome": pl.Categorical,
+                    "Start": pl.Int32,
+                    "End": pl.Int32,
+                    "Name": pl.Categorical,
+                    "Strand": pl.Categorical,
+                }.items()
+                if bed_column in bed_column_names[:column_count]
             },
         )
     elif engine == "pyarrow":
