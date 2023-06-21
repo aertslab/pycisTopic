@@ -350,6 +350,48 @@ def read_fragments_to_polars_df(
     return fragments_df_pl
 
 
+def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series:
+    """
+    Read barcode TSV file to a Polars Series.
+
+    Parameters
+    ----------
+    barcodes_tsv_filename
+        TSV file with CBs.
+
+    Returns
+    -------
+    Polars Series with CBs.
+
+    See Also
+    --------
+    pycisTopic.fragments.filter_fragments_by_cb
+
+    Examples
+    --------
+    Read gzipped barcodes TSV file to a Polars Series.
+    >>> cbs = read_barcodes_file_to_polars_series(
+    ...     barcodes_tsv_filename="barcodes.tsv.gz",
+    ... )
+
+    Read uncompressed barcodes TSV file to a Polars Series.
+    >>> cbs = read_barcodes_file_to_polars_series(
+    ...     barcodes_tsv_filename="barcodes.tsv",
+    ... )
+
+    """
+    cbs = pl.read_csv(
+        barcodes_tsv_filename,
+        has_header=False,
+        separator="\t",
+        columns=[0],
+        new_columns=["CB"],
+        dtypes={"CB": pl.Categorical},
+    ).to_series()
+
+    return cbs
+
+
 def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     """
     Create PyRanges DataFrame from Polars DataFrame.
@@ -721,6 +763,7 @@ def filter_fragments_by_cb(
     See Also
     --------
     pycisTopic.fragments.get_cbs_passing_filter
+    pycisTopic.fragments.read_barcodes_file_to_polars_series
 
     Examples
     --------
@@ -751,6 +794,10 @@ def filter_fragments_by_cb(
     ...     ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"],
     ...     dtype=pl.Categorical,
     ... )
+
+    Read list of cell barcodes from a file.
+    >>> cbs = read_barcodes_file_to_polars_series("barcodes.tsv")
+
     Polars DataFrame with fragments for the requested cell barcodes.
     >>> fragments_cb_filtered_df_pl = filter_fragments_by_cb(
     ...     fragments_df_pl=fragments_df_pl,
@@ -822,7 +869,7 @@ def get_insert_size_distribution(
     ... )
 
     """
-    insert_size_distribution_pl_df = (
+    insert_size_distribution_df_pl = (
         fragments_df_pl.lazy()
         .with_columns(
             (pl.col("End") - pl.col("Start")).abs().alias("insert_size"),
@@ -838,7 +885,7 @@ def get_insert_size_distribution(
         .collect()
     )
 
-    return insert_size_distribution_pl_df
+    return insert_size_distribution_df_pl
 
 
 def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.DataFrame):
