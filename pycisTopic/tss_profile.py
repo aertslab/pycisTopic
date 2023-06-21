@@ -4,6 +4,10 @@ import genomic_ranges
 import polars as pl
 from fragments import create_pyranges_from_polars_df
 
+# Enable Polars global string cache so all categoricals are created with the same
+# string cache.
+pl.enable_string_cache(True)
+
 
 def get_tss_profile(
     fragments_df_pl: pl.DataFrame,

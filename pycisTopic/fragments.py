@@ -14,6 +14,10 @@ import pyranges as pr
 
 from pycisTopic.utils import normalise_filepath
 
+# Enable Polars global string cache so all categoricals are created with the same
+# string cache.
+pl.enable_string_cache(True)
+
 
 def read_fragments_to_pyranges(
     fragments_bed_filename: str,

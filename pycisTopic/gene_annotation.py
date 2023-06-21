@@ -6,6 +6,10 @@ from typing import Sequence
 import pandas as pd
 import polars as pl
 
+# Enable Polars global string cache so all categoricals are created with the same
+# string cache.
+pl.enable_string_cache(True)
+
 
 def get_all_gene_annotation_ensembl_biomart_dataset_names(
     biomart_host: str = "http://www.ensembl.org",
