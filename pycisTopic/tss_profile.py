@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import genomic_ranges
 import polars as pl
-from fragments import create_pyranges_from_polars_df
+
+import pycisTopic.fragments
+from pycisTopic.genomic_ranges import intersection as gr_intersection
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
@@ -116,7 +117,7 @@ def get_tss_profile(
     # with [-flank_window, flank_window].
     overlap_with_tss_df_pl = (
         # Use genomic_ranges to calculate the intersection.
-        genomic_ranges.intersection(
+        gr_intersection(
             # Create PyRanges object from filtered fragments file and overlap with TSS
             # annotation BED file.
             regions1_df_pl=filtered_fragments_df_pl,
@@ -157,10 +158,12 @@ def get_tss_profile(
             (
                 # Create PyRanges object from filtered fragments file and overlap with TSS
                 # annotation BED file.
-                create_pyranges_from_polars_df(filtered_fragments_df_pl).join(
+                pycisTopic.fragments.create_pyranges_from_polars_df(
+                    filtered_fragments_df_pl
+                ).join(
                     # Create PyRanges object from TSS annotation BED file after extending
                     # TSS position with flanking window.
-                    create_pyranges_from_polars_df(
+                    pycisTopic.fragments.create_pyranges_from_polars_df(
                         tss_annotation.select(
                             # Only keep needed columns for faster PyRanges join.
                             pl.col(["Chromosome", "Start", "Strand"])

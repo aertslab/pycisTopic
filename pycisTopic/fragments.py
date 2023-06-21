@@ -4,7 +4,6 @@ import gzip
 from operator import itemgetter
 from typing import Literal, Sequence
 
-import genomic_ranges
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -12,6 +11,8 @@ import pyarrow as pa
 import pyarrow.csv
 import pyranges as pr
 
+import pycisTopic.tss_profile
+from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.utils import normalise_filepath
 
 # Enable Polars global string cache so all categoricals are created with the same
@@ -945,7 +946,7 @@ def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.Data
     """
     fragments_in_peaks_df_pl = (
         # Get all fragments that overlap with at least one region.
-        genomic_ranges.intersection(
+        gr_intersection(
             regions1_df_pl=fragments_df_pl,
             regions2_df_pl=regions_df_pl,
             how="first",
