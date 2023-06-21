@@ -243,10 +243,11 @@ def pyGREAT_oneset(
 
     # Params
     region_set.Name = coord_to_region_names(region_set)
-    if tmp_dir is None:
-        tmp_dir = os.path.join(tempfile.gettempdir()) + "/"
-    random_label = hex(random.randint(0, 0xFFFFFF))[2:] + "_"
-    bed_file = os.path.join(tmp_dir, random_label + "great.bed")
+    random_label = hex(random.randint(0, 0xFFFFFF))[2:]
+    bed_file = os.path.join(
+        tmp_dir if tmp_dir else tempfile.gettempdir(),
+        f"{random_label}_great.bed"
+    )
     region_set.df.to_csv(bed_file, sep="\t", index=False, header=False)
 
     # GREAT job

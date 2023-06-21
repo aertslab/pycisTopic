@@ -457,10 +457,8 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         self.topic_threshold = topic_threshold
         self.alpha = alpha
         self.eta = eta
-        if tmp_dir is None:
-            tmp_dir = os.path.join(tempfile.gettempdir()) + "/"
-        self.tmp_dir = tmp_dir
-        self.random_label = hex(random.randint(0, 0xFFFFFF))[2:] + "_"
+        self.tmp_dir = tmp_dir if tmp_dir else tempfile.gettempdir()
+        self.random_label = hex(random.randint(0, 0xFFFFFF))[2:]
         self.n_cpu = n_cpu
         self.optimize_interval = optimize_interval
         self.iterations = iterations
@@ -626,7 +624,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         str
             Path to corpus text file.
         """
-        return self.tmp_dir + "corpus.txt"
+        return os.path.join(self.tmp_dir, "corpus.txt")
 
     def fcorpusmallet(self):
         """
@@ -637,7 +635,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         str
             Path to corpus.mallet file.
         """
-        return self.tmp_dir + "corpus.mallet"
+        return os.path.join(self.tmp_dir, "corpus.mallet")
 
     def fstate(self):
         """
@@ -649,7 +647,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             Path to file.
 
         """
-        return self.tmp_dir + self.random_label + "state.mallet.gz"
+        return os.path.join(self.tmp_dir, f"{self.random_label}_state.mallet.gz")
 
     def fdoctopics(self):
         """
@@ -660,7 +658,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         str
             Path to document topic text file.
         """
-        return self.tmp_dir + self.random_label + "doctopics.txt"
+        return os.path.join(self.tmp_dir, f"{self.random_label}_doctopics.txt")
 
     def finferencer(self):
         """
@@ -671,7 +669,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         str
             Path to inferencer.mallet file.
         """
-        return self.tmp_dir + self.random_label + "inferencer.mallet"
+        return os.path.join(self.tmp_dir,  f"{self.random_label}_inferencer.mallet")
 
     def ftopickeys(self):
         """
@@ -683,7 +681,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             Path to topic keys text file.
 
         """
-        return self.tmp_dir + self.random_label + "topickeys.txt"
+        return os.path.join(self.tmp_dir, f"{self.random_label}_topickeys.txt")
 
 
 def run_cgs_models_mallet(
