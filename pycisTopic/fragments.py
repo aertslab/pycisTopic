@@ -600,7 +600,7 @@ def get_fragments_per_cb(
 
     Get number of fragments and duplication ratio per cell barcode
     (which have 50 fragments or more after collapsing duplicates).
-    >>> fragments_stats_per_cell_cb_df_pl = get_fragments_per_cb(
+    >>> fragments_stats_per_cb_df_pl = get_fragments_per_cb(
     ...     fragments_df_pl=fragments_df_pl,
     ...     min_fragments_per_cb=50,
     ...     collapse_duplicates=True,
@@ -611,7 +611,7 @@ def get_fragments_per_cb(
         "unique_fragments_count" if collapse_duplicates else "total_fragments_count"
     )
 
-    fragments_stats_per_cell_cb_df_pl = (
+    fragments_stats_per_cb_df_pl = (
         fragments_df_pl.lazy()
         .rename({"Name": "CB"})
         .groupby(by="CB", maintain_order=True)
@@ -637,11 +637,11 @@ def get_fragments_per_cb(
         .collect()
     )
 
-    return fragments_stats_per_cell_cb_df_pl
+    return fragments_stats_per_cb_df_pl
 
 
 def get_cbs_passing_filter(
-    fragments_stats_per_cell_cb_df_pl: pl.DataFrame,
+    fragments_stats_per_cb_df_pl: pl.DataFrame,
     cbs: pl.Series | Sequence | None = None,
     min_fragments_per_cb: int | None = None,
     keep_top_x_cbs: int | None = None,
@@ -652,7 +652,7 @@ def get_cbs_passing_filter(
 
     Parameters
     ----------
-    fragments_stats_per_cell_cb_df_pl
+    fragments_stats_per_cb_df_pl
         Polars DataFrame with number of fragments and duplication ratio per cell
         barcode. See :func"`pycisTopic.fragments.get_fragments_per_cb`.
     cbs
@@ -671,7 +671,7 @@ def get_cbs_passing_filter(
     Returns
     -------
     (Cell barcodes passing the filter,
-     fragments_stats_per_cell_cb_df_pl filtered by the cell barcodes passing the filter)
+     fragments_stats_per_cb_df_pl filtered by the cell barcodes passing the filter)
 
     See Also
     --------
@@ -687,7 +687,7 @@ def get_cbs_passing_filter(
 
     Get number of fragments and duplication ratio per cell barcode
     (which have 50 fragments or more after collapsing duplicates).
-    >>> fragments_stats_per_cell_cb_df_pl = get_fragments_per_cb(
+    >>> fragments_stats_per_cb_df_pl = get_fragments_per_cb(
     ...     fragments_df_pl=fragments_df_pl,
     ...     min_fragments_per_cb=50,
     ...     collapse_duplicates=True,
@@ -695,7 +695,7 @@ def get_cbs_passing_filter(
 
     Keep only cell barcodes which have 1000 or more fragments.
     >>> cbs_selected, fragments_stats_per_cb_filtered_df_pl = get_cbs_passing_filter(
-    ...     fragments_stats_per_cell_cb_df_pl=fragments_stats_per_cell_cb_df_pl,
+    ...     fragments_stats_per_cb_df_pl=fragments_stats_per_cb_df_pl,
     ...     min_fragments_per_cb=1000,
     ...     collapse_duplicates=True,
     ... )
@@ -703,7 +703,7 @@ def get_cbs_passing_filter(
     Keep only the 4000 most abundant cell barcodes based on the number of fragments
     after collapsing duplicates.
     >>> cbs_selected, fragments_stats_per_cb_filtered_df_pl = get_cbs_passing_filter(
-    ...     fragments_stats_per_cell_cb_df_pl=fragments_stats_per_cell_cb_df_pl,
+    ...     fragments_stats_per_cb_df_pl=fragments_stats_per_cb_df_pl,
     ...     keep_top_x_cbs=4000,
     ...     collapse_duplicates=True,
     ... )
@@ -724,20 +724,20 @@ def get_cbs_passing_filter(
         else:
             raise ValueError("Unsupported type for cell barcodes.")
 
-        fragments_stats_per_cb_filtered_df_pl = fragments_stats_per_cell_cb_df_pl.join(
+        fragments_stats_per_cb_filtered_df_pl = fragments_stats_per_cb_df_pl.join(
             other=cbs_series_pl.to_frame(),
             on="CB",
             how="inner",
         )
     elif isinstance(min_fragments_per_cb, int):
         fragments_stats_per_cb_filtered_df_pl = (
-            fragments_stats_per_cell_cb_df_pl.lazy()
+            fragments_stats_per_cb_df_pl.lazy()
             .filter(pl.col(fragments_count_column) >= min_fragments_per_cb)
             .collect()
         )
     elif isinstance(keep_top_x_cbs, int):
         fragments_stats_per_cb_filtered_df_pl = (
-            fragments_stats_per_cell_cb_df_pl.lazy()
+            fragments_stats_per_cb_df_pl.lazy()
             .sort(by=fragments_count_column, descending=True)
             .head(keep_top_x_cbs)
             .collect()

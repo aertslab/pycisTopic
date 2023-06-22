@@ -128,7 +128,7 @@ def compute_qc_stats(
 
     4. Compute QC statistics.
     >>> (
-    ...     fragments_stats_per_cell_cb_df_pl,
+    ...     fragments_stats_per_cb_df_pl,
     ...     insert_size_dist_df_pl,
     ...     tss_norm_matrix_sample,
     ...     tss_norm_matrix_per_cb,
@@ -158,7 +158,7 @@ def compute_qc_stats(
     )
 
     # Get Polars DataFrame with basic fragments statistics per cell barcode.
-    fragments_stats_per_cell_cb_df_pl = get_fragments_per_cb(
+    fragments_stats_per_cb_df_pl = get_fragments_per_cb(
         fragments_df_pl=fragments_df_pl,
         min_fragments_per_cb=min_fragments_per_cb,
         collapse_duplicates=collapse_duplicates,
@@ -171,8 +171,8 @@ def compute_qc_stats(
     )
 
     # Add fragment counts per region to fragments statistics per cell barcode.
-    fragments_stats_per_cell_cb_df_pl = (
-        fragments_stats_per_cell_cb_df_pl.lazy()
+    fragments_stats_per_cb_df_pl = (
+        fragments_stats_per_cb_df_pl.lazy()
         .join(
             fragments_in_peaks_df_pl.lazy(),
             how="left",
@@ -234,8 +234,8 @@ def compute_qc_stats(
     )
 
     # Add TSS enrichment to fragments statistics per cell barcode.
-    fragments_stats_per_cell_cb_df_pl = (
-        fragments_stats_per_cell_cb_df_pl.join(
+    fragments_stats_per_cb_df_pl = (
+        fragments_stats_per_cb_df_pl.join(
             tss_enrichment_per_cb.lazy(),
             how="left",
             on="CB",
@@ -247,7 +247,7 @@ def compute_qc_stats(
     )
 
     return (
-        fragments_stats_per_cell_cb_df_pl,
+        fragments_stats_per_cb_df_pl,
         insert_size_dist_df_pl,
         tss_norm_matrix_sample,
         tss_norm_matrix_per_cb,
