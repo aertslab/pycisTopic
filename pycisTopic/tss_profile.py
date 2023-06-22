@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import polars as pl
 
-import pycisTopic.fragments
+from pycisTopic.fragments import create_pyranges_from_polars_df
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 
 # Enable Polars global string cache so all categoricals are created with the same
@@ -158,12 +158,12 @@ def get_tss_profile(
             (
                 # Create PyRanges object from filtered fragments file and overlap with TSS
                 # annotation BED file.
-                pycisTopic.fragments.create_pyranges_from_polars_df(
+                create_pyranges_from_polars_df(
                     filtered_fragments_df_pl
                 ).join(
                     # Create PyRanges object from TSS annotation BED file after extending
                     # TSS position with flanking window.
-                    pycisTopic.fragments.create_pyranges_from_polars_df(
+                    create_pyranges_from_polars_df(
                         tss_annotation.select(
                             # Only keep needed columns for faster PyRanges join.
                             pl.col(["Chromosome", "Start", "Strand"])
