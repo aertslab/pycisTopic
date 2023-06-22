@@ -89,11 +89,31 @@ def get_tss_profile(
     ...     tss_window=50,
     ...     min_norm=0.2,
     ... )
-    """
 
-    # Get chromosome names which are found in the TSS annotation.
+    """
+    # Extend TSS position with flanking window and only keep minimal necessary columns
+    # needed to find the overlap with fragments.
+    tss_annotation_with_flanking_window_df_pl = (
+        tss_annotation.select(
+            # Only keep needed columns for faster Genomics Ranges / PyRanges join.
+            pl.col("Chromosome").cast(pl.Categorical),
+            pl.col("Start"),
+            pl.col("Strand"),
+        )
+        # Filter out TSS annotations without strand info
+        # (in case that would ever happen).
+        .filter(pl.col("Strand") != ".")
+        # Create [-flank_window, flank_window] around TSS
+        # (size: flank_window * 2 + 1) and set them as "Start" and "End" column.
+        .with_columns(
+            (pl.col("Start") - flank_window).alias("Start"),
+            (pl.col("Start") + flank_window + 1).alias("End"),
+        )
+    )
+
+    # Get all chromosome names which are found in the TSS annotation.
     annotation_chromosomes: pl.Series = (
-        tss_annotation.clone()
+        tss_annotation_with_flanking_window_df_pl.clone()
         .select(pl.col("Chromosome").unique())
         .get_column("Chromosome")
     )
@@ -118,26 +138,8 @@ def get_tss_profile(
     overlap_with_tss_df_pl = (
         # Use genomic_ranges to calculate the intersection.
         gr_intersection(
-            # Create PyRanges object from filtered fragments file and overlap with TSS
-            # annotation BED file.
             regions1_df_pl=filtered_fragments_df_pl,
-            # Create PyRanges object from TSS annotation BED file after extending TSS
-            # position with flanking window.
-            regions2_df_pl=(
-                tss_annotation.select(
-                    # Only keep needed columns for faster PyRanges join.
-                    pl.col(["Chromosome", "Start", "Strand"])
-                )
-                # Filter out TSS annotations without strand info
-                # (in case that would ever happen).
-                .filter(pl.col("Strand") != ".")
-                # Create [-flank_window, flank_window] around TSS
-                # (size: flank_window * 2 + 1) and set them as "Start" and "End" column.
-                .with_columns(
-                    (pl.col("Start") - flank_window).alias("Start"),
-                    (pl.col("Start") + flank_window + 1).alias("End"),
-                )
-            ),
+            regions2_df_pl=tss_annotation_with_flanking_window_df_pl,
             regions1_info=True,
             regions2_info=True,
             regions1_coord=True,
@@ -156,28 +158,12 @@ def get_tss_profile(
         # Use pyranges to calculate the intersection.
         pl.from_pandas(
             (
-                # Create PyRanges object from filtered fragments file and overlap with TSS
-                # annotation BED file.
-                create_pyranges_from_polars_df(
-                    filtered_fragments_df_pl
-                ).join(
-                    # Create PyRanges object from TSS annotation BED file after extending
-                    # TSS position with flanking window.
+                # Create PyRanges object from filtered fragments Polars DataFrame.
+                create_pyranges_from_polars_df(filtered_fragments_df_pl).join(
+                    # Create PyRanges object from TSS annotation Polars DataFrame
+                    # extended with flanking window.
                     create_pyranges_from_polars_df(
-                        tss_annotation.select(
-                            # Only keep needed columns for faster PyRanges join.
-                            pl.col(["Chromosome", "Start", "Strand"])
-                        )
-                        # Filter out TSS annotations without strand info
-                        # (in case that would ever happen).
-                        .filter(pl.col("Strand") != ".")
-                        # Create [-flank_window, flank_window] around TSS
-                        # (size: flank_window * 2 + 1) and set them as
-                        # "Start" and "End" column.
-                        .with_columns(
-                            (pl.col("Start") - flank_window).alias("Start"),
-                            (pl.col("Start") + flank_window + 1).alias("End"),
-                        )
+                        tss_annotation_with_flanking_window_df_pl
                     ),
                     # Add "_tss_flank" suffix for joined output that comes from the TSS
                     # annotation BED file.
