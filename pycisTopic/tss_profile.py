@@ -413,6 +413,7 @@ def get_tss_profile(
         .drop("Position")
         .select(pl.all().mean())
         .transpose(include_header=True, header_name="CB")
+        .with_columns(pl.col("CB").cast(pl.Categorical))
         .rename({"column_0": "tss_enrichment"})
     )
 
