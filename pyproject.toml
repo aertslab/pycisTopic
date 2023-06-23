@@ -45,3 +45,6 @@ pyarrow = ["pyarrow >= 8.0.0"]
 [project.optional-dependencies]
 pybiomart = ["pybiomart"]
 pyranges = ["pyranges"]
+
+[project.scripts]
+pycistopic = "pycisTopic.cli.pycistopic:main"
