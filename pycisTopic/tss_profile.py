@@ -30,7 +30,7 @@ def get_tss_profile(
         See :func:`pycisTopic.fragments.filter_fragments_by_cb`.
     tss_annotation
         TSS annotation Polars DataFrame with at least the following columns:
-        `["Chromosome", "Start", "Strand"]`.
+        ``["Chromosome", "Start", "Strand"]``.
         The "Start" column is 0-based like a BED file.
         See :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl` and
         :func:`pycisTopic.gene_annotation.change_chromosome_source_in_bed` for ways
@@ -38,26 +38,26 @@ def get_tss_profile(
     flank_window
         Flanking window around the TSS.
         Used for intersecting fragments with TSS positions and keeping cut sites.
-        Default: 1000 (+/- 1000 bp).
+        Default: ``1000`` (+/- 1000 bp).
     smoothing_rolling_window
         Rolling window used to smooth the cut sites signal.
         Default: 10.
     minimum_signal_window
         Average signal in the tails of the flanking window around the TSS:
-           - `[-flank_window, -flank_window + minimum_signal_window + 1]`
-           - `[flank_window - minimum_signal_window + 1, flank_window]`
+           - ``[-flank_window, -flank_window + minimum_signal_window + 1]``
+           - ``[flank_window - minimum_signal_window + 1, flank_window]``
         is used to normalize the TSS enrichment.
-        Default: `100` (average signal in `[-1000, -901]`, `[901, 1000]`
-        around TSS if `flank_window=1000`).
+        Default: ``100`` (average signal in ``[-1000, -901]``, ``[901, 1000]``
+        around TSS if ``flank_window=1000``).
     tss_window
         Window around the TSS used to count fragments in the TSS when calculating
         the TSS enrichment per cell barcode.
-        Default: `50` (+/- 50 bp).
+        Default: ``50`` (+/- 50 bp).
     min_norm
         Minimum normalization score.
         If the average minimum signal value is below this value, this number is used
         to normalize the TSS signal. This approach penalizes cells with fewer reads.
-        Default: `0.2`
+        Default: ``0.2``
     use_genomic_ranges
         Use genomic ranges implementation for calculating intersections, instead of
         using pyranges.
@@ -145,8 +145,8 @@ def get_tss_profile(
             regions1_coord=True,
             regions2_coord=True,
             regions1_suffix="_fragment",
-            # Add "_tss_flank" suffix for joined output that comes from the TSS annotation
-            # BED file.
+            # Add "_tss_flank" suffix for joined output that comes from the TSS
+            # annotation BED file.
             regions2_suffix="_tss_flank",
         ).rename(
             {
@@ -231,14 +231,16 @@ def get_tss_profile(
     #   - rows: CBs
     #   - values: number of times a cut site position was found for a certain CB.
     tss_matrix_tmp = (
-        # Get all cut site positions which fall in [-flank_window, flank_window] (size: flank_window * 2 + 1):
+        # Get all cut site positions which fall in [-flank_window, flank_window]
+        # (size: flank_window * 2 + 1):
         #   - Some fragments will have both cut sites in this interval.
         #   - Some fragments have only one cut site in this interval (start or end).
         pl.concat(
             [
                 pl.DataFrame(
                     [
-                        # Create [-flank_window, flank_window] range for all possible cut site positions.
+                        # Create [-flank_window, flank_window] range for all possible
+                        # cut site positions.
                         pl.arange(
                             start=-flank_window,
                             end=flank_window + 1,
@@ -246,9 +248,10 @@ def get_tss_profile(
                             eager=True,
                             dtype=pl.Int32,
                         ).alias("Position"),
-                        # Create a CB column with all "no_CB" values. Needed temporarily so during the pivot operation
-                        # all cut site position values ([-flank_window, flank_window] range) are kept even if there are
-                        # no cut sites for certain positions.
+                        # Create a CB column with all "no_CB" values.
+                        # Needed temporarily so during the pivot operation all cut site
+                        # position values ([-flank_window, flank_window] range) are
+                        # kept even if there are no cut sites for certain positions.
                         pl.Series(
                             "CB",
                             ["no_CB"] * (flank_window * 2 + 1),
@@ -302,7 +305,8 @@ def get_tss_profile(
         #    - columns: CBs
         #    - rows: cut site positions relative to TSS.
         .transpose(
-            # Keep cut sites position values (will be dtype=pl.Utf8) as the first column.
+            # Keep cut sites position values (will be dtype=pl.Utf8) as the first
+            # column.
             include_header=True,
             header_name="Position",
             # Add old "CB" column as column names.

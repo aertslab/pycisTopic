@@ -7,9 +7,9 @@ from typing import Literal, Sequence
 import numpy as np
 import pandas as pd
 import polars as pl
-import pyarrow as pa
-import pyarrow.csv
-import pyranges as pr
+import pyarrow as pa  # type: ignore[import]
+import pyarrow.csv  # type: ignore[import]
+import pyranges as pr  # type: ignore[import]
 
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.utils import normalise_filepath
@@ -654,7 +654,7 @@ def get_cbs_passing_filter(
     ----------
     fragments_stats_per_cb_df_pl
         Polars DataFrame with number of fragments and duplication ratio per cell
-        barcode. See :func"`pycisTopic.fragments.get_fragments_per_cb`.
+        barcode. See :func:`pycisTopic.fragments.get_fragments_per_cb`.
     cbs
         Cell barcodes to keep. If specified, ``min_fragments_per_cb`` and ``min_cbs``
         are ignored.

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-import numpy as np
 import polars as pl
 from ncls import NCLS
 
+if TYPE_CHECKING:
+    import numpy as np
 
 # Intersection/overlap code is based on:
 #   https://github.com/biocore-ntnu/pyranges/blob/master/pyranges/methods/intersection.py
@@ -28,7 +29,8 @@ def _get_start_end_and_indexes_for_chrom(
     Returns
     -------
     (starts, ends, indexes)
-         Tuple of numpy arrays with starts, ends and index positions for the requested chromosome.
+        Tuple of numpy arrays with starts, ends and index positions
+        for the requested chromosome.
 
     """
     starts, ends, indexes = list(
@@ -55,35 +57,46 @@ def _intersect_per_chrom(
     how: Literal["all", "containment", "first", "last"] | str | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Get overlap between regions from first set and second set of regions for a chromosome and return index positions
-    for those overlaps in the first and second set of regions.
+    Get intersection between two region sets per chromosome.
+
+    Get intersection between regions from first set and second set of regions for a
+    chromosome and return index positions for those overlaps in the first and
+    second set of regions.
 
     Parameters
     ----------
     regions1_per_chrom_dfs_pl
-        Dictionary of region Polars dataframes partitioned by chromosome for first set of regions.
+        Dictionary of region Polars dataframes partitioned by chromosome for first set
+        of regions.
     regions2_per_chrom_dfs_pl
-        Dictionary of region Polars dataframes partitioned by chromosome for second set of regions.
+        Dictionary of region Polars dataframes partitioned by chromosome for second set
+        of regions.
     chrom
         Chromosome name.
     how
         What intervals to report:
-          - "all" (None): all overlaps with second set or regions.
-          - "containment": only overlaps where region of first set is contained within region of second set.
-          - "first": first overlap with second set of regions.
-          - "last": last overlap with second set of regions.
-          - "outer": all regions for first and all regions of second (outer join).
-            If no overlap was found for a region, the other region set will contain None for that entry.
-          - "left": all first set of regions and overlap with second set of regions (left join).
-            If no overlap was found for a region in the first set, the second region set will contain None for that entry.
-          - "right": all second set of regions and overlap with first set of regions (right join).
-            If no overlap was found for a region in the second set, the first region set will contain None for that entry.
+          - ``"all"`` (``None``): all overlaps with second set or regions.
+          - ``"containment"``: only overlaps where region of first set is contained
+            within region of second set.
+          - ``"first"``: first overlap with second set of regions.
+          - ``"last"``: last overlap with second set of regions.
+          - ``"outer"``: all regions for first and all regions of second (outer join).
+            If no overlap was found for a region, the other region set will contain
+            ``None`` for that entry.
+          - ``"left"``: all first set of regions and overlap with second set of regions
+            (left join).
+            If no overlap was found for a region in the first set, the second region
+            set will contain None for that entry.
+          - ``"right"``: all second set of regions and overlap with first set of regions
+            (right join).
+            If no overlap was found for a region in the second set, the first region
+            set will contain ``None`` for that entry.
 
     Returns
     -------
     (regions1_indexes, regions2_indexes)
-        Tuple of indexes for regions from Polars Dataframe 1 and indexes for regions from Polars Dataframe 2 that have
-        an overlap.
+        Tuple of indexes for regions from Polars Dataframe 1 and indexes for regions
+        from Polars Dataframe 2 that have an overlap.
 
     """
     starts2, ends2, indexes2 = _get_start_end_and_indexes_for_chrom(
@@ -130,8 +143,12 @@ def _intersect_per_chrom(
         regions1_indexes = pl.Series("idx", regions1_indexes, dtype=pl.get_index_type())
         regions2_indexes = pl.Series("idx", regions2_indexes, dtype=pl.get_index_type())
 
-        regions1_all_indexes = pl.arange(0, indexes1_length, dtype=pl.get_index_type(), eager=True).alias("idx")
-        regions2_all_indexes = pl.arange(0, indexes2_length, dtype=pl.get_index_type(), eager=True).alias("idx")
+        regions1_all_indexes = pl.arange(
+            0, indexes1_length, dtype=pl.get_index_type(), eager=True
+        ).alias("idx")
+        regions2_all_indexes = pl.arange(
+            0, indexes2_length, dtype=pl.get_index_type(), eager=True
+        ).alias("idx")
 
         regions1_missing_indexes = (
             regions1_all_indexes.to_frame()
@@ -153,12 +170,28 @@ def _intersect_per_chrom(
             .to_series()
         )
 
-        regions1_none_indexes = pl.repeat(None, regions2_missing_indexes.len(), name="idx", eager=True).cast(pl.get_index_type())
-        regions2_none_indexes = pl.repeat(None, regions1_missing_indexes.len(), name="idx", eager=True).cast(pl.get_index_type())
+        regions1_none_indexes = pl.repeat(
+            None, regions2_missing_indexes.len(), name="idx", eager=True
+        ).cast(pl.get_index_type())
+        regions2_none_indexes = pl.repeat(
+            None, regions1_missing_indexes.len(), name="idx", eager=True
+        ).cast(pl.get_index_type())
 
         if how == "outer":
-            regions1_indexes = pl.concat([regions1_indexes, regions1_missing_indexes, regions1_none_indexes,])
-            regions2_indexes = pl.concat([regions2_indexes, regions2_none_indexes, regions2_missing_indexes,])
+            regions1_indexes = pl.concat(
+                [
+                    regions1_indexes,
+                    regions1_missing_indexes,
+                    regions1_none_indexes,
+                ]
+            )
+            regions2_indexes = pl.concat(
+                [
+                    regions2_indexes,
+                    regions2_none_indexes,
+                    regions2_missing_indexes,
+                ]
+            )
         elif how == "left":
             regions1_indexes = pl.concat([regions1_indexes, regions1_missing_indexes])
             regions2_indexes = pl.concat([regions2_indexes, regions2_none_indexes])
@@ -183,29 +216,35 @@ def _overlap_per_chrom(
     how: Literal["all", "containment", "first"] | str | None = "first",
 ) -> np.ndarray:
     """
-    Get overlap between regions from first set and second set of regions for a chromosome and return index positions
-    for those overlaps in the first set of regions.
+    Get overlap between two region sets per chromosome.
+
+    Get overlap between regions from first set and second set of regions for a
+    chromosome and return index positions for those overlaps in the first set
+    of regions.
 
     Parameters
     ----------
     regions1_per_chrom_dfs_pl
-        Dictionary of region Polars dataframes partitioned by chromosome for first set of regions.
+        Dictionary of region Polars dataframes partitioned by chromosome for first set
+        of regions.
     regions2_per_chrom_dfs_pl
-        Dictionary of region Polars dataframes partitioned by chromosome for second set of regions.
+        Dictionary of region Polars dataframes partitioned by chromosome for second set
+        of regions.
     chrom
         Chromosome name.
     how
         What intervals to report:
-          - "all" (None): all overlaps with second set or regions.
-          - "containment": only overlaps where region of first set is contained within region of second set.
-          - "first": first overlap with second set of regions.
+          - ``"all"`` (``None``): all overlaps with second set or regions.
+          - ``"containment"``: only overlaps where region of first set is contained
+            within region of second set.
+          - ``"first"``: first overlap with second set of regions.
 
     Returns
     -------
     regions1_indexes
         Indexes for regions from Polars Dataframe 1 that had an overlap.
-    """
 
+    """
     starts2, ends2, indexes2 = _get_start_end_and_indexes_for_chrom(
         regions2_per_chrom_dfs_pl,
         chrom=chrom,
@@ -280,7 +319,8 @@ def _filter_intersection_output_columns(
         f"End{regions2_suffix}",
     ]
 
-    # Get info column names for first set of regions (all columns except coordinate columns).
+    # Get info column names for first set of regions
+    # (all columns except coordinate columns).
     regions1_suffix_length = len(regions1_suffix)
     regions1_info_columns = [
         # Remove region1 suffix from column names.
@@ -292,7 +332,8 @@ def _filter_intersection_output_columns(
         )
     ]
 
-    # Get info column names for second set of regions (all columns except coordinate columns).
+    # Get info column names for second set of regions
+    # (all columns except coordinate columns).
     regions2_suffix_length = len(regions2_suffix)
     regions2_info_columns = [
         # Remove region2 suffix from column names if no region1 info will be displayed.
@@ -342,16 +383,22 @@ def intersection(
         Polars DataFrame containing BED entries for second set of regions.
     how
         What intervals to report:
-          - "all" (None): all overlaps with second set or regions.
-          - "containment": only overlaps where region of first set is contained within region of second set.
-          - "first": first overlap with second set of regions.
-          - "last": last overlap with second set of regions.
-          - "outer": all regions for first and all regions of second (outer join).
-            If no overlap was found for a region, the other region set will contain None for that entry.
-          - "left": all first set of regions and overlap with second set of regions (left join).
-            If no overlap was found for a region in the first set, the second region set will contain None for that entry.
-          - "right": all second set of regions and overlap with first set of regions (right join).
-            If no overlap was found for a region in the second set, the first region set will contain None for that entry.
+          - ``"all"`` (``None``): all overlaps with second set or regions.
+          - ``"containment"``: only overlaps where region of first set is contained
+            within region of second set.
+          - ``"first"``: first overlap with second set of regions.
+          - ``"last"``: last overlap with second set of regions.
+          - ``"outer"``: all regions for first and all regions of second (outer join).
+            If no overlap was found for a region, the other region set will contain
+            ``None`` for that entry.
+          - ``"left"``: all first set of regions and overlap with second set of regions
+            (left join).
+            If no overlap was found for a region in the first set, the second region
+            set will contain None for that entry.
+          - ``"right"``: all second set of regions and overlap with first set of regions
+            (right join).
+            If no overlap was found for a region in the second set, the first region
+            set will contain ``None`` for that entry.
     regions1_info
         Add non-coordinate columns from first set of regions to output of intersection.
     regions2_info
@@ -367,10 +414,10 @@ def intersection(
 
     strandedness
         Note: Not implemented yet.
-        {None, "same", "opposite", False}, default None, i.e. auto
+        {``None``, ``"same"``, ``"opposite"``, ``False``}, default ``None``, i.e. auto
         Whether to compare PyRanges on the same strand, the opposite or ignore strand
-        information. The default, None, means use "same" if both PyRanges are strande,
-        otherwise ignore the strand information.
+        information. The default, ``None``, means use ``"same"`` if both PyRanges are
+        stranded, otherwise ignore the strand information.
 
     Returns
     -------
@@ -449,7 +496,13 @@ def intersection(
     │ chr1       ┆ 4     ┆ 9   ┆ b   │
     └────────────┴───────┴─────┴─────┘
 
-    >>> intersection(regions1_df_pl, regions2_df_pl, how="containment", regions1_info=False, regions2_info=True)
+    >>> intersection(
+    ...     regions1_df_pl,
+    ...     regions2_df_pl,
+    ...     how="containment",
+    ...     regions1_info=False,
+    ...     regions2_info=True,
+    ... )
     shape: (1, 4)
     ┌────────────┬───────┬─────┬──────┐
     │ Chromosome ┆ Start ┆ End ┆ Name │
@@ -459,7 +512,12 @@ def intersection(
     │ chr1       ┆ 4     ┆ 9   ┆ reg2 │
     └────────────┴───────┴─────┴──────┘
 
-    >>> intersection(regions1_df_pl, regions2_df_pl, regions1_coord=True, regions2_coord=True)
+    >>> intersection(
+    ...     regions1_df_pl,
+    ...     regions2_df_pl,
+    ...     regions1_coord=True,
+    ...     regions2_coord=True,
+    ... )
     shape: (3, 10)
     ┌────────────┬───────┬─────┬──────────────┬─────────┬───────┬──────────────┬─────────┬───────┬─────┐
     │ Chromosome ┆ Start ┆ End ┆ Chromosome@1 ┆ Start@1 ┆ End@1 ┆ Chromosome@2 ┆ Start@2 ┆ End@2 ┆ ID  │
@@ -473,7 +531,13 @@ def intersection(
     │ chr1       ┆ 4     ┆ 9   ┆ chr1         ┆ 4       ┆ 9     ┆ chr1         ┆ 2       ┆ 9     ┆ b   │
     └────────────┴───────┴─────┴──────────────┴─────────┴───────┴──────────────┴─────────┴───────┴─────┘
 
-    >>> intersection(regions1_df_pl, regions2_df_pl, regions1_info=False, regions2_info=True, regions2_coord=True)
+    >>> intersection(
+    ...     regions1_df_pl,
+    ...     regions2_df_pl,
+    ...     regions1_info=False,
+    ...     regions_info=True,
+    ...     regions2_coord=True,
+    ... )
     shape: (3, 7)
     ┌────────────┬───────┬─────┬──────────────┬─────────┬───────┬──────┐
     │ Chromosome ┆ Start ┆ End ┆ Chromosome@2 ┆ Start@2 ┆ End@2 ┆ Name │
@@ -497,12 +561,13 @@ def intersection(
         "Chromosome", as_dict=True, maintain_order=True
     )
 
-    intersection_chrom_dfs_pl = dict()
+    intersection_chrom_dfs_pl = {}
 
     for chrom in list(regions1_per_chrom_dfs_pl.keys()):
         if chrom in list(regions2_per_chrom_dfs_pl.keys()):
-            # Find intersection between regions form first and second per chromosome dataframe and return
-            # index positions in both dataframes for those intersections.
+            # Find intersection between regions form first and second per chromosome
+            # dataframe and return index positions in both dataframes for those
+            # intersections.
             regions1_indexes, regions2_indexes = _intersect_per_chrom(
                 regions1_per_chrom_dfs_pl=regions1_per_chrom_dfs_pl,
                 regions2_per_chrom_dfs_pl=regions2_per_chrom_dfs_pl,
@@ -514,7 +579,8 @@ def intersection(
             if regions1_indexes.shape[0] == 0:
                 continue
 
-            # Get all regions from first and second per chromosome dataframe for the index positions calculated above.
+            # Get all regions from first and second per chromosome dataframe for the
+            # index positions calculated above.
             intersection_chrom_df_pl = (
                 regions1_per_chrom_dfs_pl.pop(chrom)[regions1_indexes]
                 .select(pl.all().suffix(regions1_suffix))
@@ -525,7 +591,8 @@ def intersection(
                 )
             )
 
-            # Calculate intersection start and end coordinates and return the columns of interest.
+            # Calculate intersection start and end coordinates and return the columns
+            # of interest.
             intersection_chrom_ldf_pl = (
                 intersection_chrom_df_pl.lazy()
                 .with_columns(
@@ -591,7 +658,10 @@ def overlap(
     invert: bool = False,
 ) -> pl.DataFrame:
     """
-    Get overlap between first set and second set of regions and return interval of first set of regions.
+    Get overlap between two region sets.
+
+    Get overlap between first set and second set of regions and return interval of
+    first set of regions.
 
     Parameters
     ----------
@@ -601,18 +671,19 @@ def overlap(
         Polars DataFrame containing BED entries for second set of regions.
     how
         What overlaps to report:
-          - "all" (None): all overlaps with second set or regions.
-          - "containment": only overlaps where region of first set is contained within region of second set.
-          - "first": first overlap with second set of regions.
+          - ``"all"`` (``None``): all overlaps with second set or regions.
+          - ``"containment"``: only overlaps where region of first set is contained
+            within region of second set.
+          - ``"first"``: first overlap with second set of regions.
     invert
         Whether to return the intervals without overlaps.
 
     strandedness
         Note: Not implemented yet.
-        {None, "same", "opposite", False}, default None, i.e. auto
+        {``None``, ``"same"``, ``"opposite"``, ``False``}, default ``None``, i.e. auto
         Whether to compare PyRanges on the same strand, the opposite or ignore strand
-        information. The default, None, means use "same" if both PyRanges are strande,
-        otherwise ignore the strand information.
+        information. The default, ``None``, means use ``"same"`` if both PyRanges are
+        stranded, otherwise ignore the strand information.
 
     Returns
     -------
@@ -723,12 +794,13 @@ def overlap(
         "Chromosome", as_dict=True, maintain_order=True
     )
 
-    overlap_chrom_dfs_pl = dict()
+    overlap_chrom_dfs_pl = {}
 
     for chrom in list(regions1_per_chrom_dfs_pl.keys()):
         if chrom in set(regions2_per_chrom_dfs_pl.keys()):
-            # Find overlap between regions from first and second per chromosome dataframe and return
-            # index positions in first dataframe for those overlaps.
+            # Find overlap between regions from first and second per chromosome
+            # dataframe and return index positions in first dataframe for those
+            # overlaps.
             regions1_indexes = _overlap_per_chrom(
                 regions1_per_chrom_dfs_pl=regions1_per_chrom_dfs_pl,
                 regions2_per_chrom_dfs_pl=regions2_per_chrom_dfs_pl,
@@ -741,7 +813,8 @@ def overlap(
                 continue
 
             overlap_chrom_dfs_pl[chrom] = (
-                # Get inverse selection of regions from first dataframe for the overlap.
+                # Get inverse selection of regions from first dataframe for the
+                # overlap.
                 regions1_per_chrom_dfs_pl.pop(chrom)
                 .with_row_count()
                 .filter(

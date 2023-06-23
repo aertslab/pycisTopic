@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
-import pandas as pd
 import polars as pl
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.

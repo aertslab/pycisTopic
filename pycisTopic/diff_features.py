@@ -346,7 +346,7 @@ def impute_accessibility(
         Chunk size used (number of regions for which imputed accessibility is
         calculated at the same time).
     project: str, optional
-        Name of the cisTopic imputation project. Default: `"cisTopic_impute"`.
+        Name of the cisTopic imputation project. Default: ``cisTopic_impute``.
 
     Return
     ------

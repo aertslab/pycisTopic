@@ -41,30 +41,30 @@ def qc(
     tss_flank_window
         Flanking window around the TSS.
         Used for intersecting fragments with TSS positions and keeping cut sites.
-        Default: 1000 (+/- 1000 bp).
+        Default: ``1000`` (+/- 1000 bp).
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_smoothing_rolling_window
         Rolling window used to smooth the cut sites signal.
-        Default: 10.
+        Default: ``10``.
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_minimum_signal_window
         Average signal in the tails of the flanking window around the TSS:
-           - `[-flank_window, -flank_window + minimum_signal_window + 1]`
-           - `[flank_window - minimum_signal_window + 1, flank_window]`
+           - ``[-flank_window, -flank_window + minimum_signal_window + 1]``
+           - ``[flank_window - minimum_signal_window + 1, flank_window]``
         is used to normalize the TSS enrichment.
-        Default: `100` (average signal in `[-1000, -901]`, `[901, 1000]`
+        Default: ``100`` (average signal in ``[-1000, -901]``, ``[901, 1000]``
         around TSS if `flank_window=1000`).
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_window
         Window around the TSS used to count fragments in the TSS when calculating
         the TSS enrichment per cell barcode.
-        Default: `50` (+/- 50 bp).
+        Default: ``50`` (+/- 50 bp).
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_min_norm
         Minimum normalization score.
         If the average minimum signal value is below this value, this number is used
         to normalize the TSS signal. This approach penalizes cells with fewer reads.
-        Default: `0.2`
+        Default: ``0.2``
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     use_genomic_ranges
         Use genomic ranges implementation for calculating intersections, instead of

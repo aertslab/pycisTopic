@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import polars as pl
 
-from pycisTopic.fragments import get_fragments_per_cb, get_fragments_in_peaks, get_insert_size_distribution
+from pycisTopic.fragments import (
+    get_fragments_in_peaks,
+    get_fragments_per_cb,
+    get_insert_size_distribution,
+)
 from pycisTopic.tss_profile import get_tss_profile
 
 # Enable Polars global string cache so all categoricals are created with the same
@@ -39,7 +43,7 @@ def compute_qc_stats(
         file with peak regions.
     tss_annotation
         TSS annotation Polars DataFrame with at least the following columns:
-        `["Chromosome", "Start", "Strand"]`.
+        ``["Chromosome", "Start", "Strand"]``.
         The "Start" column is 0-based like a BED file.
         :func:`pycisTopic.gene_annotation.read_tss_annotation_from_bed`,
         :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl` and
@@ -48,30 +52,30 @@ def compute_qc_stats(
     tss_flank_window
         Flanking window around the TSS.
         Used for intersecting fragments with TSS positions and keeping cut sites.
-        Default: 1000 (+/- 1000 bp).
+        Default: ``1000`` (+/- 1000 bp).
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_smoothing_rolling_window
         Rolling window used to smooth the cut sites signal.
-        Default: 10.
+        Default: ``10``.
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_minimum_signal_window
         Average signal in the tails of the flanking window around the TSS:
-           - `[-flank_window, -flank_window + minimum_signal_window + 1]`
-           - `[flank_window - minimum_signal_window + 1, flank_window]`
+           - ``[-flank_window, -flank_window + minimum_signal_window + 1]``
+           - ``[flank_window - minimum_signal_window + 1, flank_window]``
         is used to normalize the TSS enrichment.
-        Default: `100` (average signal in `[-1000, -901]`, `[901, 1000]`
-        around TSS if `flank_window=1000`).
+        Default: ``100`` (average signal in ``[-1000, -901]``, ``[901, 1000]``
+        around TSS if ``flank_window=1000``).
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_window
         Window around the TSS used to count fragments in the TSS when calculating
         the TSS enrichment per cell barcode.
-        Default: `50` (+/- 50 bp).
+        Default: ``50`` (+/- 50 bp).
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_min_norm
         Minimum normalization score.
         If the average minimum signal value is below this value, this number is used
         to normalize the TSS signal. This approach penalizes cells with fewer reads.
-        Default: `0.2`
+        Default: ``0.2``
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     use_genomic_ranges
         Use genomic ranges implementation for calculating intersections, instead of
@@ -104,7 +108,8 @@ def compute_qc_stats(
 
     Examples
     --------
-    >>> from pycisTopic.fragments import read_fragments_to_polars_df, read_bed_to_polars_df
+    >>> from pycisTopic.fragments import read_bed_to_polars_df
+    >>> from pycisTopic.fragments import read_fragments_to_polars_df
     >>> from pycisTopic.gene_annotation import read_tss_annotation_from_bed
 
     1. Read gzipped fragments BED file to a Polars DataFrame.
@@ -164,7 +169,8 @@ def compute_qc_stats(
         collapse_duplicates=collapse_duplicates,
     )
 
-    # Get Polars DataFrame with total fragment counts and unique fragment counts per region.
+    # Get Polars DataFrame with total fragment counts and unique fragment counts
+    # per region.
     fragments_in_peaks_df_pl = get_fragments_in_peaks(
         fragments_df_pl=fragments_df_pl,
         regions_df_pl=regions_df_pl,
