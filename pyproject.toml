@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pycisTopic"
+authors = [
+  { name = "Carmen Bravo", email = "carmen.bravogonzalezblas@kuleuven.be" },
+  { name = "Gert Hulselmans", email = "gert.hulselmans@kuleuven.be" },
+]
+description = "pycisTopic is a Python module to simultaneously identify cell states and cis-regulatory topics from single cell epigenomics data."
+readme = "README.rst"
+requires-python = ">=3.8"
+keywords = ["scATAC", "cell state", "topic modeling", "LDA", "enhancer"]
+license = { file = "LICENSE.txt" }
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "License :: Other/Proprietary License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/aertslab/pycisTopic"
+Documentation = "https://pycistopic.readthedocs.io/"
+Repository = "https://github.com/aertslab/pycisTopic"
+Changelog = "https://github.com/aertslab/pycisTopic/releases"
+
+[project.dependencies]
+numpy = ["numpy >= 1.20.3"]
+pandas = ["pandas == 1.5"]
+polars = ["polars >= 0.18.3"]
+pyarrow = ["pyarrow >= 8.0.0"]
+
+[project.optional-dependencies]
+pybiomart = ["pybiomart"]
+pyranges = ["pyranges"]
