@@ -75,11 +75,13 @@ def get_tss_profile(
     Examples
     --------
     Get TSS annotation for requested transcript types from Ensembl BioMart.
+
     >>> ensembl_tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
     ...     biomart_name="hsapiens_gene_ensembl"
     )
 
     Get TSS profile for Polars DataFrame with fragments filtered by cell barcodes.
+
     >>> get_tss_profile(
     ...     fragments_df_pl=fragments_cb_filtered_df_pl,
     ...     tss_annotation=ensembl_tss_annotation_bed_df_pl,

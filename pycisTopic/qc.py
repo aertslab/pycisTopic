@@ -45,7 +45,7 @@ def compute_qc_stats(
         TSS annotation Polars DataFrame with at least the following columns:
         ``["Chromosome", "Start", "Strand"]``.
         The "Start" column is 0-based like a BED file.
-        :func:`pycisTopic.gene_annotation.read_tss_annotation_from_bed`,
+        See :func:`pycisTopic.gene_annotation.read_tss_annotation_from_bed`,
         :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl` and
         :func:`pycisTopic.gene_annotation.change_chromosome_source_in_bed` for ways
         to get TSS annotation from Ensembl BioMart.
@@ -113,12 +113,14 @@ def compute_qc_stats(
     >>> from pycisTopic.gene_annotation import read_tss_annotation_from_bed
 
     1. Read gzipped fragments BED file to a Polars DataFrame.
+
     >>> fragments_df_pl = read_fragments_to_polars_df(
     ...     fragments_bed_filename="fragments.tsv.gz",
     ... )
 
     2. Read BED file with consensus peaks or SCREEN regions (get first 3 columns only)
        which will be used for counting number of fragments in peaks.
+
     >>> regions_df_pl = read_bed_to_polars_df(
     ...     bed_filename=screen_regions_bed_filename,
     ...     min_column_count=3,
@@ -127,11 +129,13 @@ def compute_qc_stats(
     3. Read TSS annotation from a file.
        See :func:`pycisTopic.gene_annotation.read_tss_annotation_from_bed` for more
        info.
+
     >>> tss_annotation_bed_df_pl = read_tss_annotation_from_bed(
     ...     tss_annotation_bed_filename="hg38.tss.bed",
     ... )
 
     4. Compute QC statistics.
+
     >>> (
     ...     fragments_stats_per_cb_df_pl,
     ...     insert_size_dist_df_pl,

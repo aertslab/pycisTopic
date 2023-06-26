@@ -24,7 +24,7 @@ def get_all_gene_annotation_ensembl_biomart_dataset_names(
     ----------
     biomart_host
         BioMart host URL to use.
-          - Default: `http://www.ensembl.org`
+          - Default: ``http://www.ensembl.org``
           - Archived Ensembl BioMart URLs:
             https://www.ensembl.org/info/website/archives/index.html
             (List of currently available archives)
@@ -114,16 +114,17 @@ def get_tss_annotation_from_ensembl(
         Ensembl BioMart ID of the dataset.
         See :func:`pycisTopic.gene_annotation.get_biomart_dataset_name_for_species`
         to get the biomart_name for species of interest:
-        e.g.: `hsapiens_gene_ensembl`, `mmusculus_gene_ensembl`,
-              `dmelanogaster_gene_ensembl`, ...
+        e.g.:
+        ``hsapiens_gene_ensembl``, ``mmusculus_gene_ensembl``,
+        ``dmelanogaster_gene_ensembl``, ...
     biomart_host
         BioMart host URL to use.
-          - Default: `http://www.ensembl.org`
+          - Default: ``http://www.ensembl.org``
           - Archived Ensembl BioMart URLs:
             https://www.ensembl.org/info/website/archives/index.html
             (List of currently available archives)
     transcript_type
-        Only keep list of specified transcript types (e.g.: `["protein_coding"]`) or
+        Only keep list of specified transcript types (e.g.: ``["protein_coding"]``) or
         all (``None``).
     use_cache
         Whether to cache requests to Ensembl BioMart server.
@@ -205,7 +206,7 @@ def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFra
     tss_annotation_bed_filename
         TSS annotation BED file to read.
         TSS annotation BED files can be written with
-        :func:`pycisTopic.gene_annotation.write_tss_annotation_to_bed`.
+        :func:`pycisTopic.gene_annotation.write_tss_annotation_to_bed`
         and will have the following header line:
             `# Chromosome Start End Gene Score Strand Transcript_type`
         Minimum required columns for :func:`pycisTopic.tss_profile.get_tss_profile`:
@@ -220,6 +221,7 @@ def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFra
     Examples
     --------
     Get TSS annotation from Ensembl.
+
     >>> tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
     ...     biomart_name="hsapiens_gene_ensembl"
     ... )
@@ -231,12 +233,14 @@ def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFra
     or RefSeq chromosome names.
 
     Write TSS annotation to a file.
+
     >>> write_tss_annotation_to_bed(
     ...     tss_annotation_bed_df_pl=tss_annotation_bed_df_pl,
     ...     tss_annotation_bed_filename="hg38.tss.bed",
     ... )
 
     Read TSS annotation from a file.
+
     >>> tss_annotation_bed_df_pl = read_tss_annotation_from_bed(
     ...     tss_annotation_bed_filename="hg38.tss.bed"
     ... )
@@ -296,6 +300,7 @@ def write_tss_annotation_to_bed(
     Examples
     --------
     Get TSS annotation from Ensembl.
+
     >>> tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
     ...     biomart_name="hsapiens_gene_ensembl"
     ... )
@@ -307,12 +312,14 @@ def write_tss_annotation_to_bed(
     or RefSeq chromosome names.
 
     Write TSS annotation to a file.
+
     >>> write_tss_annotation_to_bed(
     ...     tss_annotation_bed_df_pl=tss_annotation_bed_df_pl,
     ...     tss_annotation_bed_filename="hg38.tss.bed",
     ... )
 
     Read TSS annotation from a file.
+
     >>> tss_annotation_bed_df_pl = read_tss_annotation_from_bed(
     ...     tss_annotation_bed_filename="hg38.tss.bed"
     ... )
@@ -341,12 +348,12 @@ def get_chrom_alias_mapping(
     Parameters
     ----------
     ucsc_assembly:
-        UCSC assembly names (`hg38`, `mm10`, `dm6`, ...)
+        UCSC assembly names (``hg38``, ``mm10``, ``dm6``, ...)
         If specified, retrieve data from UCSC.
     chrom_alias_tsv_filename:
         If specified and ``ucsc_assembly`` is not ``None``, write the chromosome alias
         mapping to the specified file.
-        If specified and `ucsc_assembly=None`, read chromosome alias mapping from
+        If specified and ``ucsc_assembly=None``, read chromosome alias mapping from
         specified file.
 
     Returns
@@ -361,17 +368,20 @@ def get_chrom_alias_mapping(
     Examples
     --------
     Get chromosome aliases for different assemblies from UCSC:
+
     >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping(ucsc_assembly="hg38")
     >>> chrom_alias_mm10_df_pl = get_chrom_alias_mapping(ucsc_assembly="mm10")
     >>> chrom_alias_dm6_df_pl = get_chrom_alias_mapping(ucsc_assembly="dm6")
 
     Get chromosome aliases for hg38 and also write it to a TSV file:
+
     >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping(
     ...     ucsc_assembly="hg38",
     ...     chrom_alias_tsv_filename="chrom_alias_hg38_mapping.tsv",
     ... )
 
     Get chromosome aliases for hg38 from a previous written TSV file:
+
     >>> chrom_alias_hg38_from_file_df_pl = get_chrom_alias_mapping(
     ...    chrom_alias_tsv_filename="chrom_alias_hg38_mapping.tsv",
     ... )
@@ -505,7 +515,7 @@ def find_most_likely_chromosome_source_in_bed(
     ----------
     chrom_alias_df_pl
         Polars DataFrame with chromosome alias content.
-        See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping.get_chrom_alias_mapping`.
+        See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping`.
     bed_df_pl
         Polars DataFrame with BED entries.
         See :func:`pycisTopic.fragments.read_bed_to_polars_df`.
@@ -565,21 +575,21 @@ def change_chromosome_source_in_bed(
     ----------
     chrom_alias_df_pl
         Polars DataFrame with UCSC chromosome alias content.
-        See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping.get_chrom_alias_mapping`.
+        See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping`.
     bed_df_pl
         Polars DataFrame with BED entries for which chromosome names need to be
         remapped from ``from_chrom_source_name`` to ``to_chrom_source_name``.
         See :func:`pycisTopic.fragments.read_bed_to_polars_df` and
         :func:`pycisTopic.gene_annotation.read_tss_annotation_from_bed`
     from_chrom_source_name
-        Current chromosome source name for the input BED file: `ucsc`, `ensembl`,
-        `genbank` or `refseq`.
+        Current chromosome source name for the input BED file: ``ucsc``, ``ensembl``,
+        ``genbank`` or ``refseq``.
         Can be guessed with
         :func:`pycisTopic.gene_annotation.find_most_likely_chromosome_source_in_bed`.
     to_chrom_source_name
         Chromosome source name to which the output Polars DataFrame with BED entries
         should be mapped:
-        `ucsc`, `ensembl`, `genbank` or `refseq`.
+        ``ucsc``, ``ensembl``, ``genbank`` or ``refseq``.
 
     Returns
     -------
@@ -596,15 +606,18 @@ def change_chromosome_source_in_bed(
     Examples
     --------
     Get chromosome alias mapping for hg38.
+
     >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping(ucsc_assembly="hg38")
 
     Get gene annotation for hg38 from Ensembl BioMart.
+
     >>> hg38_tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
     ...     biomart_name="hsapiens_gene_ensembl",
     ... )
     >>> hg38_tss_annotation_bed_df_pl
 
     Replace Ensembl chromosome names with UCSC chromosome names in gene annotation for hg38.
+
     >>> hg38_tss_annotation_ucsc_chroms_bed_df_pl = change_chromosome_source_in_bed(
     ...     chrom_alias_df_pl=chrom_alias_hg38_df_pl,
     ...     bed_df_pl=hg38_tss_annotation_bed_df_pl,
