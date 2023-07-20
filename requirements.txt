@@ -21,7 +21,7 @@ pandas==1.5
 polars>=0.17.0
 pybedtools
 pyfasta
-pyranges
+pyranges<0.0.128
 pybiomart
 pyBigWig
 python-Levenshtein
