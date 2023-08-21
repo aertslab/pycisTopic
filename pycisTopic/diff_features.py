@@ -12,6 +12,7 @@ import scipy
 import scipy.sparse as sparse
 import sklearn
 from scipy.stats import ranksums
+import random
 
 from .cistopic_class import *
 from .utils import *
@@ -695,6 +696,24 @@ def find_highly_variable_features(
     return var_features
 
 
+
+def subsample(
+        samples: List,
+        n: int
+):
+    """
+    helper function for subsampling list of barcodes
+    """
+
+    if n >= len(samples):
+        selsamples = samples
+    else:    
+        selsamples = random.sample(samples, n)
+    
+    return selsamples
+
+
+
 def find_diff_features(
     cistopic_obj: "CistopicObject",
     imputed_features_obj: "CistopicImputedFeatures",
@@ -705,6 +724,8 @@ def find_diff_features(
     log2fc_thr: Optional[float] = np.log2(1.5),
     split_pattern: Optional[str] = "___",
     n_cpu: Optional[int] = 1,
+    n_subsample_clusters_bg: Optional[int] = None,
+    seed: Optional[int] = 42,
     **kwargs,
 ):
     """
@@ -732,6 +753,10 @@ def find_diff_features(
         Pattern to split cell barcode from sample id. Default: `___`
     n_cpu: int, optional
         Number of cores to use. Default: 1
+    n_subsample_clusters_bg: Optional[int] = None
+        Subsample background barcodes per cluster by specified number if the cluster is larger than it
+    seed: Optional[int] = 42
+        seed for random number generator, used for subsampling
     **kwargs
         Parameters to pass to ray.init()
 
@@ -766,13 +791,32 @@ def find_diff_features(
         ]
 
     # Get barcodes in each class per contrasts.
-    barcode_groups = [
-        [
-            group_var[group_var.isin(contrasts[i][0])].index.tolist(),
-            group_var[group_var.isin(contrasts[i][1])].index.tolist(),
+    if n_subsample_clusters_bg is None:
+        barcode_groups = [
+            [
+                group_var[group_var.isin(contrasts[i][0])].index.tolist(),
+                group_var[group_var.isin(contrasts[i][1])].index.tolist(),
+            ]
+            for i in range(len(contrasts))
         ]
-        for i in range(len(contrasts))
-    ]
+    else:
+        # set random seed
+        random.seed(seed)
+        log.info(f"Set seed for RNG to {seed}.")
+        
+        # create background
+        log.info(f"Subsampling background max. {n_subsample_clusters_bg} barcodes per cluster.")
+        
+        bcs_bg = sum([ subsample([bc for bc in group_var[group_var == grp].index], n_subsample_clusters_bg)
+                       for grp in np.unique(group_var) ], [])
+        
+        barcode_groups = [
+            [
+                group_var[group_var.isin(contrasts[i][0])].index.tolist(),
+                [ bc for bc in group_var[group_var.isin(contrasts[i][1])].index.tolist() if bc in bcs_bg],
+            ]
+            for i in range(len(contrasts))
+        ]
 
     # Subset imputed accessibility matrix.
     subset_imputed_features_obj = imputed_features_obj.subset(
