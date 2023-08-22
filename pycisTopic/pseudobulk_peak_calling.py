@@ -23,6 +23,7 @@ def export_pseudobulk(
     bed_path: str,
     bigwig_path: str,
     path_to_fragments: Optional[Dict[str, str]] = None,
+    chrom_filter: Optional[str] = None,
     sample_id_col: Optional[str] = "sample_id",
     n_cpu: Optional[int] = 1,
     normalize_bigwig: Optional[bool] = True,
@@ -55,6 +56,9 @@ def export_pseudobulk(
             A dictionary of character strings, with sample name as names indicating the path to the fragments file/s from which pseudobulk profiles have to
             be created. If a :class:`CistopicObject` is provided as input it will be ignored, but if a cell metadata :class:`pd.DataFrame` is provided it
             is necessary to provide it. The keys of the dictionary need to match with the sample_id tag added to the index names of the input data frame.
+    chrom_filter: str, optional
+            A regular expression to filter out scaffolds like GL/KI genes from the fragments list.
+            Example: `"GL|KI"`
     sample_id_col: str, optional
             Name of the column containing the sample name per barcode in the input :class:`CistopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
     n_cpu: int, optional
@@ -129,6 +133,12 @@ def export_pseudobulk(
                         prepare_tag_cells(cell_data.index.tolist(), split_pattern)
                     )
                 ]
+            if chrom_filter is not None:
+                fragment_drop = fragments_df.Chromosome.str.contains(chrom_filter)
+                n_fragments_dropped = fragment_drop.sum()
+                log.info("Filtering out " + str(n_fragments_dropped) + " fragments.")
+                fragments_df.drop(fragments_df[fragment_drop].index, inplace=True)
+            
             fragments_df_dict[sample_id] = fragments_df
 
     # Set groups
