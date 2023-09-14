@@ -142,22 +142,7 @@ def qc(
     )
 
 
-def main():
-    parser = argparse.ArgumentParser(description="pycisTopic CLI.")
-
-    subparsers = parser.add_subparsers(
-        title="Commands",
-        description="List of available commands for pycisTopic CLI.",
-        dest="command",
-        help="Command description.",
-    )
-    subparsers.required = True
-
-    parser_tss = subparsers.add_parser(
-        "tss",
-        help="Get TSS annotation from Ensembl.",
-    )
-
+def add_parser_qc(subparsers):
     parser_qc = subparsers.add_parser(
         "qc",
         help="Run QC statistics on fragment file.",
@@ -181,9 +166,9 @@ def main():
         type=str,
         required=True,
         help="""
-        Consensus peaks / SCREEN regions BED file. Used to calculate amount of
-        fragments in peaks.
-        """,
+            Consensus peaks / SCREEN regions BED file. Used to calculate amount of
+            fragments in peaks.
+            """,
     )
 
     parser_qc.add_argument(
@@ -194,9 +179,9 @@ def main():
         type=str,
         required=True,
         help="""
-        TSS annotation BED file. Used to calculate distance of fragments to TSS
-        positions.
-        """,
+            TSS annotation BED file. Used to calculate distance of fragments to TSS
+            positions.
+            """,
     )
 
     parser_qc.add_argument(
@@ -239,13 +224,13 @@ def main():
         required=False,
         default=100,
         help="""
-        Average signal in the tails of the flanking window around the TSS
-        ([-flank_window, -flank_window + minimum_signal_window + 1],
-        [flank_window - minimum_signal_window + 1, flank_window])
-        is used to normalize the TSS enrichment.
-        Default: 100 (average signal in [-1000, -901], [901, 1000] around TSS,
-        if flank_window=1000).
-        """,
+            Average signal in the tails of the flanking window around the TSS
+            ([-flank_window, -flank_window + minimum_signal_window + 1],
+            [flank_window - minimum_signal_window + 1, flank_window])
+            is used to normalize the TSS enrichment.
+            Default: 100 (average signal in [-1000, -901], [901, 1000] around TSS,
+            if flank_window=1000).
+            """,
     )
 
     parser_qc.add_argument(
@@ -256,10 +241,10 @@ def main():
         required=False,
         default=50,
         help="""
-        Window around the TSS used to count fragments in the TSS when calculating
-        the TSS enrichment per cell barcode.
-        Default: 50 (+/- 50 bp).
-        """,
+            Window around the TSS used to count fragments in the TSS when calculating
+            the TSS enrichment per cell barcode.
+            Default: 50 (+/- 50 bp).
+            """,
     )
 
     parser_qc.add_argument(
@@ -270,11 +255,11 @@ def main():
         required=False,
         default=0.2,
         help="""
-        Minimum normalization score.
-        If the average minimum signal value is below this value, this number is used
-        to normalize the TSS signal. This approach penalizes cells with fewer reads.
-        Default: 0.2
-        """,
+            Minimum normalization score.
+            If the average minimum signal value is below this value, this number is used
+            to normalize the TSS signal. This approach penalizes cells with fewer reads.
+            Default: 0.2
+            """,
     )
 
     parser_qc.add_argument(
@@ -283,9 +268,9 @@ def main():
         action="store_false",
         required=False,
         help="""
-        Use pyranges instead of genomic ranges implementation for calculating
-        intersections.
-        """,
+            Use pyranges instead of genomic ranges implementation for calculating
+            intersections.
+            """,
     )
 
     parser_qc.add_argument(
@@ -296,10 +281,10 @@ def main():
         required=False,
         default=50,
         help="""
-        Minimum number of fragments needed per cell barcode to keep the fragments
-        for those cell barcodes.
-        Default: 50.
-        """,
+            Minimum number of fragments needed per cell barcode to keep the fragments
+            for those cell barcodes.
+            Default: 50.
+            """,
     )
 
     parser_qc.add_argument(
@@ -308,11 +293,25 @@ def main():
         action="store_false",
         required=False,
         help="""
-        Don't collapse duplicate fragments (same chromosomal positions and linked to
-        the same cell barcode).
-        Default: collapse duplicates.
-        """,
+            Don't collapse duplicate fragments (same chromosomal positions and linked to
+            the same cell barcode).
+            Default: collapse duplicates.
+            """,
     )
+
+
+def main():
+    parser = argparse.ArgumentParser(description="pycisTopic CLI.")
+
+    subparsers = parser.add_subparsers(
+        title="Commands",
+        description="List of available commands for pycisTopic CLI.",
+        dest="command",
+        help="Command description.",
+    )
+    subparsers.required = True
+
+    add_parser_qc(subparsers)
 
     args = parser.parse_args()
 
