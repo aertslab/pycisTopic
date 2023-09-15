@@ -142,11 +142,29 @@ def qc(
     )
 
 
+def run_qc(args):
+    qc(
+        fragments_tsv_filename=args.fragments_tsv_filename,
+        regions_bed_filename=args.regions_bed_filename,
+        tss_annotation_bed_filename=args.tss_annotation_bed_filename,
+        output_prefix=args.output_prefix,
+        tss_flank_window=args.tss_flank_window,
+        tss_smoothing_rolling_window=args.tss_smoothing_rolling_window,
+        tss_minimum_signal_window=args.tss_minimum_signal_window,
+        tss_window=args.tss_window,
+        tss_min_norm=args.tss_min_norm,
+        use_genomic_ranges=args.use_genomic_ranges,
+        min_fragments_per_cb=args.min_fragments_per_cb,
+        collapse_duplicates=args.collapse_duplicates,
+    )
+
+
 def add_parser_qc(subparsers):
     parser_qc = subparsers.add_parser(
         "qc",
         help="Run QC statistics on fragment file.",
     )
+    parser_qc.set_defaults(func=run_qc)
 
     parser_qc.add_argument(
         "-f",
@@ -314,6 +332,7 @@ def main():
     add_parser_qc(subparsers)
 
     args = parser.parse_args()
+    args.func(args)
 
     if args.command == "qc":
         qc(
