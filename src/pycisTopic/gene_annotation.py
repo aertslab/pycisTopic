@@ -64,7 +64,7 @@ def get_biomart_dataset_name_for_species(
     species: str,
 ) -> pd.DataFrame:
     """
-    Get Ensembl BioMart dataset names for species of interest.
+    Get gene annotation Ensembl BioMart dataset names for species of interest.
 
     Parameters
     ----------
@@ -76,7 +76,7 @@ def get_biomart_dataset_name_for_species(
 
     Returns
     -------
-    Filtered list of Biomart Ensembl dataset names.
+    Filtered list of gene annotation Ensembl BioMart dataset names.
 
     See Also
     --------
