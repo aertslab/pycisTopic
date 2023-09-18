@@ -938,7 +938,7 @@ def compute_qc_stats(
     use_polars: Optional[bool] = True,
     **kwargs,
 ):
-    """ "
+    """
     Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
 
     Parameters
@@ -1283,6 +1283,7 @@ def compute_qc_stats_ray(
     partition: Optional[int] = 1,
     check_for_duplicates: Optional[bool] = True,
     remove_duplicates: Optional[bool] = True,
+    use_polars: Optional[bool] = True
 ):
     """
     Wrapper function to compute QC statistics on several samples. For detailed instructions, please see the independent functions.
@@ -1319,6 +1320,8 @@ def compute_qc_stats_ray(
             If no duplicate counts are provided per row in the fragments file, whether to collapse duplicates. Default: True.
     remove_duplicates: bool, optional
             Whether to remove duplicates. Default: True.
+    use_polars: bool, optional
+        Whether to use polars to read fragments files. Default: True.
 
     Return
     ---
@@ -1326,22 +1329,23 @@ def compute_qc_stats_ray(
             A list with the barcode statistics for all samples (or a combined data frame with a column 'Sample' indicating the sample of origin) and a list of dictionaries with the sample-level profiles for each sample.
     """
     return compute_qc_stats_single(
-        fragments,
-        tss_annotation,
-        stats,
-        label,
-        path_to_regions,
-        valid_bc,
-        n_frag,
-        n_bc,
-        tss_flank_window,
-        tss_window,
-        tss_minimum_signal_window,
-        tss_rolling_window,
-        min_norm,
-        partition,
-        check_for_duplicates,
-        remove_duplicates)
+        fragments=fragments,
+        tss_annotation=tss_annotation,
+        stats=stats,
+        label=label,
+        path_to_regions=path_to_regions,
+        valid_bc=valid_bc,
+        n_frag=n_frag,
+        n_bc=n_bc,
+        tss_flank_window=tss_flank_window,
+        tss_window=tss_window,
+        tss_minimum_signal_window=tss_minimum_signal_window,
+        tss_rolling_window=tss_rolling_window,
+        min_norm=min_norm,
+        partition=partition,
+        check_for_duplicates=check_for_duplicates,
+        remove_duplicates=remove_duplicates,
+        use_polars=use_polars)
 
 def plot_sample_metrics(
     profile_data_dict: Dict[str, pd.DataFrame],
