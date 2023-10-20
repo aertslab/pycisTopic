@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import io
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
 import polars as pl
+import requests
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -388,100 +391,83 @@ def get_chrom_alias_mapping(
 
     """
     if ucsc_assembly:
-        # Get chromosome alias file from UCSC genome browser.
         chrom_alias_tsv_url_filename = f"https://hgdownload.soe.ucsc.edu/goldenPath/{ucsc_assembly}/bigZips/{ucsc_assembly}.chromAlias.txt"
-        chrom_alias_df_pl = pl.read_csv(
-            chrom_alias_tsv_url_filename,
-            sep="\t",
-            has_header=False,
-            comment_char="#",
-            # Read all columns as strings.
-            infer_schema_length=0,
-        )
 
-        def find_chrom_source_column(chrom_alias_df_pl, chrom_source):
-            if chrom_source == "ucsc":
-                # Get UCSC chromosome column number by assuming it is the column which
-                # contains the most chromosome names that start with "chr".
-                chrom_source_expr = pl.col("^column_[1-9]$").str.starts_with("chr")
-            elif chrom_source == "ensembl":
-                # Get Ensembl chromosome column number by assuming it is the column
-                # which is the most similar to the UCSC chromosome column, but without
-                # "chr". Requires that UCSC chromosome column was found before.
-                chrom_source_expr = pl.col("^column_[1-9]$") == pl.col(
-                    "ucsc"
-                ).str.replace("^chr", "")
-            elif chrom_source == "refseq":
-                chrom_source_expr = pl.col("^column_[1-9]$").str.contains("^N[CTW]_")
-            elif chrom_source == "genbank":
-                chrom_source_expr = (
-                    pl.col("^column_[1-9]$")
-                    .str.contains("^[A-Z]{1,2}[0-9]{5,6}\\.[0-9]{1,3}")
-                    .sum()
-                )
-            else:
-                raise ValueError(
-                    'Only "ucsc", "ensembl", "refseq" and "genbank" are supported as '
-                    "chromosome source."
-                )
+        # Get chromosome alias file from UCSC genome browser.
+        response = requests.get(chrom_alias_tsv_url_filename)
 
-            no_unresolved_columns = len(
-                [
-                    column_name
-                    for column_name in chrom_alias_df_pl.columns
-                    if column_name.startswith("column_")
-                ]
+        if response.status_code == 200:
+            # Define some regexes to recognise chromosome names for:
+            #   - genbank ID:
+            #       starts with 1 or 2 capital characters followed by 5 up to 8
+            #       numbers, a dot and some more numbers.
+            #   - refseq IDs:
+            #       starts with "NC_", "NG_", "NT_" or "NW_" followed by 5 up to 9
+            #       numbers, a dot and some more numbers.
+            #   - UCSC:
+            #       starts with "chr".
+            genbank_id_regex = "^[A-Z]{1,2}[0-9]{5,8}\\.[0-9]+$"
+            refseq_id_regex = "^(NC|NG|NT|NW)_[0-9]{5,9}\\.[0-9]+$"
+            ucsc_regex = "^chr"
+
+            # Create an in memory TSV file to which the ucsc, ensembl, refseq_id and
+            # genbank_id chromosome columns will be written in the correct order.
+            chrom_alias_tsv_string_io = io.StringIO()
+
+            # Write header to in memory TSV file.
+            print(
+                "ucsc\tensembl\trefseq_id\tgenbank_id", file=chrom_alias_tsv_string_io
             )
 
-            if no_unresolved_columns == 0:
-                # All "column_x" names are already assigned to a chromosome source name.
-                return chrom_alias_df_pl
+            for line in response.content.decode("utf-8").split("\n"):
+                if not line or line.startswith("#"):
+                    continue
 
-            # Get all column names that match the filter the best.
-            chromosome_column_names = (
-                chrom_alias_df_pl.select(
-                    # Count how many times a chromosome name in a chromosome column
-                    # confirmed to the chrom_source_expr filter.
-                    chrom_source_expr.sum(),
+                columns = line.split("\t")
+
+                ucsc = ""
+                ensembl = ""
+                refseq_id = ""
+                genbank_id = ""
+
+                # Find correct chromosome source column for UCSC, Ensembl, RefSeq
+                # and Genbank per line of a UCSC chromosome alias file, instead of
+                # for whole columns at once as UCSC sorts the chromosome identifiers
+                # per line alphabetically instead of keeping it per source.
+                for column in columns:
+                    if re.match(ucsc_regex, column):
+                        ucsc = column
+                    elif re.match(genbank_id_regex, column):
+                        genbank_id = column
+                    elif re.match(refseq_id_regex, column):
+                        refseq_id = column
+                    else:
+                        ensembl = column
+
+                # Write columns in the correct order to the in memory TSV file.
+                print(
+                    "\t".join([ucsc, ensembl, refseq_id, genbank_id]),
+                    file=chrom_alias_tsv_string_io,
                 )
-                .transpose(include_header=True)
-                .filter(pl.col("column_0") != 0)
-                .filter(pl.col("column_0").max() == pl.col("column_0"))
-                .to_series()
-                .to_list()
+
+            # Rewind file descriptor to the start of the in memory TSV file.
+            chrom_alias_tsv_string_io.seek(0)
+
+            # Read in memory TSV file as a Polars dataframe.
+            chrom_alias_df_pl = pl.read_csv(
+                chrom_alias_tsv_string_io,
+                separator="\t",
+                has_header=True,
+                comment_char="#",
+                # Read all columns as strings.
+                infer_schema_length=0,
             )
-
-            if len(chromosome_column_names) == 0:
-                # No suitable chromosome column found.
-                return chrom_alias_df_pl
-            elif len(chromosome_column_names) == 1:
-                # On suitable chromosome column found.
-                chromosome_column_name = chromosome_column_names[0]
-            else:
-                # Multiple suitable chromosome columns found with the same score.
-                # Sort by number of null values and take the first column name.
-                chromosome_column_name = (
-                    chrom_alias_df_pl.select(
-                        pl.col(chromosome_column_names).is_null().sum(),
-                    )
-                    .transpose(include_header=True)
-                    .sort(by="column_0", descending=True)
-                    .head(1)
-                    .to_series()
-                    .item()
-                )
-
-            return chrom_alias_df_pl.rename({chromosome_column_name: chrom_source})
-
-        # Find out which columns contain which chromosome source as the UCSC chromosome
-        # alias file does not have a proper header or has the columns always in the
-        # same order.
-        chrom_alias_df_pl = find_chrom_source_column(chrom_alias_df_pl, "ucsc")
-        # Find the Ensembl column after the UCSC column as it's filter needs the UCSC
-        # column.
-        chrom_alias_df_pl = find_chrom_source_column(chrom_alias_df_pl, "ensembl")
-        chrom_alias_df_pl = find_chrom_source_column(chrom_alias_df_pl, "refseq")
-        chrom_alias_df_pl = find_chrom_source_column(chrom_alias_df_pl, "genbank")
+        else:
+            raise ValueError(
+                f'Failed to download the file "{chrom_alias_tsv_url_filename}". '
+                f"Status code: {response.status_code}.\n"
+                f"{response.text}"
+            )
 
         if chrom_alias_tsv_filename and isinstance(
             chrom_alias_tsv_filename, (str, Path)
