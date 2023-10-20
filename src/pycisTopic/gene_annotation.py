@@ -788,3 +788,113 @@ def change_chromosome_source_in_bed(
     )
 
     return chrom_source_stats_df_pl
+
+
+def get_ncbi_assembly_accessions_for_species(species: str) -> str:
+    """
+    Get NCBI assembly accession numbers and assembly names for a certain species.
+
+    Parameters
+    ----------
+    species
+         Species name (latin name) for which to look for NCBI assembly accession
+         numbers.
+
+    Returns
+    -------
+    String with NCBI assembly accession number and assembly name.
+
+    See Also
+    --------
+    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi
+
+    Examples
+    --------
+    >>> print(get_ncbi_assembly_accessions_for_species("homo sapiens"))
+    accession	assembly_name
+    GCF_000001405.40	GRCh38.p14
+    GCF_000001405.25	GRCh37.p13
+    GCF_000001405.26	GRCh38
+    GCF_000001405.27	GRCh38.p1
+    GCF_000001405.28	GRCh38.p2
+    GCF_000001405.29	GRCh38.p3
+    GCF_000001405.30	GRCh38.p4
+    GCF_000001405.31	GRCh38.p5
+    GCF_000001405.32	GRCh38.p6
+    GCF_000001405.33	GRCh38.p7
+    GCF_000001405.34	GRCh38.p8
+    GCF_000001405.35	GRCh38.p9
+    GCF_000001405.36	GRCh38.p10
+    GCF_000001405.37	GRCh38.p11
+    GCF_000001405.38	GRCh38.p12
+    GCF_000001405.39	GRCh38.p13
+    GCF_000002125.1	HuRef
+    GCF_000306695.2	CHM1_1.1
+    GCF_009914755.1	T2T-CHM13v2.0
+    >>> print(get_ncbi_assembly_accessions_for_species("drosophila melanogaster"))
+    accession	assembly_name
+    GCF_000001215.4	Release 6 plus ISO1 MT
+
+    """
+    url = "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/dataset_report"
+
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    data = {
+        "filters": {
+            "assembly_source": "refseq",
+            "assembly_version": "all_assemblies",
+            "exclude_atypical": True,
+            "has_annotation": False,
+            "is_metagenome_derived": "METAGENOME_DERIVED_UNSET",
+            "reference_only": False,
+        },
+        "include_tabular_header": "INCLUDE_TABULAR_HEADER_FIRST_PAGE_ONLY",
+        "page_size": 1000,
+        "returned_content": "COMPLETE",
+        "sort": [
+            {"direction": "SORT_DIRECTION_ASCENDING", "field": "organismName"},
+            {"direction": "SORT_DIRECTION_DESCENDING", "field": "isRefGenome"},
+            {"direction": "SORT_DIRECTION_DESCENDING", "field": "isRepGenome"},
+            {"direction": "SORT_DIRECTION_DESCENDING", "field": "isRefseq"},
+            {"direction": "SORT_DIRECTION_ASCENDING", "field": "accession"},
+        ],
+        "taxons": [species],
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+
+    if response.status_code == 200:
+        result = response.json()
+
+        if not result:
+            raise ValueError(
+                f"No assembly accession IDs found for {species}. "
+                'Make sure to use the full latin name (e.g. "homo sapiens").'
+            )
+
+        # Create an in memory TSV file.
+        get_ncbi_assembly_accessions_tsv_string_io = io.StringIO()
+
+        # Write header to in memory TSV file.
+        print(
+            "accession\tassembly_name",
+            file=get_ncbi_assembly_accessions_tsv_string_io,
+        )
+
+        for report in result["reports"]:
+            print(
+                report["accession"] + "\t" + report["assembly_info"]["assembly_name"],
+                file=get_ncbi_assembly_accessions_tsv_string_io,
+            )
+
+        # Return content of in memory TSV file as string.
+        return get_ncbi_assembly_accessions_tsv_string_io.getvalue()
+    else:
+        raise ValueError(
+            f"Request failed with status code: {response.status_code}.\n"
+            f"{response.text}"
+        )
