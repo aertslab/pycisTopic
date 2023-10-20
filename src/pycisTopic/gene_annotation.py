@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
@@ -380,6 +381,116 @@ def get_chrom_alias_mapping_from_file(
     return chrom_alias_df_pl
 
 
+def get_chrom_alias_mapping_from_ncbi(
+    accession_id: str, chrom_alias_tsv_filename: str | None
+) -> pl.DataFrame:
+    """
+    Get chromosome alias mapping from NCBI sequence reports.
+
+    Get chromosome alias mapping from NCBI sequence reports to be able to map
+    chromosome names between UCSC, Ensembl, GenBank and RefSeq chromosome names
+    or read mapping from local file (chromosome_alias_tsv_file) instead.
+
+    Parameters
+    ----------
+    accession_id
+        NCBI assembly accession ID.
+    chrom_alias_tsv_filename
+        If specified, write the chromosome alias mapping to the specified file.
+
+    Returns
+    -------
+    Polars Dataframe with chromosome alias mappings between UCSC, Ensembl, GenBank and
+        RefSeq chromosome names.
+
+    See Also
+    --------
+    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file
+    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc
+    pycisTopic.gene_annotation.get_ncbi_assembly_accessions_for_species
+
+    Examples
+    --------
+    Get chromosome aliases for different assemblies from NCBI.
+
+    Assemby accession IDs for a species can be queries with
+    `pycisTopic.gene_annotation.get_ncbi_assembly_accessions_for_species`
+
+    >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping_from_ncbi(
+    ...    accession_id="GCF_000001405.40"
+    ... )
+    >>> chrom_alias_mm10_df_pl = get_chrom_alias_mapping_from_ncbi(
+    ...     accession_id="GCF_000001215.4"
+    ... )
+    >>> chrom_alias_dm6_df_pl = get_chrom_alias_mapping_from_ncbi(
+    ...     accession_id="GCF_000001215.4"
+    ... )
+
+    Get chromosome aliases for hg38 and also write it to a TSV file:
+
+    >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping_from_ncbi(
+    ...     accession_id="GCF_000001405.40",
+    ...     chrom_alias_tsv_filename="chrom_alias_hg38_mapping.tsv",
+    ... )
+
+    """
+    # Set the URL
+    url = "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/sequence_reports"
+
+    # Set the request headers
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    # Set the request data
+    data = {
+        "accession": accession_id,  # Replace with your accession ID
+        "chromosomes": [],
+        "role_filters": [],
+        "table_fields": [],
+        "count_assembly_unplaced": False,
+        "page_size": 0,
+        "page_token": "",
+        "include_tabular_header": "INCLUDE_TABULAR_HEADER_FIRST_PAGE_ONLY",
+        "table_format": "",
+    }
+
+    # Make the POST request
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+
+    # Check the response
+    if response.status_code == 200:
+        # Parse the JSON response
+        result = response.json()
+        # Extract the "reports" part
+        reports = result.get("reports", [])
+
+        chrom_alias_df_pl = pl.from_dicts(reports).select(
+            pl.col("ucsc_style_name").alias("ucsc"),
+            pl.when(pl.col("ucsc_style_name").str.contains("_"))
+            .then(pl.col("genbank_accession"))
+            .otherwise(pl.col("chr_name"))
+            .alias("ensembl"),
+            pl.col("refseq_accession").alias("refseq"),
+            pl.col("genbank_accession").alias("genbank"),
+        )
+
+        if chrom_alias_tsv_filename and isinstance(
+            chrom_alias_tsv_filename, (str, Path)
+        ):
+            chrom_alias_df_pl.write_csv(
+                file=chrom_alias_tsv_filename, separator="\t", has_header=True
+            )
+
+        return chrom_alias_df_pl
+    else:
+        raise ValueError(
+            f"Request failed with status code: {response.status_code}.\n"
+            f"{response.text}"
+        )
+
+
 def get_chrom_alias_mapping_from_ucsc(
     ucsc_assembly: str, chrom_alias_tsv_filename: str | Path | None = None
 ) -> pl.DataFrame:
@@ -534,8 +645,9 @@ def find_most_likely_chromosome_source_in_bed(
     ----------
     chrom_alias_df_pl
         Polars DataFrame with chromosome alias content.
-        See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file`
-        and :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc`.
+        See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file`,
+        :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi` and
+        :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc`.
     bed_df_pl
         Polars DataFrame with BED entries.
         See :func:`pycisTopic.fragments.read_bed_to_polars_df`.
@@ -550,6 +662,7 @@ def find_most_likely_chromosome_source_in_bed(
     pycisTopic.fragments.read_bed_to_polars_df
     pycisTopic.gene_annotation.change_chromosome_source_in_bed
     pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file
+    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi
     pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc
 
     Examples
@@ -597,7 +710,8 @@ def change_chromosome_source_in_bed(
     chrom_alias_df_pl
         Polars DataFrame with chromosome alias content.
         See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file`,
-        and :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc`.
+        :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi` and
+        :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc`.
     bed_df_pl
         Polars DataFrame with BED entries for which chromosome names need to be
         remapped from ``from_chrom_source_name`` to ``to_chrom_source_name``.
@@ -622,6 +736,7 @@ def change_chromosome_source_in_bed(
     pycisTopic.fragments.read_bed_to_polars_df
     pycisTopic.gene_annotation.find_most_likely_chromosome_source_in_bed
     pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file
+    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi
     pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc
     pycisTopic.gene_annotation.read_tss_annotation_from_bed
     pycisTopic.gene_annotation.write_tss_annotation_to_bed
