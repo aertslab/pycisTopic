@@ -9,6 +9,75 @@ import polars as pl
 pl.enable_string_cache(True)
 
 
+def get_species_gene_annotation_ensembl_biomart_dataset_names(
+    species: str | None,
+    biomart_host: str = "http://www.ensembl.org",
+    use_cache: bool = True,
+) -> None:
+    """
+    Get all avaliable gene annotation Ensembl BioMart dataset names, optionally filtered by species.
+
+    Parameters
+    ----------
+    species
+        Filter list of all avaliable gene annotation Ensembl BioMart dataset names
+        by species.
+    biomart_host
+        BioMart host URL to use.
+          - Default: ``http://www.ensembl.org``
+          - Archived Ensembl BioMart URLs:
+            https://www.ensembl.org/info/website/archives/index.html
+            (List of currently available archives)
+    use_cache
+        Whether to cache requests to Ensembl BioMart server.
+
+    Returns
+    -------
+    Optionally filtered list of gene annotation Ensembl BioMart dataset names.
+
+    See Also
+    --------
+    pycisTopic.gene_annotation.get_all_gene_annotation_ensembl_biomart_dataset_names
+    pycisTopic.gene_annotation.get_biomart_dataset_name_for_species
+
+    Example
+    -------
+    Get full list of gene annotation Ensembl BioMart datasets from Ensembl BioMart.
+    >>> get_species_gene_annotation_ensembl_biomart_dataset_names()
+
+    Get filtered list of gene annotation Ensembl BioMart datasets from Ensembl BioMart.
+    >>> get_species_gene_annotation_ensembl_biomart_dataset_names(
+    ...     species="human",
+    ... )
+
+    Get filtered list of gene annotation Ensembl BioMart datasets from an archived
+    Ensembl BioMart.
+    >>> get_species_gene_annotation_ensembl_biomart_dataset_names(
+    ...     species="mouse",
+    ...     biomart_host="http://jul2022.archive.ensembl.org/",
+    ... )
+
+    """  # noqa: W505
+    import pycisTopic.gene_annotation as ga
+
+    biomart_datasets = ga.get_all_gene_annotation_ensembl_biomart_dataset_names(
+        biomart_host=biomart_host,
+        use_cache=use_cache,
+    )
+
+    if not species:
+        biomart_datasets.to_csv(sys.stdout, sep="\t", header=False, index=False)
+    else:
+        biomart_datasets_for_species = ga.get_biomart_dataset_name_for_species(
+            biomart_datasets=biomart_datasets,
+            species=species,
+        )
+
+        biomart_datasets_for_species.to_csv(
+            sys.stdout, sep="\t", header=False, index=False
+        )
+
+
 def qc(
     fragments_tsv_filename: str,
     regions_bed_filename: str,
@@ -79,6 +148,7 @@ def qc(
     Returns
     -------
     None
+
     """
     from pycisTopic.fragments import read_bed_to_polars_df, read_fragments_to_polars_df
     from pycisTopic.gene_annotation import read_tss_annotation_from_bed
@@ -142,6 +212,14 @@ def qc(
     )
 
 
+def run_tss_gene_annotation_list(args):
+    get_species_gene_annotation_ensembl_biomart_dataset_names(
+        species=args.filter,
+        biomart_host=args.biomart_host,
+        use_cache=args.use_cache,
+    )
+
+
 def run_qc(args):
     qc(
         fragments_tsv_filename=args.fragments_tsv_filename,
@@ -156,6 +234,60 @@ def run_qc(args):
         use_genomic_ranges=args.use_genomic_ranges,
         min_fragments_per_cb=args.min_fragments_per_cb,
         collapse_duplicates=args.collapse_duplicates,
+    )
+
+
+def add_parser_tss(subparsers):
+    parser_tss = subparsers.add_parser(
+        "tss",
+        help="Get TSS annotation from Ensembl.",
+    )
+
+    subparser_tss = parser_tss.add_subparsers(
+        title="TSS",
+        dest="tss",
+        help="Get list of all Ensembl BioMart gene annotation names.",
+    )
+    subparser_tss.required = True
+
+    parser_tss_gene_annotation_list = subparser_tss.add_parser(
+        "gene_annotation_list",
+        help="Get list of all Ensembl BioMart gene annotation names.",
+    )
+    parser_tss_gene_annotation_list.set_defaults(func=run_tss_gene_annotation_list)
+
+    parser_tss_gene_annotation_list.add_argument(
+        "-f",
+        "--filter",
+        dest="filter",
+        action="store",
+        type=str,
+        required=False,
+        help="Only keep list of Ensembl BioMart gene annotation names that contain specified string.",
+    )
+
+    parser_tss_gene_annotation_list.add_argument(
+        "-s",
+        "--server",
+        dest="biomart_host",
+        action="store",
+        type=str,
+        required=False,
+        default="http://www.ensembl.org",
+        help='BioMart host URL to use. Default: "http://www.ensembl.org". '
+        "Archived Ensembl BioMart URLs: "
+        "https://www.ensembl.org/info/website/archives/index.html "
+        "(List of currently available archives).",
+    )
+
+    parser_tss_gene_annotation_list.add_argument(
+        "--no-cache",
+        dest="use_cache",
+        action="store_false",
+        # type=bool,
+        required=False,
+        default=True,
+        help="Disable caching of requests to Ensembl BioMart server.",
     )
 
 
@@ -329,6 +461,7 @@ def main():
     )
     subparsers.required = True
 
+    add_parser_tss(subparsers)
     add_parser_qc(subparsers)
 
     args = parser.parse_args()
