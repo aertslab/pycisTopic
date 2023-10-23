@@ -575,7 +575,7 @@ def get_chrom_alias_mapping_from_ucsc(
                 genbank_id = ""
 
                 # Find correct chromosome source column for UCSC, Ensembl, RefSeq
-                # and Genbank per line of a UCSC chromosome alias file, instead of
+                # and GenBank per line of a UCSC chromosome alias file, instead of
                 # for whole columns at once as UCSC sorts the chromosome identifiers
                 # per line alphabetically instead of keeping it per source.
                 for column in columns:
