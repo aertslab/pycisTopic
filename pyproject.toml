@@ -29,18 +29,18 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dynamic = ["version"]
+dependencies = [
+    "numpy >= 1.20.3",
+    "pandas == 1.5",
+    "polars >= 0.18.3",
+    "pyarrow >= 8.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/aertslab/pycisTopic"
 Documentation = "https://pycistopic.readthedocs.io/"
 Repository = "https://github.com/aertslab/pycisTopic"
 Changelog = "https://github.com/aertslab/pycisTopic/releases"
-
-[project.dependencies]
-numpy = ["numpy >= 1.20.3"]
-pandas = ["pandas == 1.5"]
-polars = ["polars >= 0.18.3"]
-pyarrow = ["pyarrow >= 8.0.0"]
 
 [project.optional-dependencies]
 pybiomart = ["pybiomart"]
