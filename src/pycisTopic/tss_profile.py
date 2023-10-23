@@ -339,7 +339,7 @@ def get_tss_profile(
     tss_norm_matrix_sample = tss_smoothed_matrix_per_cb.select(
         pl.col("Position"),
         # Get total number of cut sites per position over all CBs.
-        pl.sum(pl.all().exclude("Position")).alias("smoothed_per_pos_sum"),
+        pl.sum_horizontal(pl.all().exclude("Position")).alias("smoothed_per_pos_sum"),
     ).select(
         pl.col("Position"),
         # Normalize total number of cut sites per position over all CBs.
