@@ -82,6 +82,7 @@ def get_tss_annotation_bed_file(
 
     See Also
     --------
+    pycisTopic.cli.pycistopic.get_ncbi_assembly_accessions_for_species
     pycisTopic.cli.pycistopic.get_species_gene_annotation_ensembl_biomart_dataset_names
     pycisTopic.gene_annotation.change_chromosome_source_in_bed
     pycisTopic.gene_annotation.get_biomart_dataset_name_for_species
@@ -257,6 +258,7 @@ def get_species_gene_annotation_ensembl_biomart_dataset_names(
 
     See Also
     --------
+    pycisTopic.cli.pycistopic.get_tss_annotation_bed_file
     pycisTopic.gene_annotation.get_all_gene_annotation_ensembl_biomart_dataset_names
     pycisTopic.gene_annotation.get_biomart_dataset_name_for_species
 
@@ -296,6 +298,35 @@ def get_species_gene_annotation_ensembl_biomart_dataset_names(
         biomart_datasets_for_species.to_csv(
             sys.stdout, sep="\t", header=False, index=False
         )
+
+
+def get_ncbi_assembly_accessions_for_species(species: str) -> None:
+    """
+    Get NCBI assembly accession numbers and assembly names for a certain species.
+
+    Parameters
+    ----------
+    species
+         Species name (latin name) for which to look for NCBI assembly accession
+         numbers.
+
+    Returns
+    -------
+    None.
+
+    See Also
+    --------
+    pycisTopic.cli.pycistopic.get_tss_annotation_bed_file
+    pycisTopic.gene_annotation.get_ncbi_assembly_accessions_for_species
+
+    Examples
+    --------
+    >>> get_ncbi_assembly_accessions_for_species(species="homo sapiens")
+
+    """
+    import pycisTopic.gene_annotation as ga
+
+    print(ga.get_ncbi_assembly_accessions_for_species(species))
 
 
 def qc(
@@ -460,6 +491,10 @@ def run_tss_gene_annotation_list(args):
     )
 
 
+def run_tss_get_ncbi_acc(args):
+    get_ncbi_assembly_accessions_for_species(species=args.species)
+
+
 def run_qc(args):
     qc(
         fragments_tsv_filename=args.fragments_tsv_filename,
@@ -600,7 +635,8 @@ def add_parser_tss(subparsers):
         help="NCBI genome accession ID for which to retrieve NCBI sequence reports, "
         "which will be used to build chromosome alias mappings, which can be used to "
         "map Ensembl chromosome names (from TSS annotation) to UCSC, RefSeq or "
-        "GenBank chromosome names. "
+        "GenBank chromosome names. Run `pycistopic tss get_ncbi_acc` to get all "
+        "possible NCBI genome accession IDs for a species. "
         'e.g.: "GCF_000001405.40", "GCF_000001215.4", "GCF_000001215.4", ...',
     )
 
@@ -657,6 +693,23 @@ def add_parser_tss(subparsers):
         required=False,
         default=True,
         help="Disable caching of requests to Ensembl BioMart server.",
+    )
+
+    parser_tss_get_ncbi_acc = subparser_tss.add_parser(
+        "get_ncbi_acc",
+        help="Get NCBI assembly accession numbers and assembly names for a certain species.",
+    )
+    parser_tss_get_ncbi_acc.set_defaults(func=run_tss_get_ncbi_acc)
+
+    parser_tss_get_ncbi_acc.add_argument(
+        "-s",
+        "--species",
+        dest="species",
+        action="store",
+        type=str,
+        required=True,
+        help="Species name (latin name) for which to look for NCBI assembly accession "
+        'numbers. e.g.: "homo sapiens".',
     )
 
 
