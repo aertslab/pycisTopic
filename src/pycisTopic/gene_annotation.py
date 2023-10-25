@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
-pl.enable_string_cache(True)
+pl.enable_string_cache()
 
 
 def get_all_gene_annotation_ensembl_biomart_dataset_names(

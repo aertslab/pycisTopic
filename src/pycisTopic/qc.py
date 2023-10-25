@@ -11,7 +11,7 @@ from pycisTopic.tss_profile import get_tss_profile
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
-pl.enable_string_cache(True)
+pl.enable_string_cache()
 
 
 def compute_qc_stats(

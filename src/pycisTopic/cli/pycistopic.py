@@ -9,7 +9,7 @@ import polars as pl
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
-pl.enable_string_cache(True)
+pl.enable_string_cache()
 
 
 def get_tss_annotation_bed_file(

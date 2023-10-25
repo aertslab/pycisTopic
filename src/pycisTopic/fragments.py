@@ -16,7 +16,7 @@ from pycisTopic.utils import normalise_filepath
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
-pl.enable_string_cache(True)
+pl.enable_string_cache()
 
 
 def read_fragments_to_pyranges(
@@ -253,7 +253,7 @@ def read_bed_to_polars_df(
 
     # Enable global string cache so categorical columns from multiple Polars DataFrames
     # can be joined later, if necessary.
-    pl.enable_string_cache(True)
+    pl.enable_string_cache()
 
     if engine == "polars":
         # Read BED file with Polars.
