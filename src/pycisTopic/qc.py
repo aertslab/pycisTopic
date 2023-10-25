@@ -203,19 +203,19 @@ def compute_qc_stats(
             pl.col("total_fragments_count"),
             (pl.col("total_fragments_count") + 1)
             .log10()
-            .alias("log_total_fragments_count"),
+            .alias("log10_total_fragments_count"),
             pl.col("unique_fragments_count"),
             (pl.col("unique_fragments_count") + 1)
             .log10()
-            .alias("log_unique_fragments_count"),
+            .alias("log10_unique_fragments_count"),
             pl.col("total_fragments_in_peaks_count"),
             (pl.col("total_fragments_in_peaks_count") + 1)
             .log10()
-            .alias("log_total_fragments_in_peaks_count"),
+            .alias("log10_total_fragments_in_peaks_count"),
             pl.col("unique_fragments_in_peaks_count"),
             (pl.col("unique_fragments_in_peaks_count") + 1)
             .log10()
-            .alias("log_unique_fragments_in_peaks_count"),
+            .alias("log10_unique_fragments_in_peaks_count"),
             pl.col("fraction_of_fragments_in_peaks"),
             pl.col("duplication_count"),
             pl.col("duplication_ratio"),
