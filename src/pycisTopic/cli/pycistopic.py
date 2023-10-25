@@ -544,7 +544,7 @@ def add_parser_tss(subparsers):
     )
 
     group_tgt_biomart = parser_tss_get_tss.add_argument_group(
-        "Ensembl BioMart", "Ensembl BioMart server"
+        "Ensembl BioMart", "Ensembl BioMart server settings."
     )
     group_tgt_biomart.add_argument(
         "-n",
@@ -669,7 +669,7 @@ def add_parser_tss(subparsers):
     )
 
     group_tgal_biomart = parser_tss_gene_annotation_list.add_argument_group(
-        "Ensembl BioMart", "Ensembl BioMart server"
+        "Ensembl BioMart", "Ensembl BioMart server settings."
     )
 
     group_tgal_biomart.add_argument(
@@ -766,7 +766,10 @@ def add_parser_qc(subparsers):
         help="Output prefix to use for QC statistics parquet output files.",
     )
 
-    parser_qc.add_argument(
+    group_qc_tss = parser_qc.add_argument_group(
+        "TSS profile", "TSS profile statistics calculation settings."
+    )
+    group_qc_tss.add_argument(
         "--tss_flank_window",
         dest="tss_flank_window",
         action="store",
@@ -778,7 +781,7 @@ def add_parser_qc(subparsers):
         "Default: 2000 (+/- 2000 bp).",
     )
 
-    parser_qc.add_argument(
+    group_qc_tss.add_argument(
         "--tss_smoothing_rolling_window",
         dest="tss_smoothing_rolling_window",
         action="store",
@@ -788,7 +791,7 @@ def add_parser_qc(subparsers):
         help="Rolling window used to smooth the cut sites signal. Default: 10.",
     )
 
-    parser_qc.add_argument(
+    group_qc_tss.add_argument(
         "--tss_minimum_signal_window",
         dest="tss_minimum_signal_window",
         action="store",
@@ -805,7 +808,7 @@ def add_parser_qc(subparsers):
             """,
     )
 
-    parser_qc.add_argument(
+    group_qc_tss.add_argument(
         "--tss_window",
         dest="tss_window",
         action="store",
@@ -819,7 +822,7 @@ def add_parser_qc(subparsers):
             """,
     )
 
-    parser_qc.add_argument(
+    group_qc_tss.add_argument(
         "--tss_min_norm",
         dest="tss_min_norm",
         action="store",
@@ -834,7 +837,7 @@ def add_parser_qc(subparsers):
             """,
     )
 
-    parser_qc.add_argument(
+    group_qc_tss.add_argument(
         "--use-pyranges",
         dest="use_genomic_ranges",
         action="store_false",
