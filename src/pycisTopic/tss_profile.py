@@ -13,7 +13,7 @@ pl.enable_string_cache()
 def get_tss_profile(
     fragments_df_pl: pl.DataFrame,
     tss_annotation: pl.DataFrame,
-    flank_window: int = 1000,
+    flank_window: int = 2000,
     smoothing_rolling_window: int = 10,
     minimum_signal_window: int = 100,
     tss_window: int = 50,
@@ -38,7 +38,7 @@ def get_tss_profile(
     flank_window
         Flanking window around the TSS.
         Used for intersecting fragments with TSS positions and keeping cut sites.
-        Default: ``1000`` (+/- 1000 bp).
+        Default: ``2000`` (+/- 2000 bp).
     smoothing_rolling_window
         Rolling window used to smooth the cut sites signal.
         Default: 10.
@@ -47,8 +47,8 @@ def get_tss_profile(
            - ``[-flank_window, -flank_window + minimum_signal_window + 1]``
            - ``[flank_window - minimum_signal_window + 1, flank_window]``
         is used to normalize the TSS enrichment.
-        Default: ``100`` (average signal in ``[-1000, -901]``, ``[901, 1000]``
-        around TSS if ``flank_window=1000``).
+        Default: ``100`` (average signal in ``[-2000, -1901]``, ``[1901, 2000]``
+        around TSS if ``flank_window=2000``).
     tss_window
         Window around the TSS used to count fragments in the TSS when calculating
         the TSS enrichment per cell barcode.
@@ -85,7 +85,7 @@ def get_tss_profile(
     >>> get_tss_profile(
     ...     fragments_df_pl=fragments_cb_filtered_df_pl,
     ...     tss_annotation=ensembl_tss_annotation_bed_df_pl,
-    ...     flank_window=1000,
+    ...     flank_window=2000,
     ...     smoothing_rolling_window=10,
     ...     minimum_signal_window=100,
     ...     tss_window=50,

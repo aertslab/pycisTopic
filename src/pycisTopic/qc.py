@@ -18,13 +18,13 @@ def compute_qc_stats(
     fragments_df_pl: pl.DataFrame,
     regions_df_pl: pl.DataFrame,
     tss_annotation: pl.DataFrame,
-    tss_flank_window: int = 1000,
+    tss_flank_window: int = 2000,
     tss_smoothing_rolling_window: int = 10,
     tss_minimum_signal_window: int = 100,
     tss_window: int = 50,
     tss_min_norm: int = 0.2,
     use_genomic_ranges: bool = True,
-    min_fragments_per_cb: int = 50,
+    min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     """
@@ -52,7 +52,7 @@ def compute_qc_stats(
     tss_flank_window
         Flanking window around the TSS.
         Used for intersecting fragments with TSS positions and keeping cut sites.
-        Default: ``1000`` (+/- 1000 bp).
+        Default: ``2000`` (+/- 2000 bp).
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_smoothing_rolling_window
         Rolling window used to smooth the cut sites signal.
@@ -63,8 +63,8 @@ def compute_qc_stats(
            - ``[-flank_window, -flank_window + minimum_signal_window + 1]``
            - ``[flank_window - minimum_signal_window + 1, flank_window]``
         is used to normalize the TSS enrichment.
-        Default: ``100`` (average signal in ``[-1000, -901]``, ``[901, 1000]``
-        around TSS if ``flank_window=1000``).
+        Default: ``100`` (average signal in ``[-2000, -1901]``, ``[1901, 2000]``
+        around TSS if ``flank_window=2000``).
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
     tss_window
         Window around the TSS used to count fragments in the TSS when calculating
@@ -145,13 +145,13 @@ def compute_qc_stats(
     ...     fragments_df_pl=fragments_cb_filtered_df_pl,
     ...     regions_df_pl=regions_df_pl,
     ...     tss_annotation=tss_annotation_bed_df_pl,
-    ...     tss_flank_window=1000,
+    ...     tss_flank_window=2000,
     ...     tss_smoothing_rolling_window=10,
     ...     tss_minimum_signal_window=100,
     ...     tss_window=50,
     ...     tss_min_norm=0.2,
     ...     use_genomic_ranges=True,
-    ...     min_fragments_per_cb=50,
+    ...     min_fragments_per_cb=10,
     ...     collapse_duplicates=True,
     ... )
 

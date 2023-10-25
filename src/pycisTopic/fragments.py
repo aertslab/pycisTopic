@@ -579,7 +579,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
 
 def get_fragments_per_cb(
     fragments_df_pl: pl.DataFrame,
-    min_fragments_per_cb: int = 50,
+    min_fragments_per_cb: int = 10,
     collapse_duplicates: bool | None = True,
 ) -> pl.DataFrame:
     """
@@ -614,11 +614,11 @@ def get_fragments_per_cb(
     ... )
 
     Get number of fragments and duplication ratio per cell barcode
-    (which have 50 fragments or more after collapsing duplicates).
+    (which have 10 fragments or more after collapsing duplicates).
 
     >>> fragments_stats_per_cb_df_pl = get_fragments_per_cb(
     ...     fragments_df_pl=fragments_df_pl,
-    ...     min_fragments_per_cb=50,
+    ...     min_fragments_per_cb=10,
     ...     collapse_duplicates=True,
     ... )
 
@@ -703,11 +703,11 @@ def get_cbs_passing_filter(
     ... )
 
     Get number of fragments and duplication ratio per cell barcode
-    (which have 50 fragments or more after collapsing duplicates).
+    (which have 10 fragments or more after collapsing duplicates).
 
     >>> fragments_stats_per_cb_df_pl = get_fragments_per_cb(
     ...     fragments_df_pl=fragments_df_pl,
-    ...     min_fragments_per_cb=50,
+    ...     min_fragments_per_cb=10,
     ...     collapse_duplicates=True,
     ... )
 
