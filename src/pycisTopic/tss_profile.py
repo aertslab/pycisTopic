@@ -173,7 +173,7 @@ def get_tss_profile(
                     apply_strand_suffix=False,
                 )
             ).df
-        )
+        ).rename({"Start": "Start_fragment", "End": "End_fragment"})
     )
 
     if overlap_with_tss_df_pl.shape == (0, 0):
@@ -190,8 +190,8 @@ def get_tss_profile(
         overlap_with_tss_df_pl.clone()
         .with_columns(
             # Fragment start, fragment end and TSS position in 0-based coordinates.
-            pl.col("Start").alias("fragment_start"),
-            (pl.col("End") - 1).alias("fragment_end"),
+            pl.col("Start_fragment").alias("fragment_start"),
+            (pl.col("End_fragment") - 1).alias("fragment_end"),
             (pl.col("Start_tss_flank") + flank_window).alias("tss"),
             pl.col("Strand"),
         )
