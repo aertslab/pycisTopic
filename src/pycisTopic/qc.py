@@ -251,7 +251,7 @@ def compute_qc_stats(
             on="CB",
         )
         .with_columns(
-            pl.col("tss_enrichment"),
+            pl.col("tss_enrichment").fill_null(0.0),
         )
         .collect()
     )
