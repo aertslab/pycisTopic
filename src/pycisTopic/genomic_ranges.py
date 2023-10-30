@@ -144,10 +144,10 @@ def _intersect_per_chrom(
         regions2_indexes = pl.Series("idx", regions2_indexes, dtype=pl.get_index_type())
 
         regions1_all_indexes = pl.arange(
-            0, indexes1_length, dtype=pl.get_index_type(), eager=True
+            0, indexes1_length, dtype=pl.get_index_type()(), eager=True
         ).alias("idx")
         regions2_all_indexes = pl.arange(
-            0, indexes2_length, dtype=pl.get_index_type(), eager=True
+            0, indexes2_length, dtype=pl.get_index_type()(), eager=True
         ).alias("idx")
 
         regions1_missing_indexes = (
@@ -643,6 +643,58 @@ def intersection(
 
             intersection_chrom_dfs_pl[chrom] = intersection_chrom_ldf_pl.collect()
 
+    if len(list(intersection_chrom_dfs_pl.values())) == 0:
+        # Return empty dataframe if there was no shared chromosome.
+        return (
+            regions1_df_pl.select(pl.all().suffix(regions1_suffix))
+            .head(0)
+            .hstack(regions2_df_pl.select(pl.all().suffix(regions2_suffix)).head(0))
+            .with_columns(
+                [
+                    # Chromosome name for intersection.
+                    pl.coalesce(
+                        pl.col(f"Chromosome{regions1_suffix}"),
+                        pl.col(f"Chromosome{regions2_suffix}"),
+                    ).alias("Chromosome"),
+                    # Calculate start coordinate for intersection.
+                    pl.when(
+                        pl.col(f"Start{regions1_suffix}")
+                        > pl.col(f"Start{regions2_suffix}")
+                    )
+                    .then(pl.col(f"Start{regions1_suffix}"))
+                    .otherwise(
+                        pl.coalesce(
+                            pl.col(f"Start{regions2_suffix}"),
+                            pl.col(f"Start{regions1_suffix}"),
+                        )
+                    )
+                    .alias("Start"),
+                    # Calculate end coordinate for intersection.
+                    pl.when(
+                        pl.col(f"End{regions1_suffix}")
+                        < pl.col(f"End{regions2_suffix}")
+                    )
+                    .then(pl.col(f"End{regions1_suffix}"))
+                    .otherwise(
+                        pl.coalesce(
+                            pl.col(f"End{regions2_suffix}"),
+                            pl.col(f"End{regions1_suffix}"),
+                        )
+                    )
+                    .alias("End"),
+                ]
+            )
+            .pipe(
+                function=_filter_intersection_output_columns,
+                regions1_info=regions1_info,
+                regions2_info=regions2_info,
+                regions1_coord=regions1_coord,
+                regions2_coord=regions2_coord,
+                regions1_suffix=regions1_suffix,
+                regions2_suffix=regions2_suffix,
+            )
+        )
+
     # Combine per chromosome dataframes to a full one.
     intersection_df_pl = pl.concat(
         list(intersection_chrom_dfs_pl.values()), rechunk=False
@@ -827,6 +879,10 @@ def overlap(
                 # Get selection of regions from first dataframe for the overlap.
                 else regions1_per_chrom_dfs_pl.pop(chrom)[regions1_indexes]
             )
+
+    if len(list(overlap_chrom_dfs_pl.values())) == 0:
+        # Return empty dataframe if there was no shared chromosome.
+        return regions1_df_pl.head(0)
 
     # Combine per chromosome dataframes to a full one.
     overlap_df_pl = pl.concat(list(overlap_chrom_dfs_pl.values()), rechunk=False)
