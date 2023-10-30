@@ -342,6 +342,7 @@ def qc(
     use_genomic_ranges: bool = True,
     min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
+    no_threads: int = 8,
 ) -> None:
     """
     Compute quality check statistics from fragments file.
@@ -395,6 +396,11 @@ def qc(
     collapse_duplicates
         Collapse duplicate fragments (same chromosomal positions and linked to the same
         cell barcode).
+    no_threads
+        Number of threads to use when calculating kernel-density estimate (KDE) to get
+        probability density function (PDF) values for log10 unique fragments in peaks
+        vs TSS enrichment, fractions of fragments in peaks and duplication ratio.
+        Default: ``8``
 
     Returns
     -------
@@ -436,6 +442,7 @@ def qc(
         use_genomic_ranges=use_genomic_ranges,
         min_fragments_per_cb=min_fragments_per_cb,
         collapse_duplicates=collapse_duplicates,
+        no_threads=no_threads,
     )
 
     fragments_stats_per_cb_df_pl.write_parquet(
@@ -509,6 +516,7 @@ def run_qc(args):
         use_genomic_ranges=args.use_genomic_ranges,
         min_fragments_per_cb=args.min_fragments_per_cb,
         collapse_duplicates=args.collapse_duplicates,
+        no_threads=args.threads,
     )
 
 
@@ -764,6 +772,20 @@ def add_parser_qc(subparsers):
         type=str,
         required=True,
         help="Output prefix to use for QC statistics parquet output files.",
+    )
+
+    parser_qc.add_argument(
+        "--threads",
+        dest="threads",
+        action="store",
+        type=int,
+        required=False,
+        default=8,
+        help="Number of threads to use when calculating kernel-density estimate (KDE) "
+        "to get probability density function (PDF) values for log10 unique fragments "
+        "in peaks vs TSS enrichment, fractions of fragments in peaks and duplication "
+        "ratio. "
+        "Default: 8.",
     )
 
     group_qc_tss = parser_qc.add_argument_group(

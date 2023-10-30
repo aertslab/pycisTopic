@@ -1,17 +1,97 @@
 from __future__ import annotations
 
-import polars as pl
+from concurrent.futures import ThreadPoolExecutor
 
+import numpy as np
+import polars as pl
 from pycisTopic.fragments import (
     get_fragments_in_peaks,
     get_fragments_per_cb,
     get_insert_size_distribution,
 )
 from pycisTopic.tss_profile import get_tss_profile
+from scipy.stats import gaussian_kde
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
 pl.enable_string_cache()
+
+
+def compute_kde(training_data: np.ndarray, test_data: np.ndarray, no_threads: int = 8):
+    """
+    Compute kernel-density estimate (KDE) using Gaussian kernels.
+
+    This function calculates the KDE in parallel and gives the same result as:
+
+    >>> from scipy.stats import gaussian_kde
+    >>> gaussian_kde(training_data)(test_data)
+
+    Parameters
+    ----------
+    training_data
+        2D numpy array with training data to train the KDE.
+    test_data
+        2D numpy array with test data for which to evaluate the estimated probability density function (PDF).
+    no_threads
+        Number of threads to use in parallelization of KDE function.
+
+    Returns
+    -------
+    1D numpy array with probability density function (PDF) values for points in test_data.
+
+    """
+    # Convert 2D numpy array test data to complex number array so numpy considers both
+    # columns at the same time in further operations.
+    test_data_all = np.empty(test_data.shape[1], dtype=np.complex128)
+    test_data_all.real = test_data[0]
+    test_data_all.imag = test_data[1]
+
+    # Get unique values for test data considering whole rows of the original test_data.
+    # The KDE calculation only needs to be done for unique values in the test data.
+    test_data_unique = np.unique(test_data_all)
+
+    # Get index position locations in test_data_unique for each value in test_data_all.
+    test_data_original_order_idx = np.searchsorted(test_data_unique, test_data_all)
+
+    # Split the array of unique test data values in one array for each thread.
+    test_data_unique_split_arrays = np.array_split(
+        np.vstack([test_data_unique.real, test_data_unique.imag]),
+        no_threads,
+        axis=1,
+    )
+
+    def compute_kde_part(test_data_unique_split_array):
+        """
+        Compute kernel-density estimate (KDE) using Gaussian kernels for a subsection of the test_data.
+
+        Parameters
+        ----------
+        test_data_unique_split_array
+            2D numpy array with a part of the test data for which to evaluate the
+            estimated probability density function (PDF).
+
+        Returns
+        -------
+        1D numpy array with probability density function (PDF) values for points in test_data.
+
+        """
+        return gaussian_kde(training_data)(test_data_unique_split_array)
+
+    pdf_results = []
+
+    # Calculate KDE for each subsection of the test dataStart the thread pool.
+    with ThreadPoolExecutor(no_threads) as executor:
+        # Execute tasks concurrently and process results in order.
+        for pdf_result in executor.map(compute_kde_part, test_data_unique_split_arrays):
+            # Store partial PDF result.
+            pdf_results.append(pdf_result)
+
+    # Get PDF values from the partial PDF results calculated on unique values in the
+    # test data and construct a full PDF values array that matches the order of the
+    # original test data.
+    pdf_values = np.concatenate(pdf_results)[test_data_original_order_idx]
+
+    return pdf_values
 
 
 def compute_qc_stats(
@@ -26,6 +106,7 @@ def compute_qc_stats(
     use_genomic_ranges: bool = True,
     min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
+    no_threads: int = 8,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     """
     Compute quality check statistics from Polars DataFrame with fragments.
@@ -86,7 +167,11 @@ def compute_qc_stats(
     collapse_duplicates
         Collapse duplicate fragments (same chromosomal positions and linked to the same
         cell barcode).
-
+    no_threads
+        Number of threads to use when calculating kernel-density estimate (KDE) to get
+        probability density function (PDF) values for log10 unique fragments in peaks
+        vs TSS enrichment, fractions of fragments in peaks and duplication ratio.
+        Default: ``8``
 
     Returns
     -------
@@ -153,6 +238,7 @@ def compute_qc_stats(
     ...     use_genomic_ranges=True,
     ...     min_fragments_per_cb=10,
     ...     collapse_duplicates=True,
+    ...     no_threads=8,
     ... )
 
     """
@@ -254,6 +340,66 @@ def compute_qc_stats(
             pl.col("tss_enrichment").fill_null(0.0),
         )
         .collect()
+    )
+
+    # Extract certain columns as numpy arrays as they are needed for calculating KDE.
+    (
+        log10_unique_fragments_in_peaks_count,
+        tss_enrichment,
+        fraction_of_fragments_in_peaks,
+        duplication_ratio,
+    ) = (
+        fragments_stats_per_cb_df_pl.select(
+            [
+                pl.col("log10_unique_fragments_in_peaks_count"),
+                pl.col("tss_enrichment"),
+                pl.col("fraction_of_fragments_in_peaks"),
+                pl.col("duplication_ratio"),
+            ]
+        )
+        .to_numpy()
+        .T
+    )
+
+    # Construct 2D numpy matrices for usage with compute_kde.
+    kde_data_for_tss_enrichment = np.vstack(
+        [log10_unique_fragments_in_peaks_count, tss_enrichment]
+    )
+    kde_data_for_fraction_of_fragments_in_peaks = np.vstack(
+        [log10_unique_fragments_in_peaks_count, fraction_of_fragments_in_peaks]
+    )
+    kde_data_for_duplication_ratio = np.vstack(
+        [log10_unique_fragments_in_peaks_count, duplication_ratio]
+    )
+
+    # Calculate KDE for log10 unique fragments in peaks vs TSS enrichment,
+    # fractions of fragments in peaks and duplication ratio.
+    pdf_values_for_tss_enrichment = compute_kde(
+        training_data=kde_data_for_tss_enrichment,
+        test_data=kde_data_for_tss_enrichment,
+        no_threads=no_threads,
+    )
+    pdf_values_for_fraction_of_fragments_in_peaks = compute_kde(
+        training_data=kde_data_for_fraction_of_fragments_in_peaks,
+        test_data=kde_data_for_fraction_of_fragments_in_peaks,
+        no_threads=no_threads,
+    )
+    pdf_values_for_duplication_ratio = compute_kde(
+        training_data=kde_data_for_duplication_ratio,
+        test_data=kde_data_for_duplication_ratio,
+        no_threads=no_threads,
+    )
+
+    # Add probability density function (PDF) values for log10 unique fragments in peaks vs TSS enrichment,
+    # fractions of fragments in peaks and duplication ratio to fragments statistics per cell barcode.
+    fragments_stats_per_cb_df_pl = fragments_stats_per_cb_df_pl.hstack(
+        pl.DataFrame(
+            {
+                "pdf_values_for_tss_enrichment": pdf_values_for_tss_enrichment,
+                "pdf_values_for_fraction_of_fragments_in_peaks": pdf_values_for_fraction_of_fragments_in_peaks,
+                "pdf_values_for_duplication_ratio": pdf_values_for_duplication_ratio,
+            }
+        )
     )
 
     return (
