@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, overload
 
 import polars as pl
 from ncls import NCLS
@@ -269,6 +269,32 @@ def _overlap_per_chrom(
     del starts1, ends1, indexes1
 
     return regions1_indexes
+
+
+@overload
+def _filter_intersection_output_columns(
+    df: pl.DataFrame,
+    regions1_info: bool,
+    regions2_info: bool,
+    regions1_coord: bool,
+    regions2_coord: bool,
+    regions1_suffix: str,
+    regions2_suffix: str,
+) -> pl.DataFrame:
+    ...
+
+
+@overload
+def _filter_intersection_output_columns(
+    df: pl.LazyFrame,
+    regions1_info: bool,
+    regions2_info: bool,
+    regions1_coord: bool,
+    regions2_coord: bool,
+    regions1_suffix: str,
+    regions2_suffix: str,
+) -> pl.LazyFrame:
+    ...
 
 
 def _filter_intersection_output_columns(
