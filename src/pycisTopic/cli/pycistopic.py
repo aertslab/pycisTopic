@@ -409,7 +409,7 @@ def qc(
     """
     from pycisTopic.fragments import read_bed_to_polars_df, read_fragments_to_polars_df
     from pycisTopic.gene_annotation import read_tss_annotation_from_bed
-    from pycisTopic.qc import compute_qc_stats
+    from pycisTopic.qc import compute_qc_stats, get_otsu_threshold
 
     tss_annotation_bed_df_pl = read_tss_annotation_from_bed(
         tss_annotation_bed_filename=tss_annotation_bed_filename
@@ -468,6 +468,40 @@ def qc(
         compression="zstd",
         use_pyarrow=True,
     )
+
+    (
+        unique_fragments_in_peaks_count_otsu_threshold,
+        tss_enrichment_otsu_threshold,
+        fragments_stats_per_cb_for_otsu_threshold_df_pl,
+    ) = get_otsu_threshold(
+        fragments_stats_per_cb_df_pl=fragments_stats_per_cb_df_pl,
+        min_otsu_fragments=100,
+        min_otsu_tss=1.0,
+    )
+
+    fragments_stats_per_cb_for_otsu_threshold_df_pl.write_parquet(
+        f"{output_prefix}.fragments_stats_per_cb_for_otsu_thresholds.parquet",
+        compression="zstd",
+        use_pyarrow=True,
+    )
+    fragments_stats_per_cb_for_otsu_threshold_df_pl.write_csv(
+        f"{output_prefix}.fragments_stats_per_cb_for_otsu_thresholds.tsv",
+        separator="\t",
+        has_header=True,
+    )
+
+    fragments_stats_per_cb_for_otsu_threshold_df_pl.select(pl.col("CB")).write_csv(
+        f"{output_prefix}.cbs_for_otsu_thresholds.tsv",
+        separator="\t",
+        has_header=False,
+    )
+
+    with open(f"{output_prefix}.otsu_thresholds.tsv", "w") as fh:
+        print(
+            "unique_fragments_in_peaks_count_otsu_threshold\ttss_enrichment_otsu_threshold\n"
+            f"{unique_fragments_in_peaks_count_otsu_threshold}\t{tss_enrichment_otsu_threshold}",
+            file=fh,
+        )
 
 
 def run_tss_get_tss_annotation(args):
