@@ -339,98 +339,103 @@ def write_tss_annotation_to_bed(
     )
 
 
-def get_chrom_alias_mapping_from_file(
-    chrom_alias_tsv_filename: str | Path,
+def get_chrom_sizes_and_alias_mapping_from_file(
+    chrom_sizes_and_alias_tsv_filename: str | Path,
 ) -> pl.DataFrame:
     """
-    Get chromosome alias mapping from a chromosome alias TSV file.
+    Get chromosome sizes and alias mapping from a chromosome alias TSV file.
 
-    Get chromosome alias mapping from a chromosome alias TSV file to map chromosome
-    names between UCSC, Ensembl, GenBank and RefSeq chromosome names.
+    Get chromosome sizes and alias mapping from a chromosome alias TSV file to map
+    chromosome names between UCSC, Ensembl, GenBank and RefSeq chromosome names.
 
     Parameters
     ----------
-    chrom_alias_tsv_filename:
+    chrom_sizes_and_alias_tsv_filename:
         Chromosome alias TSV files created with:
-          - get_chrom_alias_mapping_from_ncbi
-          - get_chrom_alias_mapping_from_ucsc
+          - get_chrom_sizes_and_alias_mapping_from_ncbi
+          - get_chrom_sizes_and_alias_mapping_from_ucsc
 
     Returns
     -------
-    Polars Dataframe with chromosome alias mappings between UCSC, Ensembl, GenBank and
-    RefSeq chromosome names.
+    Polars Dataframe with chromosome sizes and alias mapping between UCSC, Ensembl,
+    GenBank and RefSeq chromosome names.
 
     See Also
     --------
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ncbi
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ucsc
 
     Examples
     --------
-    Get chromosome aliases for hg38 from a previous written TSV file:
+    Get chromosome sizes and alias mapping for hg38 from a previous written TSV file:
 
-    >>> chrom_alias_hg38_from_file_df_pl = get_chrom_alias_mapping_from_file(
-    ...    chrom_alias_tsv_filename="chrom_alias_hg38_mapping.tsv",
+    >>> chrom_sizes_and_alias_hg38_from_file_df_pl = get_chrom_sizes_and_alias_mapping_from_file(
+    ...    chrom_sizes_and_alias_tsv_filename="hg38.chrom_sizes_and_alias.tsv",
     ... )
 
     """
-    chrom_alias_df_pl = pl.read_csv(
-        chrom_alias_tsv_filename, separator="\t", has_header=True, comment_char="#"
+    chrom_sizes_and_alias_df_pl = pl.read_csv(
+        chrom_sizes_and_alias_tsv_filename,
+        separator="\t",
+        has_header=True,
+        comment_char="#",
     )
 
-    return chrom_alias_df_pl
+    return chrom_sizes_and_alias_df_pl
 
 
-def get_chrom_alias_mapping_from_ncbi(
-    accession_id: str, chrom_alias_tsv_filename: str | None
+def get_chrom_sizes_and_alias_mapping_from_ncbi(
+    accession_id: str, chrom_sizes_and_alias_tsv_filename: str | Path | None
 ) -> pl.DataFrame:
     """
-    Get chromosome alias mapping from NCBI sequence reports.
+    Get chromosome sizes and alias mapping from NCBI sequence reports.
 
-    Get chromosome alias mapping from NCBI sequence reports to be able to map
-    chromosome names between UCSC, Ensembl, GenBank and RefSeq chromosome names
-    or read mapping from local file (chromosome_alias_tsv_file) instead.
+    Get chromosome sizes and alias mapping from NCBI sequence reports to be able to map
+    chromosome names between UCSC, Ensembl, GenBank and RefSeq chromosome names or read
+    mapping from local file (``chrom_sizes_and_alias_tsv_filename``) instead.
 
     Parameters
     ----------
     accession_id
         NCBI assembly accession ID.
-    chrom_alias_tsv_filename
-        If specified, write the chromosome alias mapping to the specified file.
+    chrom_sizes_and_alias_tsv_filename
+        If specified, write the chromosome sizes and alias mapping to the specified
+        file.
 
     Returns
     -------
-    Polars Dataframe with chromosome alias mappings between UCSC, Ensembl, GenBank and
-        RefSeq chromosome names.
+    Polars Dataframe with chromosome alias mapping between UCSC, Ensembl, GenBank and
+    RefSeq chromosome names.
 
     See Also
     --------
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_file
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ucsc
     pycisTopic.gene_annotation.get_ncbi_assembly_accessions_for_species
 
     Examples
     --------
-    Get chromosome aliases for different assemblies from NCBI.
+    Get chromosome sizes and alias mapping for different assemblies from NCBI.
 
     Assemby accession IDs for a species can be queries with
     `pycisTopic.gene_annotation.get_ncbi_assembly_accessions_for_species`
 
-    >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping_from_ncbi(
+    >>> chrom_sizes_and_alias_hg38_df_pl = get_chrom_sizes_and_alias_mapping_from_ncbi(
     ...    accession_id="GCF_000001405.40"
     ... )
-    >>> chrom_alias_mm10_df_pl = get_chrom_alias_mapping_from_ncbi(
+    >>> chrom_sizes_and_alias_mm10_df_pl = get_chrom_sizes_and_alias_mapping_from_ncbi(
     ...     accession_id="GCF_000001215.4"
     ... )
-    >>> chrom_alias_dm6_df_pl = get_chrom_alias_mapping_from_ncbi(
+    >>> chrom_sizes_and_alias_dm6_df_pl = get_chrom_sizes_and_alias_mapping_from_ncbi(
     ...     accession_id="GCF_000001215.4"
     ... )
 
-    Get chromosome aliases for hg38 and also write it to a TSV file:
+    Get chromosome sizes and alias mapping for Homo sapiens and also write it to a TSV
+    file:
 
-    >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping_from_ncbi(
+    >>> chrom_sizes_and_alias_hg38_df_pl = get_chrom_sizes_and_alias_mapping_from_ncbi(
     ...     accession_id="GCF_000001405.40",
-    ...     chrom_alias_tsv_filename="chrom_alias_hg38_mapping.tsv",
+    ...     chrom_sizes_and_alias_tsv_filename="GCF_000001405.40.chrom_sizes_and_alias.tsv",
     ... )
 
     """
@@ -466,8 +471,9 @@ def get_chrom_alias_mapping_from_ncbi(
         # Extract the "reports" part
         reports = result.get("reports", [])
 
-        chrom_alias_df_pl = pl.from_dicts(reports).select(
+        chrom_sizes_and_alias_df_pl = pl.from_dicts(reports).select(
             pl.col("ucsc_style_name").alias("ucsc"),
+            pl.col("length"),
             pl.when(pl.col("ucsc_style_name").str.contains("_"))
             .then(pl.col("genbank_accession"))
             .otherwise(pl.col("chr_name"))
@@ -476,14 +482,14 @@ def get_chrom_alias_mapping_from_ncbi(
             pl.col("genbank_accession").alias("genbank"),
         )
 
-        if chrom_alias_tsv_filename and isinstance(
-            chrom_alias_tsv_filename, (str, Path)
+        if chrom_sizes_and_alias_tsv_filename and isinstance(
+            chrom_sizes_and_alias_tsv_filename, (str, Path)
         ):
-            chrom_alias_df_pl.write_csv(
-                file=chrom_alias_tsv_filename, separator="\t", has_header=True
+            chrom_sizes_and_alias_df_pl.write_csv(
+                file=chrom_sizes_and_alias_tsv_filename, separator="\t", has_header=True
             )
 
-        return chrom_alias_df_pl
+        return chrom_sizes_and_alias_df_pl
     else:
         raise ValueError(
             f"Request failed with status code: {response.status_code}.\n"
@@ -491,46 +497,54 @@ def get_chrom_alias_mapping_from_ncbi(
         )
 
 
-def get_chrom_alias_mapping_from_ucsc(
-    ucsc_assembly: str, chrom_alias_tsv_filename: str | Path | None = None
+def get_chrom_sizes_and_alias_mapping_from_ucsc(
+    ucsc_assembly: str, chrom_sizes_and_alias_tsv_filename: str | Path | None = None
 ) -> pl.DataFrame:
     """
-    Get chromosome alias mapping from UCSC genome browser.
+    Get chromosome sizes and alias mapping from UCSC genome browser.
 
-    Get chromosome alias mapping from UCSC genome browser for UCSC assembly to be able
-    to map chromosome names between UCSC, Ensembl, GenBank and RefSeq chromosome names
-    or read mapping from local file (chromosome_alias_tsv_file) instead.
+    Get chromosome sizes and alias mapping from UCSC genome browser for UCSC assembly
+    to be able to map chromosome names between UCSC, Ensembl, GenBank and RefSeq
+    chromosome names or read mapping from local file
+    (``chrom_sizes_and_alias_tsv_filename``) instead.
 
     Parameters
     ----------
     ucsc_assembly:
         UCSC assembly names (``hg38``, ``mm10``, ``dm6``, ...).
-    chrom_alias_tsv_filename:
-        If specified, write the chromosome alias mapping to the specified file.
+    chrom_sizes_and_alias_tsv_filename:
+        If specified, write the chromosome sizes and alias mapping to the specified
+        file.
 
     Returns
     -------
-    Polars Dataframe with chromosome alias mappings between UCSC, Ensembl, GenBank and
-    RefSeq chromosome names.
+    Polars Dataframe with chromosome sizes and alias mapping between UCSC, Ensembl,
+    GenBank and RefSeq chromosome names.
 
     See Also
     --------
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_file
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ncbi
 
     Examples
     --------
-    Get chromosome aliases for different assemblies from UCSC:
+    Get chromosome sizes and aliases for different assemblies from UCSC:
 
-    >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping_from_ucsc(ucsc_assembly="hg38")
-    >>> chrom_alias_mm10_df_pl = get_chrom_alias_mapping_from_ucsc(ucsc_assembly="mm10")
-    >>> chrom_alias_dm6_df_pl = get_chrom_alias_mapping_from_ucsc(ucsc_assembly="dm6")
+    >>> chrom_sizes_and_alias_hg38_df_pl = get_chrom_sizes_and_alias_mapping_from_ucsc(
+    ...     ucsc_assembly="hg38"
+    ... )
+    >>> chrom_sizes_and_alias_mm10_df_pl = get_chrom_sizes_and_alias_mapping_from_ucsc(
+    ...     ucsc_assembly="mm10"
+    ... )
+    >>> chrom_sizes_and_alias_dm6_df_pl = get_chrom_sizes_and_alias_mapping_from_ucsc(
+    ...     ucsc_assembly="dm6"
+    ... )
 
-    Get chromosome aliases for hg38 and also write it to a TSV file:
+    Get chromosome sizes and aliases for hg38 and also write it to a TSV file:
 
-    >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping_from_ucsc(
+    >>> chrom_sizes_and_alias_hg38_df_pl = get_chrom_sizes_and_alias_mapping_from_ucsc(
     ...     ucsc_assembly="hg38",
-    ...     chrom_alias_tsv_filename="chrom_alias_hg38_mapping.tsv",
+    ...     chrom_sizes_and_alias_tsv_filename="hg38.chrom_sizes_and_alias.tsv",
     ... )
 
     """
@@ -613,41 +627,76 @@ def get_chrom_alias_mapping_from_ucsc(
                 f"{response.text}"
             )
 
-        if chrom_alias_tsv_filename and isinstance(
-            chrom_alias_tsv_filename, (str, Path)
-        ):
-            chrom_alias_df_pl.write_csv(
-                file=chrom_alias_tsv_filename, separator="\t", has_header=True
+        chrom_sizes_tsv_url_filename = f"https://hgdownload.soe.ucsc.edu/goldenPath/{ucsc_assembly}/bigZips/{ucsc_assembly}.chrom.sizes"
+
+        # Get chromosome alias file from UCSC genome browser.
+        response = requests.get(chrom_sizes_tsv_url_filename)
+
+        if response.status_code == 200:
+            # Read chromosome sizes TSV file as a Polars dataframe.
+            chrom_sizes_df_pl = pl.read_csv(
+                response.content,
+                separator="\t",
+                has_header=True,
+                comment_char="#",
+                new_columns=["ucsc", "length"],
+                dtypes=[pl.Utf8, pl.Int64],
             )
-    elif chrom_alias_tsv_filename and isinstance(chrom_alias_tsv_filename, (str, Path)):
-        chrom_alias_df_pl = pl.read_csv(
-            chrom_alias_tsv_filename, separator="\t", has_header=True, comment_char="#"
+
+        else:
+            raise ValueError(
+                f'Failed to download the file "{chrom_sizes_tsv_url_filename}". '
+                f"Status code: {response.status_code}.\n"
+                f"{response.text}"
+            )
+
+        # Combine chromosome sizes with chromosome alias Polars dataframe.
+        chrom_sizes_and_alias_df_pl = chrom_sizes_df_pl.join(
+            chrom_alias_df_pl, on="ucsc"
+        )
+
+        if chrom_sizes_and_alias_tsv_filename and isinstance(
+            chrom_sizes_and_alias_tsv_filename, (str, Path)
+        ):
+            chrom_sizes_and_alias_df_pl.write_csv(
+                file=chrom_sizes_and_alias_tsv_filename, separator="\t", has_header=True
+            )
+    elif chrom_sizes_and_alias_tsv_filename and isinstance(
+        chrom_sizes_and_alias_tsv_filename, (str, Path)
+    ):
+        chrom_sizes_and_alias_df_pl = pl.read_csv(
+            chrom_sizes_and_alias_tsv_filename,
+            separator="\t",
+            has_header=True,
+            comment_char="#",
         )
     else:
         raise ValueError(
-            """Both "ucsc_assembly" and "chrom_alias_tsv_filename" can't be `None`."""
+            """Both "ucsc_assembly" and "chrom_sizes_and_alias_tsv_filename" can't be `None`."""
         )
 
-    return chrom_alias_df_pl
+    return chrom_sizes_and_alias_df_pl
 
 
 def find_most_likely_chromosome_source_in_bed(
-    chrom_alias_df_pl: pl.DataFrame, bed_df_pl: pl.DataFrame
+    chrom_sizes_and_alias_df_pl: pl.DataFrame, bed_df_pl: pl.DataFrame
 ) -> (str, pl.DataFrame):
     """
     Find which chromosome source is the most likely in the provided BED file entries.
 
     Find which chromosome source (UCSC, Ensembl, GenBank and RefSeq) given as a
-    ``chrom_alias_df_pl`` Polars DataFrame is the most likely in the provided Polars
-    DataFrame with BED entries.
+    ``chrom_sizes_and_alias_df_pl`` Polars DataFrame is the most likely in the provided
+    Polars DataFrame with BED entries.
 
     Parameters
     ----------
-    chrom_alias_df_pl
-        Polars DataFrame with chromosome alias content.
-        See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file`,
-        :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi` and
-        :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc`.
+    chrom_sizes_and_alias_df_pl
+        Polars DataFrame with chromosome sizes and alias mapping.
+        See
+        :func:`pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_file`,
+        :func:`pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ncbi`
+        and
+        :func:`pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ucsc`.
     bed_df_pl
         Polars DataFrame with BED entries.
         See :func:`pycisTopic.fragments.read_bed_to_polars_df`.
@@ -661,16 +710,16 @@ def find_most_likely_chromosome_source_in_bed(
     --------
     pycisTopic.fragments.read_bed_to_polars_df
     pycisTopic.gene_annotation.change_chromosome_source_in_bed
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_file
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ncbi
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ucsc
 
     Examples
     --------
-    >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping_from_ucsc(ucsc_assembly="hg38")
+    >>> chrom_sizes_and_alias_hg38_df_pl = get_chrom_sizes_and_alias_mapping_from_ucsc(ucsc_assembly="hg38")
     >>> bed_df_pl = read_bed_to_polars_df("test.bed", engine="pyarrow")
     >>> best_chrom_source_name, chrom_source_stats_df_pl = find_most_likely_chromosome_source_in_bed(
-    ...     chrom_alias_df_pl=chrom_alias_hg38_df_pl,
+    ...     chrom_sizes_and_alias_df_pl=chrom_sizes_and_alias_hg38_df_pl,
     ...     bed_df_pl=bed_df_pl,
     ... )
     >>> print(best_chrom_source_name, chrom_source_stats_df_pl)
@@ -681,10 +730,10 @@ def find_most_likely_chromosome_source_in_bed(
 
     # Find how often those chromosome names are found for each chromosome source
     # (UCSC, Ensembl, GenBank and RefSeq).
-    chrom_source_stats_df_pl = chrom_alias_df_pl.select(
+    chrom_source_stats_df_pl = chrom_sizes_and_alias_df_pl.select(
         [
             pl.col(column_name).is_in(chroms_from_bed).sum()
-            for column_name in chrom_alias_df_pl.columns
+            for column_name in chrom_sizes_and_alias_df_pl.columns
         ]
     )
 
@@ -697,7 +746,7 @@ def find_most_likely_chromosome_source_in_bed(
 
 
 def change_chromosome_source_in_bed(
-    chrom_alias_df_pl: pl.DataFrame,
+    chrom_sizes_and_alias_df_pl: pl.DataFrame,
     bed_df_pl: pl.DataFrame,
     from_chrom_source_name: str,
     to_chrom_source_name: str,
@@ -707,11 +756,11 @@ def change_chromosome_source_in_bed(
 
     Parameters
     ----------
-    chrom_alias_df_pl
-        Polars DataFrame with chromosome alias content.
-        See :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file`,
-        :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi` and
-        :func:`pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc`.
+    chrom_sizes_and_alias_df_pl
+        Polars DataFrame with chromosome sizes and alias mapping.
+        See :func:`pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_file`,
+        :func:`pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ncbi` and
+        :func:`pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ucsc`.
     bed_df_pl
         Polars DataFrame with BED entries for which chromosome names need to be
         remapped from ``from_chrom_source_name`` to ``to_chrom_source_name``.
@@ -735,17 +784,17 @@ def change_chromosome_source_in_bed(
     --------
     pycisTopic.fragments.read_bed_to_polars_df
     pycisTopic.gene_annotation.find_most_likely_chromosome_source_in_bed
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_file
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ucsc
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_file
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ncbi
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ucsc
     pycisTopic.gene_annotation.read_tss_annotation_from_bed
     pycisTopic.gene_annotation.write_tss_annotation_to_bed
 
     Examples
     --------
-    Get chromosome alias mapping for hg38.
+    Get chromosome sizes and alias mapping for hg38.
 
-    >>> chrom_alias_hg38_df_pl = get_chrom_alias_mapping_from_ucsc(ucsc_assembly="hg38")
+    >>> chrom_sizes_and_alias_hg38_df_pl = get_chrom_sizes_and_alias_mapping_from_ucsc(ucsc_assembly="hg38")
 
     Get gene annotation for hg38 from Ensembl BioMart.
 
@@ -757,7 +806,7 @@ def change_chromosome_source_in_bed(
     Replace Ensembl chromosome names with UCSC chromosome names in gene annotation for hg38.
 
     >>> hg38_tss_annotation_ucsc_chroms_bed_df_pl = change_chromosome_source_in_bed(
-    ...     chrom_alias_df_pl=chrom_alias_hg38_df_pl,
+    ...     chrom_sizes_and_alias_df_pl=chrom_sizes_and_alias_hg38_df_pl,
     ...     bed_df_pl=hg38_tss_annotation_bed_df_pl,
     ...     from_chrom_source_name="ensembl",
     ...     to_chrom_source_name="ucsc",
@@ -767,7 +816,7 @@ def change_chromosome_source_in_bed(
     """  # noqa: W505
     chrom_source_stats_df_pl = (
         bed_df_pl.join(
-            chrom_alias_df_pl.select(
+            chrom_sizes_and_alias_df_pl.select(
                 [
                     pl.col(from_chrom_source_name),
                     pl.col(to_chrom_source_name),
@@ -806,7 +855,7 @@ def get_ncbi_assembly_accessions_for_species(species: str) -> str:
 
     See Also
     --------
-    pycisTopic.gene_annotation.get_chrom_alias_mapping_from_ncbi
+    pycisTopic.gene_annotation.get_chrom_sizes_and_alias_mapping_from_ncbi
 
     Examples
     --------
