@@ -249,7 +249,7 @@ def get_tss_profile(
                             step=1,
                             eager=True,
                             dtype=pl.Int32,
-                        ).alias("Position"),
+                        ).alias("position_from_tss"),
                         # Create a CB column with all "no_CB" values.
                         # Needed temporarily so during the pivot operation all cut site
                         # position values ([-flank_window, flank_window] range) are
@@ -266,7 +266,7 @@ def get_tss_profile(
                     pl.col("rel_start").abs() <= flank_window
                 ).select(
                     # Get cut site position and associated CB.
-                    pl.col("rel_start").alias("Position"),
+                    pl.col("rel_start").alias("position_from_tss"),
                     pl.col("CB"),
                 ),
                 # Get all cut sites for the relative end that pass the filter.
@@ -274,16 +274,16 @@ def get_tss_profile(
                     pl.col("rel_end").abs() <= flank_window
                 ).select(
                     # Get cut site position and associated CB.
-                    pl.col("rel_end").alias("Position"),
+                    pl.col("rel_end").alias("position_from_tss"),
                     pl.col("CB"),
                 ),
             ],
         )
         # Count number of cut sites with the same CB and same position per CB.
         .pivot(
-            values="Position",
+            values="position_from_tss",
             index="CB",
-            columns="Position",
+            columns="position_from_tss",
             aggregate_function="count",
         )
         # Remove "no_CB" cell barcode (was only needed for the pivot).
@@ -310,12 +310,12 @@ def get_tss_profile(
             # Keep cut sites position values (will be dtype=pl.Utf8) as the first
             # column.
             include_header=True,
-            header_name="Position",
+            header_name="position_from_tss",
             # Add old "CB" column as column names.
             column_names=tss_matrix_tmp.get_column("CB"),
         ).with_columns(
-            # Convert "Position" column from pl.Utf8 to pl.Int32.
-            pl.col("Position").cast(pl.Int32)
+            # Convert "position_from_tss" column from pl.Utf8 to pl.Int32.
+            pl.col("position_from_tss").cast(pl.Int32)
         )
     )
 
@@ -324,9 +324,9 @@ def get_tss_profile(
 
     # Smooth TSS matrix per CB by a rolling window.
     tss_smoothed_matrix_per_cb = tss_matrix.with_columns(
-        pl.col("Position"),
+        pl.col("position_from_tss"),
         pl.all()
-        .exclude("Position")
+        .exclude("position_from_tss")
         .rolling_mean(window_size=smoothing_rolling_window, min_periods=0),
     )
 
@@ -337,11 +337,13 @@ def get_tss_profile(
     # Get normalized sample TSS enrichment per position from the per CB
     # smoothed TSS matrix.
     tss_norm_matrix_sample = tss_smoothed_matrix_per_cb.select(
-        pl.col("Position"),
+        pl.col("position_from_tss"),
         # Get total number of cut sites per position over all CBs.
-        pl.sum_horizontal(pl.all().exclude("Position")).alias("smoothed_per_pos_sum"),
+        pl.sum_horizontal(pl.all().exclude("position_from_tss")).alias(
+            "smoothed_per_pos_sum"
+        ),
     ).select(
-        pl.col("Position"),
+        pl.col("position_from_tss"),
         # Normalize total number of cut sites per position over all CBs.
         (
             pl.col("smoothed_per_pos_sum")
@@ -364,7 +366,7 @@ def get_tss_profile(
                 # Take highest value.
                 .max()
             )
-        ).alias("norm"),
+        ).alias("normalized_tss_enrichment"),
     )
 
     # Get normalized TSS matrix per CB for each cut site position.
@@ -396,13 +398,13 @@ def get_tss_profile(
     tss_enrichment_per_cb = (
         tss_norm_matrix_per_cb.clone()
         .filter(
-            pl.col("Position").is_between(
+            pl.col("position_from_tss").is_between(
                 lower_bound=-tss_window,
                 upper_bound=tss_window,
                 closed="both",
             )
         )
-        .drop("Position")
+        .drop("position_from_tss")
         .select(pl.all().mean())
         .transpose(include_header=True, header_name="CB")
         .with_columns(pl.col("CB").cast(pl.Categorical))
