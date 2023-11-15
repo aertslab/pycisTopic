@@ -533,24 +533,48 @@ def qc(
     None
 
     """
+    import logging
+
     from pycisTopic.fragments import read_bed_to_polars_df, read_fragments_to_polars_df
     from pycisTopic.gene_annotation import read_tss_annotation_from_bed
     from pycisTopic.qc import compute_qc_stats, get_otsu_threshold
 
+    class RelativeSeconds(logging.Formatter):
+        def format(self, record):
+            record.relativeCreated = record.relativeCreated // 1000
+            return super().format(record)
+
+    formatter = RelativeSeconds(
+        "%(asctime)s %(relativeCreated)ds - %(levelname)s - %(name)s:%(funcName)s - %(message)s"
+    )
+    logging.basicConfig(
+        # format=formatter,
+        filename=f"{output_prefix}.pycistopic_qc.log",
+        encoding="utf-8",
+        level=logging.INFO,
+    )
+    logging.root.handlers[0].setFormatter(formatter)
+
+    logger = logging.getLogger(__name__)
+
+    logger.info(f'Loading TSS annotation from "{tss_annotation_bed_filename}".')
     tss_annotation_bed_df_pl = read_tss_annotation_from_bed(
         tss_annotation_bed_filename=tss_annotation_bed_filename
     )
 
+    logger.info(f'Loading regions BED file from "{regions_bed_filename}".')
     regions_df_pl = read_bed_to_polars_df(
         bed_filename=regions_bed_filename,
         min_column_count=3,
     )
 
+    logger.info(f'Loading fragments TSV file from "{fragments_tsv_filename}".')
     fragments_df_pl = read_fragments_to_polars_df(
         fragments_tsv_filename,
         engine="pyarrow",
     )
 
+    logger.info("Computing QC stats.")
     (
         fragments_stats_per_cb_df_pl,
         insert_size_dist_df_pl,
@@ -571,30 +595,35 @@ def qc(
         no_threads=no_threads,
     )
 
+    logger.info(f'Writing "{output_prefix}.fragments_stats_per_cb.parquet".')
     fragments_stats_per_cb_df_pl.write_parquet(
         f"{output_prefix}.fragments_stats_per_cb.parquet",
         compression="zstd",
         use_pyarrow=True,
     )
 
+    logger.info(f'Writing "{output_prefix}.fragments_insert_size_dist.parquet".')
     insert_size_dist_df_pl.write_parquet(
         f"{output_prefix}.fragments_insert_size_dist.parquet",
         compression="zstd",
         use_pyarrow=True,
     )
 
+    logger.info(f'Writing "{output_prefix}.tss_norm_matrix_sample.parquet".')
     tss_norm_matrix_sample.write_parquet(
         f"{output_prefix}.tss_norm_matrix_sample.parquet",
         compression="zstd",
         use_pyarrow=True,
     )
 
+    logger.info(f'Writing "{output_prefix}.tss_norm_matrix_per_cb.parquet".')
     tss_norm_matrix_per_cb.write_parquet(
         f"{output_prefix}.tss_norm_matrix_per_cb.parquet",
         compression="zstd",
         use_pyarrow=True,
     )
 
+    logger.info("Calculating Otsu thresholds.")
     (
         unique_fragments_in_peaks_count_otsu_threshold,
         tss_enrichment_otsu_threshold,
@@ -605,10 +634,16 @@ def qc(
         min_otsu_tss=1.0,
     )
 
+    logger.info(
+        f'Writing "{output_prefix}.fragments_stats_per_cb_for_otsu_thresholds.parquet".'
+    )
     fragments_stats_per_cb_for_otsu_threshold_df_pl.write_parquet(
         f"{output_prefix}.fragments_stats_per_cb_for_otsu_thresholds.parquet",
         compression="zstd",
         use_pyarrow=True,
+    )
+    logger.info(
+        f'Writing "{output_prefix}.fragments_stats_per_cb_for_otsu_thresholds.tsv".'
     )
     fragments_stats_per_cb_for_otsu_threshold_df_pl.write_csv(
         f"{output_prefix}.fragments_stats_per_cb_for_otsu_thresholds.tsv",
@@ -616,18 +651,21 @@ def qc(
         has_header=True,
     )
 
+    logger.info(f'Writing "{output_prefix}.cbs_for_otsu_thresholds.tsv".')
     fragments_stats_per_cb_for_otsu_threshold_df_pl.select(pl.col("CB")).write_csv(
         f"{output_prefix}.cbs_for_otsu_thresholds.tsv",
         separator="\t",
         has_header=False,
     )
 
+    logger.info(f'Writing "{output_prefix}.otsu_thresholds.tsv".')
     with open(f"{output_prefix}.otsu_thresholds.tsv", "w") as fh:
         print(
             "unique_fragments_in_peaks_count_otsu_threshold\ttss_enrichment_otsu_threshold\n"
             f"{unique_fragments_in_peaks_count_otsu_threshold}\t{tss_enrichment_otsu_threshold}",
             file=fh,
         )
+    logger.info("pycisTopic QC finished.")
 
 
 def run_tss_get_tss_annotation(args):

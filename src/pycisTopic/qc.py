@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from concurrent.futures import ThreadPoolExecutor
 
@@ -331,6 +332,8 @@ def compute_qc_stats(
     ... )
 
     """
+    logger = logging.getLogger(__name__)
+
     # Define correct column to get, based on the setting of `collapse_duplicates`.
     fragments_count_column = (
         "unique_fragments_count" if collapse_duplicates else "total_fragments_count"
@@ -342,6 +345,7 @@ def compute_qc_stats(
     )
 
     # Get Polars DataFrame with basic fragments statistics per cell barcode.
+    logger.info("Get basic fragments statistics per cell barcode.")
     fragments_stats_per_cb_df_pl = get_fragments_per_cb(
         fragments_df_pl=fragments_df_pl,
         min_fragments_per_cb=min_fragments_per_cb,
@@ -350,12 +354,16 @@ def compute_qc_stats(
 
     # Get Polars DataFrame with total fragment counts and unique fragment counts
     # per region.
+    logger.info("Get total fragment counts and unique fragment counts per region.")
     fragments_in_peaks_df_pl = get_fragments_in_peaks(
         fragments_df_pl=fragments_df_pl,
         regions_df_pl=regions_df_pl,
     )
 
     # Add fragment counts per region to fragments statistics per cell barcode.
+    logger.info(
+        "Add fragment counts per region to fragments statistics per cell barcode."
+    )
     fragments_stats_per_cb_df_pl = (
         fragments_stats_per_cb_df_pl.lazy()
         .join(
@@ -398,11 +406,13 @@ def compute_qc_stats(
     )
 
     # Get insert size distribution of fragments.
+    logger.info("Get insert size distribution of fragments.")
     insert_size_dist_df_pl = get_insert_size_distribution(
         fragments_df_pl=fragments_df_pl,
     )
 
     # Get TSS profile for fragments.
+    logger.info("Get TSS profile for fragments.")
     (
         tss_enrichment_per_cb,
         tss_norm_matrix_sample,
@@ -419,6 +429,7 @@ def compute_qc_stats(
     )
 
     # Add TSS enrichment to fragments statistics per cell barcode.
+    logger.info("Add TSS enrichment to fragments statistics per cell barcode.")
     fragments_stats_per_cb_df_pl = (
         fragments_stats_per_cb_df_pl.join(
             tss_enrichment_per_cb.lazy(),
@@ -463,15 +474,23 @@ def compute_qc_stats(
 
     # Calculate KDE for log10 unique fragments in peaks vs TSS enrichment,
     # fractions of fragments in peaks and duplication ratio.
+    logger.info("Calculate KDE for log10 unique fragments in peaks vs TSS enrichment.")
     pdf_values_for_tss_enrichment = compute_kde(
         training_data=kde_data_for_tss_enrichment,
         test_data=kde_data_for_tss_enrichment,
         no_threads=no_threads,
     )
+    logger.info(
+        "Calculate KDE for log10 unique fragments in peaks vs fractions of fragments "
+        "in peaks."
+    )
     pdf_values_for_fraction_of_fragments_in_peaks = compute_kde(
         training_data=kde_data_for_fraction_of_fragments_in_peaks,
         test_data=kde_data_for_fraction_of_fragments_in_peaks,
         no_threads=no_threads,
+    )
+    logger.info(
+        "Calculate KDE for log10 unique fragments in peaks vs duplication ratio."
     )
     pdf_values_for_duplication_ratio = compute_kde(
         training_data=kde_data_for_duplication_ratio,
@@ -482,6 +501,10 @@ def compute_qc_stats(
     # Add probability density function (PDF) values for log10 unique fragments in peaks
     # vs TSS enrichment, fractions of fragments in peaks and duplication ratio to
     # fragments statistics per cell barcode.
+    logger.info(
+        "Add probability density function (PDF) values to fragments statistics per "
+        "cell barcode."
+    )
     fragments_stats_per_cb_df_pl = fragments_stats_per_cb_df_pl.hstack(
         pl.DataFrame(
             {
