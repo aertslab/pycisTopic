@@ -378,8 +378,7 @@ def get_chrom_sizes_and_alias_mapping_from_file(
         chrom_sizes_and_alias_tsv_filename,
         separator="\t",
         has_header=True,
-        comment_char="#",
-    )
+    ).rename({"# ucsc": "ucsc"})
 
     return chrom_sizes_and_alias_df_pl
 
@@ -485,8 +484,10 @@ def get_chrom_sizes_and_alias_mapping_from_ncbi(
         if chrom_sizes_and_alias_tsv_filename and isinstance(
             chrom_sizes_and_alias_tsv_filename, (str, Path)
         ):
-            chrom_sizes_and_alias_df_pl.write_csv(
-                file=chrom_sizes_and_alias_tsv_filename, separator="\t", has_header=True
+            chrom_sizes_and_alias_df_pl.rename({"ucsc": "# ucsc"}).write_csv(
+                file=chrom_sizes_and_alias_tsv_filename,
+                separator="\t",
+                has_header=True,
             )
 
         return chrom_sizes_and_alias_df_pl
@@ -548,131 +549,121 @@ def get_chrom_sizes_and_alias_mapping_from_ucsc(
     ... )
 
     """
-    if ucsc_assembly:
-        chrom_alias_tsv_url_filename = f"https://hgdownload.soe.ucsc.edu/goldenPath/{ucsc_assembly}/bigZips/{ucsc_assembly}.chromAlias.txt"
+    chrom_alias_tsv_url_filename = (
+        f"https://hgdownload.soe.ucsc.edu/goldenPath/{ucsc_assembly}/bigZips/"
+        f"{ucsc_assembly}.chromAlias.txt"
+    )
 
-        # Get chromosome alias file from UCSC genome browser.
-        response = requests.get(chrom_alias_tsv_url_filename)
+    # Get chromosome alias file from UCSC genome browser.
+    response = requests.get(chrom_alias_tsv_url_filename)
 
-        if response.status_code == 200:
-            # Define some regexes to recognise chromosome names for:
-            #   - genbank ID:
-            #       starts with 1 or 2 capital characters followed by 5 up to 8
-            #       numbers, a dot and some more numbers.
-            #   - refseq IDs:
-            #       starts with "NC_", "NG_", "NT_" or "NW_" followed by 5 up to 9
-            #       numbers, a dot and some more numbers.
-            #   - UCSC:
-            #       starts with "chr".
-            genbank_id_regex = "^[A-Z]{1,2}[0-9]{5,8}\\.[0-9]+$"
-            refseq_id_regex = "^(NC|NG|NT|NW)_[0-9]{5,9}\\.[0-9]+$"
-            ucsc_regex = "^chr"
+    if response.status_code == 200:
+        # Define some regexes to recognise chromosome names for:
+        #   - genbank ID:
+        #       starts with 1 or 2 capital characters followed by 5 up to 8
+        #       numbers, a dot and some more numbers.
+        #   - refseq IDs:
+        #       starts with "NC_", "NG_", "NT_" or "NW_" followed by 5 up to 9
+        #       numbers, a dot and some more numbers.
+        #   - UCSC:
+        #       starts with "chr".
+        genbank_id_regex = "^[A-Z]{1,2}[0-9]{5,8}\\.[0-9]+$"
+        refseq_id_regex = "^(NC|NG|NT|NW)_[0-9]{5,9}\\.[0-9]+$"
+        ucsc_regex = "^chr"
 
-            # Create an in memory TSV file to which the ucsc, ensembl, refseq_id and
-            # genbank_id chromosome columns will be written in the correct order.
-            chrom_alias_tsv_string_io = io.StringIO()
+        # Create an in memory TSV file to which the ucsc, ensembl, refseq_id and
+        # genbank_id chromosome columns will be written in the correct order.
+        chrom_alias_tsv_string_io = io.StringIO()
 
-            # Write header to in memory TSV file.
+        # Write header to in memory TSV file.
+        print("ucsc\tensembl\trefseq_id\tgenbank_id", file=chrom_alias_tsv_string_io)
+
+        for line in response.content.decode("utf-8").split("\n"):
+            if not line or line.startswith("#"):
+                continue
+
+            columns = line.split("\t")
+
+            ucsc = ""
+            ensembl = ""
+            refseq_id = ""
+            genbank_id = ""
+
+            # Find correct chromosome source column for UCSC, Ensembl, RefSeq
+            # and GenBank per line of a UCSC chromosome alias file, instead of
+            # for whole columns at once as UCSC sorts the chromosome identifiers
+            # per line alphabetically instead of keeping it per source.
+            for column in columns:
+                if re.match(ucsc_regex, column):
+                    ucsc = column
+                elif re.match(genbank_id_regex, column):
+                    genbank_id = column
+                elif re.match(refseq_id_regex, column):
+                    refseq_id = column
+                else:
+                    ensembl = column
+
+            # Write columns in the correct order to the in memory TSV file.
             print(
-                "ucsc\tensembl\trefseq_id\tgenbank_id", file=chrom_alias_tsv_string_io
+                "\t".join([ucsc, ensembl, refseq_id, genbank_id]),
+                file=chrom_alias_tsv_string_io,
             )
 
-            for line in response.content.decode("utf-8").split("\n"):
-                if not line or line.startswith("#"):
-                    continue
+        # Rewind file descriptor to the start of the in memory TSV file.
+        chrom_alias_tsv_string_io.seek(0)
 
-                columns = line.split("\t")
-
-                ucsc = ""
-                ensembl = ""
-                refseq_id = ""
-                genbank_id = ""
-
-                # Find correct chromosome source column for UCSC, Ensembl, RefSeq
-                # and GenBank per line of a UCSC chromosome alias file, instead of
-                # for whole columns at once as UCSC sorts the chromosome identifiers
-                # per line alphabetically instead of keeping it per source.
-                for column in columns:
-                    if re.match(ucsc_regex, column):
-                        ucsc = column
-                    elif re.match(genbank_id_regex, column):
-                        genbank_id = column
-                    elif re.match(refseq_id_regex, column):
-                        refseq_id = column
-                    else:
-                        ensembl = column
-
-                # Write columns in the correct order to the in memory TSV file.
-                print(
-                    "\t".join([ucsc, ensembl, refseq_id, genbank_id]),
-                    file=chrom_alias_tsv_string_io,
-                )
-
-            # Rewind file descriptor to the start of the in memory TSV file.
-            chrom_alias_tsv_string_io.seek(0)
-
-            # Read in memory TSV file as a Polars dataframe.
-            chrom_alias_df_pl = pl.read_csv(
-                chrom_alias_tsv_string_io,
-                separator="\t",
-                has_header=True,
-                comment_char="#",
-                # Read all columns as strings.
-                infer_schema_length=0,
-            )
-        else:
-            raise ValueError(
-                f'Failed to download the file "{chrom_alias_tsv_url_filename}". '
-                f"Status code: {response.status_code}.\n"
-                f"{response.text}"
-            )
-
-        chrom_sizes_tsv_url_filename = f"https://hgdownload.soe.ucsc.edu/goldenPath/{ucsc_assembly}/bigZips/{ucsc_assembly}.chrom.sizes"
-
-        # Get chromosome alias file from UCSC genome browser.
-        response = requests.get(chrom_sizes_tsv_url_filename)
-
-        if response.status_code == 200:
-            # Read chromosome sizes TSV file as a Polars dataframe.
-            chrom_sizes_df_pl = pl.read_csv(
-                response.content,
-                separator="\t",
-                has_header=True,
-                comment_char="#",
-                new_columns=["ucsc", "length"],
-                dtypes=[pl.Utf8, pl.Int64],
-            )
-
-        else:
-            raise ValueError(
-                f'Failed to download the file "{chrom_sizes_tsv_url_filename}". '
-                f"Status code: {response.status_code}.\n"
-                f"{response.text}"
-            )
-
-        # Combine chromosome sizes with chromosome alias Polars dataframe.
-        chrom_sizes_and_alias_df_pl = chrom_sizes_df_pl.join(
-            chrom_alias_df_pl, on="ucsc"
-        )
-
-        if chrom_sizes_and_alias_tsv_filename and isinstance(
-            chrom_sizes_and_alias_tsv_filename, (str, Path)
-        ):
-            chrom_sizes_and_alias_df_pl.write_csv(
-                file=chrom_sizes_and_alias_tsv_filename, separator="\t", has_header=True
-            )
-    elif chrom_sizes_and_alias_tsv_filename and isinstance(
-        chrom_sizes_and_alias_tsv_filename, (str, Path)
-    ):
-        chrom_sizes_and_alias_df_pl = pl.read_csv(
-            chrom_sizes_and_alias_tsv_filename,
+        # Read in memory TSV file as a Polars dataframe.
+        chrom_alias_df_pl = pl.read_csv(
+            chrom_alias_tsv_string_io,
             separator="\t",
             has_header=True,
             comment_char="#",
+            # Read all columns as strings.
+            infer_schema_length=0,
         )
     else:
         raise ValueError(
-            """Both "ucsc_assembly" and "chrom_sizes_and_alias_tsv_filename" can't be `None`."""
+            f'Failed to download the file "{chrom_alias_tsv_url_filename}". '
+            f"Status code: {response.status_code}.\n"
+            f"{response.text}"
+        )
+
+    chrom_sizes_tsv_url_filename = (
+        f"https://hgdownload.soe.ucsc.edu/goldenPath/{ucsc_assembly}/bigZips/"
+        f"{ucsc_assembly}.chrom.sizes"
+    )
+
+    # Get chromosome alias file from UCSC genome browser.
+    response = requests.get(chrom_sizes_tsv_url_filename)
+
+    if response.status_code == 200:
+        # Read chromosome sizes TSV file as a Polars dataframe.
+        chrom_sizes_df_pl = pl.read_csv(
+            response.content,
+            separator="\t",
+            has_header=False,
+            comment_char="#",
+            new_columns=["ucsc", "length"],
+            dtypes=[pl.Utf8, pl.Int64],
+        )
+
+    else:
+        raise ValueError(
+            f'Failed to download the file "{chrom_sizes_tsv_url_filename}". '
+            f"Status code: {response.status_code}.\n"
+            f"{response.text}"
+        )
+
+    # Combine chromosome sizes with chromosome alias Polars dataframe.
+    chrom_sizes_and_alias_df_pl = chrom_sizes_df_pl.join(chrom_alias_df_pl, on="ucsc")
+
+    if chrom_sizes_and_alias_tsv_filename and isinstance(
+        chrom_sizes_and_alias_tsv_filename, (str, Path)
+    ):
+        chrom_sizes_and_alias_df_pl.rename({"ucsc": "# ucsc"}).write_csv(
+            file=chrom_sizes_and_alias_tsv_filename,
+            separator="\t",
+            has_header=True,
         )
 
     return chrom_sizes_and_alias_df_pl
