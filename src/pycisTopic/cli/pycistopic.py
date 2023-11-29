@@ -539,6 +539,9 @@ def qc(
     from pycisTopic.gene_annotation import read_tss_annotation_from_bed
     from pycisTopic.qc import compute_qc_stats, get_otsu_threshold
 
+    # Remove trailing dot(s) from the output prefix.
+    output_prefix = output_prefix.rstrip(".")
+
     class RelativeSeconds(logging.Formatter):
         def format(self, record):
             record.relativeCreated = record.relativeCreated // 1000
