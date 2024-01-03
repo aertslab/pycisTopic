@@ -46,8 +46,8 @@ MACS2
 lxml
 tspex
 polars
-git+https://github.com/aertslab/pySCENIC@master#egg=pyscenic
-git+https://github.com/aertslab/LoomXpy@main#egg=loomxpy
+pyscenic@git+https://github.com/aertslab/pySCENIC@master
+loomxpy@git+https://github.com/aertslab/LoomXpy@main
 sphinx_rtd_theme
 nbsphinx
 nbsphinx_link

@@ -1037,9 +1037,9 @@ def subset_array_second_axis(arr, col_indices):
 
     """
     if np.max(col_indices) >= arr.shape[1]:
-        raise IndexError(f"index {np.max(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
+        raise IndexError("index is out of bounds for axis 1.")
     if np.min(col_indices) < -arr.shape[1]:
-        raise IndexError(f"index {np.min(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
+        raise IndexError("index is out of bounds for axis 1 with size")
 
     # Create empty subset array of correct dimensions and dtype.
     subset_arr = np.empty(
@@ -1086,9 +1086,7 @@ def get_log2_fc(fg_mat, bg_mat):
 
     if fg_mat.shape[0] != bg_mat.shape[0]:
         raise ValueError(
-            "Foreground matrix and background matrix have a different first dimension:"
-            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
-        )
+            "Foreground matrix and background matrix have a different first dimension:")
 
     # Calculate log2 fold change between foreground and background matrix with numba in
     # a similar way as the following numpy code:
