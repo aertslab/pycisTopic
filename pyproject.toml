@@ -1,0 +1,23 @@
+[build-system]
+requires = [
+    "setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pycisTopic"
+dynamic = ["dependencies"]
+authors = [
+    {name = "Carmen Bravo", email = "carmen.bravogonzalezblas@kuleuven.be"},
+    {name = "Seppe De Winter", email = "seppe.dewinter@kuleuven.be"},
+    {name = "Gert Hulselmans", email = "gert.hulselmans@kuleuven.be"}
+]
+readme = "README.rst"
+version = "1.0a"
+
+[tool.setuptools.packages]
+# Pure Python packages/modules
+find = { where = ["python"] }
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
