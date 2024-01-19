@@ -1,19 +1,18 @@
 [build-system]
 requires = [
-    "setuptools>=60",
-    "setuptools-scm>=8.0",
-    "setuptools-rust"]
+    "setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pycisTopic"
-dynamic = ["version", "dependencies"]
+dynamic = ["dependencies"]
 authors = [
     {name = "Carmen Bravo", email = "carmen.bravogonzalezblas@kuleuven.be"},
     {name = "Seppe De Winter", email = "seppe.dewinter@kuleuven.be"},
     {name = "Gert Hulselmans", email = "gert.hulselmans@kuleuven.be"}
 ]
 readme = "README.rst"
+version = "1.0a"
 
 [tool.setuptools.packages]
 # Pure Python packages/modules
@@ -22,7 +21,3 @@ find = { where = ["python"] }
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
-[[tool.setuptools-rust.ext-modules]]
-# Private Rust extension module to be nested into the Python package
-target = "pycisTopic.pseudobulk"  # The last part of the name (e.g. "_lib") has to match lib.name in Cargo.toml,
-                                  # but you can add a prefix to nest it inside of a Python package.
