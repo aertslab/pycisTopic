@@ -105,11 +105,11 @@ def export_pseudobulk(
         path_to_fragments = input_data.path_to_fragments
         if path_to_fragments is None:
             log.error("No path_to_fragments in this cisTopic object.")
-        cell_data = input_data.cell_data
+        cell_data = input_data.cell_data.copy()
     elif isinstance(input_data, pd.DataFrame):
         if path_to_fragments is None:
             log.error("Please, provide path_to_fragments.")
-        cell_data = input_data
+        cell_data = input_data.copy()
     # Check for sample_id column
     try:
         sample_ids = list(set(cell_data[sample_id_col]))
@@ -120,6 +120,16 @@ def export_pseudobulk(
     # Check wether we have a path to fragments for each sample
     if not all([sample_id in path_to_fragments.keys() for sample_id in sample_ids]):
         raise ValueError("Please, provide a path to fragments for each sample in your cell metadata!")
+    # Check for NaNs in variable column
+    if cell_data[variable].isna().any():
+        log.warning(
+            f"NaNs detected in {variable} column. These will be converted to 'nan' string.")
+    # Check for numerical values in variable column
+    if not all([isinstance(x, str) for x in cell_data[variable].dropna()]):
+        log.warning(
+            f"Non-string values detected in {variable} column. These will be converted to strings.")
+    # Convert variable column to string
+    cell_data[variable] = cell_data[variable].astype(str)
     # make output folders, if they don't exists
     if not os.path.exists(bed_path):
         os.makedirs(bed_path)
