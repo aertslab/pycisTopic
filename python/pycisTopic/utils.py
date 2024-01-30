@@ -397,7 +397,7 @@ def read_fragments_from_file(
                 has_header=False,
                 skip_rows=skip_rows,
                 separator="\t",
-                use_pyarrow=True,
+                use_pyarrow=False,
                 new_columns=bed_column_names[:nbr_columns],
             )
             .with_columns(
