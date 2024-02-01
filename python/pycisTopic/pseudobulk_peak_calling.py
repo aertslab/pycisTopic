@@ -27,7 +27,8 @@ def _generate_bigwig(
         path_to_fragments: str,
         chromsizes: Dict[str, int],
         normalize_bigwig: bool,
-        bw_filename: str):
+        bw_filename: str,
+        log: logging.Logger):
     fragments_df = read_fragments_to_polars_df(path_to_fragments)
     fragments_to_bw(
         fragments_df = fragments_df,
@@ -37,6 +38,7 @@ def _generate_bigwig(
         scaling_factor = 1,
         cut_sites = False
     )
+    log.info(f"{bw_filename} done!")
 
 def export_pseudobulk(
     input_data: Union[CistopicObject, pd.DataFrame],
@@ -179,7 +181,8 @@ def export_pseudobulk(
             path_to_fragments = bed_paths[cell_type],
             chromsizes = chromsizes_dict,
             normalize_bigwig = normalize_bigwig,
-            bw_filename = os.path.join(bigwig_path, f"{_santize_string_for_filename(cell_type)}.bw")
+            bw_filename = os.path.join(bigwig_path, f"{_santize_string_for_filename(cell_type)}.bw"),
+            log = log
         )
         for cell_type in bed_paths.keys()
     )
