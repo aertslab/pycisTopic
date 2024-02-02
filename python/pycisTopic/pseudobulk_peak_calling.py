@@ -210,6 +210,7 @@ def peak_calling(
     keep_dup: Optional[str] = "all",
     q_value: Optional[float] = 0.05,
     nolambda: Optional[bool] = True,
+    skip_empty_peaks: bool = False,
     **kwargs
 ):
     """
@@ -267,6 +268,7 @@ def peak_calling(
                     keep_dup,
                     q_value,
                     nolambda,
+                    skip_empty_peaks
                 )
                 for name in list(bed_paths.keys())
             ]
@@ -285,12 +287,14 @@ def peak_calling(
                     keep_dup,
                     q_value,
                     nolambda,
+                    skip_empty_peaks
                 )
                 for name in list(bed_paths.keys())
             ]
     narrow_peaks_dict = {
         list(bed_paths.keys())[i]: narrow_peaks[i].narrow_peak
         for i in range(len(narrow_peaks))
+        if len(narrow_peaks[i].narrow_peak) > 0
     }
     return narrow_peaks_dict
 
@@ -306,6 +310,7 @@ def macs_call_peak(
     keep_dup: Optional[str] = "all",
     q_value: Optional[int] = 0.05,
     nolambda: Optional[bool] = True,
+    skip_empty_peaks: bool = False
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -362,6 +367,7 @@ def macs_call_peak(
         keep_dup=keep_dup,
         q_value=q_value,
         nolambda=nolambda,
+        skip_empty_peaks=skip_empty_peaks
     )
     log.info(f"{name} done!")
     return MACS_peak_calling
@@ -379,6 +385,7 @@ def macs_call_peak_ray(
     keep_dup: Optional[str] = "all",
     q_value: Optional[int] = 0.05,
     nolambda: Optional[bool] = True,
+    skip_empty_peaks: bool = False
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -435,6 +442,7 @@ def macs_call_peak_ray(
         keep_dup=keep_dup,
         q_value=q_value,
         nolambda=nolambda,
+        skip_empty_peaks=skip_empty_peaks
     )
     log.info(name + " done!")
     return MACS_peak_calling
@@ -484,6 +492,7 @@ class MACSCallPeak:
         keep_dup: Optional[str] = "all",
         q_value: Optional[int] = 0.05,
         nolambda: Optional[bool] = True,
+        skip_empty_peaks: bool = False,
     ):
         self.macs_path = macs_path
         self.treatment = bed_path
@@ -496,6 +505,7 @@ class MACSCallPeak:
         self.keep_dup = keep_dup
         self.qvalue = q_value
         self.nolambda = nolambda
+        self.skip_empty_peaks = skip_empty_peaks
         self.call_peak()
 
     def call_peak(self):
@@ -542,12 +552,24 @@ class MACSCallPeak:
                     e.cmd, e.returncode, e.output
                 )
             )
-        self.narrow_peak = self.load_narrow_peak()
+        self.narrow_peak = self.load_narrow_peak(self.skip_empty_peaks)
 
-    def load_narrow_peak(self):
+    def load_narrow_peak(self, skip_empty_peaks: bool):
         """
         Load MACS2 narrow peak files as :class:`pr.PyRanges`.
         """
+        # check if file is empty
+        file_is_empty = False
+        with open(os.path.join(self.outdir, f"{self.name}_peaks.narrowPeak")) as f:
+            first_line = f.readline()
+            if len(first_line) == 0:
+                file_is_empty = True
+        if file_is_empty and skip_empty_peaks:
+            print(f"{self.name} has no peaks, skipping")
+            return  pr.PyRanges()
+        elif file_is_empty and not skip_empty_peaks:
+            raise ValueError(f"{self.name} has no peaks, exiting. Set skip_empty_peaks to True to skip empty peaks.")
+
         narrow_peak = pd.read_csv(
             os.path.join(self.outdir, f"{self.name}_peaks.narrowPeak"),
             sep="\t",
