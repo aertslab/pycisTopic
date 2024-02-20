@@ -48,7 +48,7 @@ tspex
 polars
 pyscenic@git+https://github.com/aertslab/pySCENIC@master
 loomxpy@git+https://github.com/aertslab/LoomXpy@main
-scatac_fragment_tools@git+https://github.com/aertslab/scatac_fragment_tools@main
+scatac_fragment_tools
 sphinx_rtd_theme
 nbsphinx
 nbsphinx_link
