@@ -1,51 +1,131 @@
+from __future__ import annotations
+
 import gc
-import gzip
 import logging
 import math
+import os
 import re
-import sys
+from pathlib import Path
+from typing import Literal, Sequence, Union
 
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import polars as pl
 import pyranges as pr
 from PIL import Image
 from scipy import sparse
 
-
-def region_names_to_coordinates(region_names):
-    chrom = pd.DataFrame([i.split(":", 1)[0] for i in region_names if ":" in i])
-    coor = [i.split(":", 1)[1] for i in region_names if ":" in i]
-    start = pd.DataFrame([int(i.split("-", 1)[0]) for i in coor])
-    end = pd.DataFrame([int(i.split("-", 1)[1]) for i in coor])
-    regiondf = pd.concat([chrom, start, end], axis=1, sort=False)
-    regiondf.index = [i for i in region_names if ":" in i]
-    regiondf.columns = ["Chromosome", "Start", "End"]
-    return regiondf
+from pycisTopic.lda_models import CistopicLDAModel
 
 
-def get_position_index(query_list, target_list):
-    d = {k: v for v, k in enumerate(target_list)}
-    index = (d[k] for k in query_list)
-    return list(index)
+def normalise_filepath(path: str | Path, check_not_directory: bool = True) -> str:
+    """
+    Create a string path, expanding the home directory if present.
+
+    """
+    path = os.path.expanduser(path)
+    if check_not_directory and os.path.exists(path) and os.path.isdir(path):
+        raise IsADirectoryError(f"Expected a file path; {path!r} is a directory")
+    return path
 
 
-def non_zero_rows(X):
-    if isinstance(X, sparse.csr_matrix):
+def coord_to_region_names(df_pl: pl.DataFrame) -> list[str]:
+    """
+    Convert Polars DataFrame with fragments to region names.
+
+    Parameters
+    ----------
+    df_pl
+
+    Returns
+    -------
+
+    List of region names.
+    """
+
+    df_pl.select(
+        [
+            (
+                pl.col("Chromosome").cast(pl.Utf8)
+                + ":"
+                + pl.col("Start").cast(pl.Utf8)
+                + "-"
+                + pl.col("End").cast(pl.Utf8)
+            ).alias("RegionIDs")
+        ]
+    ).get_column("RegionIDs").to_list()
+
+
+def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
+    """
+    Create Pandas DataFrame with region IDs to coordinates mapping.
+
+    Parameters
+    ----------
+    region_names: List of region names in "chrom:start-end" format.
+
+    Returns
+    -------
+
+    Pandas DataFrame with region IDs to coordinates mapping.
+    """
+
+    region_df = (
+        pl.DataFrame(
+            data=region_names,
+            columns=["RegionIDs"],
+        )
+        .with_columns(
+            pl.col("RegionIDs")
+            # Replace first ":" with "-".
+            .str.replace(":", "-")
+            # Split on "-" to generate 3 parts: "Chromosome", "Start" and "End"
+            .str.split_exact("-", 2)
+            # Give sensible names to each splitted part.
+            .struct.rename_fields(
+                ["Chromosome", "Start", "End"],
+            ).alias("RegionIDsFields")
+        )
+        # Unpack "RegionIDsFields" struct column and create Chromosome", "Start" and "End" columns.
+        .unnest("RegionIDsFields")
+        .with_columns(
+            # Convert "Start" and "End" string columns to int32 columns.
+            pl.col(["Start", "End"]).cast(pl.Int32)
+        )
+        # Convert to Pandas.
+        .to_pandas()
+    )
+
+    # Set RegionIDs as index.
+    region_df.set_index("RegionIDs", inplace=True)
+
+    return region_df
+
+
+def get_position_index(
+    query_list: Sequence[str], target_list: Sequence[str]
+) -> Sequence[int]:
+    d = {k: idx for idx, k in enumerate(target_list)}
+    index = [d[k] for k in query_list]
+    return index
+
+
+def subset_list(target_list: Sequence[str], index_list: Sequence[int]) -> Sequence[str]:
+    return list(map(target_list.__getitem__, index_list))
+
+
+def non_zero_rows(matrix: Union[sparse.csr_matrix, np.ndarray]):
+    if isinstance(matrix, sparse.csr_matrix):
         # Remove all explicit zeros in sparse matrix.
-        X.eliminate_zeros()
+        matrix.eliminate_zeros()
         # Get number of non zeros per row and get indices for each row which is
         # not completely zero.
-        return np.nonzero(X.getnnz(axis=1))[0]
+        return np.nonzero(matrix.getnnz(axis=1))[0]
     else:
         # For non sparse matrices.
-        return np.nonzero(np.count_nonzero(X, axis=1))[0]
-
-
-def subset_list(target_list, index_list):
-    X = list(map(target_list.__getitem__, index_list))
-    return X
+        return np.nonzero(np.count_nonzero(matrix, axis=1))[0]
 
 
 def loglikelihood(nzw, ndz, alpha, eta):
@@ -82,15 +162,6 @@ def loglikelihood(nzw, ndz, alpha, eta):
     return ll
 
 
-def sparse2bow(X):
-    for indprev, indnow in zip(X.indptr, X.indptr[1:]):
-        yield np.array(X.indices[indprev:indnow])
-
-
-def chunks(l, n):
-    return [l[x : x + n] for x in xrange(0, len(l), n)]
-
-
 def gini(array):
     """Calculate the Gini coefficient of a numpy array."""
     # based on bottom eq: http://www.statsdirect.com/help/content/image/stat0206_wmf.gif
@@ -112,14 +183,14 @@ def regions_overlap(target, query):
     if isinstance(target, str):
         target_pr = pr.read_bed(target)
     if isinstance(target, list):
-        target_pr = pr.PyRanges(regionNamesToCoordinates(target))
+        target_pr = pr.PyRanges(region_names_to_coordinates(target))
     if isinstance(target, pr.PyRanges):
         target_pr = target
     # Read input
     if isinstance(query, str):
         query_pr = pr.read_bed(query)
     if isinstance(query, list):
-        query_pr = pr.PyRanges(regionNamesToCoordinates(query))
+        query_pr = pr.PyRanges(region_names_to_coordinates(query))
     if isinstance(query, pr.PyRanges):
         query_pr = query
 
@@ -132,32 +203,6 @@ def regions_overlap(target, query):
         + target_pr.End.astype(str)
     ).to_list()
     return selected_regions
-
-
-def format_input_regions(input_data):
-    new_data = {}
-    for key in input_data.keys():
-        data = input_data[key]
-        if isinstance(data, pd.DataFrame):
-            regions = data.index.tolist()
-            if len(regions) > 0:
-                new_data[key] = pr.PyRanges(regionNamesToCoordinates(regions))
-        else:
-            new_data[key] = data
-    return new_data
-
-
-def inplace_change(filename, old_string, new_string):
-    # Safely read the input filename using 'with'
-    with open(filename) as f:
-        s = f.read()
-        if old_string not in s:
-            return
-    # Safely write the changed content, if found in the file
-    with open(filename, "w") as f:
-        s = s.replace(old_string, new_string)
-        f.write(s)
-
 
 def load_cisTopic_model(path_to_cisTopic_model_matrices):
     metrics = None
@@ -328,7 +373,6 @@ def get_tss_matrix(fragments, flank_window, tss_space_annotation):
     gc.collect()
 
     return TSS_matrix
-
 
 def read_fragments_from_file(
     fragments_bed_filename, use_polars: bool = True

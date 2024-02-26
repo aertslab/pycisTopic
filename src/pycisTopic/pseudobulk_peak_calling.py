@@ -53,6 +53,7 @@ def export_pseudobulk(
     split_pattern: str = "___",
     temp_dir: str = "/tmp"
 ) -> Tuple[Dict[str, str], Dict[str, str]]:
+
     """
     Create pseudobulks as bed and bigwig from single cell fragments file given a barcode annotation.
 
@@ -83,6 +84,7 @@ def export_pseudobulk(
             Number of cores to use. Default: 1.
     normalize_bigwig: bool, optional
             Whether bigwig files should be CPM normalized. Default: True.
+
     split_pattern: str, optional
             Pattern to split cell barcode from sample id. Default: '___'. Note, if `split_pattern` is not None, then `export_pseudobulk` will
             attempt to infer `sample_id` from the index of `input_data` and ignore `sample_id_col`.
@@ -94,7 +96,6 @@ def export_pseudobulk(
     dict
             A dictionary containing the paths to the newly created bed fragments files per group a dictionary containing the paths to the
             newly created bigwig files per group.
-
     """
     # Create logger
     level = logging.INFO
@@ -102,11 +103,13 @@ def export_pseudobulk(
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger("cisTopic")
+
     # Get fragments file
     if isinstance(input_data, CistopicObject):
         path_to_fragments = input_data.path_to_fragments
         if path_to_fragments is None:
             log.error("No path_to_fragments in this cisTopic object.")
+
         cell_data = input_data.cell_data.copy()
     elif isinstance(input_data, pd.DataFrame):
         if path_to_fragments is None:
@@ -119,6 +122,7 @@ def export_pseudobulk(
         print(
             'Please, include a sample identification column (e.g. "sample_id") in your cell metadata!'
         )
+
     # Check wether we have a path to fragments for each sample
     if not all([sample_id in path_to_fragments.keys() for sample_id in sample_ids]):
         raise ValueError("Please, provide a path to fragments for each sample in your cell metadata!")
@@ -269,6 +273,7 @@ def peak_calling(
                     q_value,
                     nolambda,
                     skip_empty_peaks
+
                 )
                 for name in list(bed_paths.keys())
             ]
@@ -288,6 +293,7 @@ def peak_calling(
                     q_value,
                     nolambda,
                     skip_empty_peaks
+
                 )
                 for name in list(bed_paths.keys())
             ]
@@ -311,6 +317,7 @@ def macs_call_peak(
     q_value: Optional[int] = 0.05,
     nolambda: Optional[bool] = True,
     skip_empty_peaks: bool = False
+
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -386,6 +393,7 @@ def macs_call_peak_ray(
     q_value: Optional[int] = 0.05,
     nolambda: Optional[bool] = True,
     skip_empty_peaks: bool = False
+
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -443,6 +451,7 @@ def macs_call_peak_ray(
         q_value=q_value,
         nolambda=nolambda,
         skip_empty_peaks=skip_empty_peaks
+
     )
     log.info(name + " done!")
     return MACS_peak_calling
@@ -506,6 +515,7 @@ class MACSCallPeak:
         self.qvalue = q_value
         self.nolambda = nolambda
         self.skip_empty_peaks = skip_empty_peaks
+
         self.call_peak()
 
     def call_peak(self):
@@ -569,7 +579,6 @@ class MACSCallPeak:
             return  pr.PyRanges()
         elif file_is_empty and not skip_empty_peaks:
             raise ValueError(f"{self.name} has no peaks, exiting. Set skip_empty_peaks to True to skip empty peaks.")
-
         narrow_peak = pd.read_csv(
             os.path.join(self.outdir, f"{self.name}_peaks.narrowPeak"),
             sep="\t",

@@ -346,7 +346,7 @@ def impute_accessibility(
         Chunk size used (number of regions for which imputed accessibility is
         calculated at the same time).
     project: str, optional
-        Name of the cisTopic imputation project. Default: `"cisTopic_impute"`.
+        Name of the cisTopic imputation project. Default: ``cisTopic_impute``.
 
     Return
     ------
@@ -1037,9 +1037,9 @@ def subset_array_second_axis(arr, col_indices):
 
     """
     if np.max(col_indices) >= arr.shape[1]:
-        raise IndexError("index is out of bounds for axis 1.")
+        raise IndexError(f"index {np.max(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
     if np.min(col_indices) < -arr.shape[1]:
-        raise IndexError("index is out of bounds for axis 1 with size")
+        raise IndexError(f"index {np.min(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
 
     # Create empty subset array of correct dimensions and dtype.
     subset_arr = np.empty(
@@ -1086,7 +1086,9 @@ def get_log2_fc(fg_mat, bg_mat):
 
     if fg_mat.shape[0] != bg_mat.shape[0]:
         raise ValueError(
-            "Foreground matrix and background matrix have a different first dimension:")
+            "Foreground matrix and background matrix have a different first dimension:"
+            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
+        )
 
     # Calculate log2 fold change between foreground and background matrix with numba in
     # a similar way as the following numpy code:
