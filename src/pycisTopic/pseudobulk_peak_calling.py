@@ -1,36 +1,59 @@
-import gc
 import logging
 import os
-import re
 import subprocess
 import sys
-from typing import Dict, List, Optional, Union
+from typing import Dict, Optional, Tuple, Union
 
-import numpy as np
 import pandas as pd
-import pyBigWig
 import pyranges as pr
 import ray
 
-from .cistopic_class import *
+from scatac_fragment_tools.library.split.split_fragments_by_cell_type import (
+    split_fragment_files_by_cell_type,
+    _santize_string_for_filename
+)
+
+from scatac_fragment_tools.library.bigwig.fragments_to_bigwig import (
+        fragments_to_bw,
+        read_fragments_to_polars_df,
+    )
+
+from .cistopic_class import CistopicObject
 from .utils import *
 
+import joblib
+
+def _generate_bigwig(
+        path_to_fragments: str,
+        chromsizes: Dict[str, int],
+        normalize_bigwig: bool,
+        bw_filename: str,
+        log: logging.Logger):
+    fragments_df = read_fragments_to_polars_df(path_to_fragments)
+    fragments_to_bw(
+        fragments_df = fragments_df,
+        chrom_sizes = chromsizes,
+        bw_filename = bw_filename,
+        normalize = normalize_bigwig,
+        scaling_factor = 1,
+        cut_sites = False
+    )
+    log.info(f"{bw_filename} done!")
 
 def export_pseudobulk(
-    input_data: Union["CistopicObject", pd.DataFrame, Dict[str, pd.DataFrame]],
+    input_data: Union[CistopicObject, pd.DataFrame],
     variable: str,
     chromsizes: Union[pd.DataFrame, pr.PyRanges],
     bed_path: str,
     bigwig_path: str,
     path_to_fragments: Optional[Dict[str, str]] = None,
-    sample_id_col: Optional[str] = "sample_id",
-    n_cpu: Optional[int] = 1,
-    normalize_bigwig: Optional[bool] = True,
-    remove_duplicates: Optional[bool] = True,
-    split_pattern: Optional[str] = "___",
-    use_polars: Optional[bool] = True,
-    **kwargs
-):
+    sample_id_col: str = "sample_id",
+    n_cpu: int = 1,
+    normalize_bigwig: bool = True,
+    split_pattern: str = "___",
+    temp_dir: str = "/tmp"
+) -> Tuple[Dict[str, str], Dict[str, str]]:
+
     """
     Create pseudobulks as bed and bigwig from single cell fragments file given a barcode annotation.
 
@@ -61,15 +84,12 @@ def export_pseudobulk(
             Number of cores to use. Default: 1.
     normalize_bigwig: bool, optional
             Whether bigwig files should be CPM normalized. Default: True.
-    remove_duplicates: bool, optional
-            Whether duplicates should be removed before converting the data to bigwig.
+
     split_pattern: str, optional
             Pattern to split cell barcode from sample id. Default: '___'. Note, if `split_pattern` is not None, then `export_pseudobulk` will
             attempt to infer `sample_id` from the index of `input_data` and ignore `sample_id_col`.
-    use_polars: bool, optional
-            Whether to use polars to read fragments files. Default: True.
-    **kwargs
-            Additional parameters for ray.init()
+    temp_dir: str
+            Path to temporary directory. Default: '/tmp'.
 
     Return
     ------
@@ -89,11 +109,12 @@ def export_pseudobulk(
         path_to_fragments = input_data.path_to_fragments
         if path_to_fragments is None:
             log.error("No path_to_fragments in this cisTopic object.")
-        cell_data = input_data.cell_data
+
+        cell_data = input_data.cell_data.copy()
     elif isinstance(input_data, pd.DataFrame):
         if path_to_fragments is None:
             log.error("Please, provide path_to_fragments.")
-        cell_data = input_data
+        cell_data = input_data.copy()
     # Check for sample_id column
     try:
         sample_ids = list(set(cell_data[sample_id_col]))
@@ -102,260 +123,84 @@ def export_pseudobulk(
             'Please, include a sample identification column (e.g. "sample_id") in your cell metadata!'
         )
 
-    # Get fragments
-    fragments_df_dict = {}
-    for sample_id in path_to_fragments.keys():
-        if sample_id not in sample_ids:
-            log.info(
-                "The following path_to_fragments entry is not found in the cell metadata sample_id_col: ",
-                sample_id,
-                ". It will be ignored.",
-            )
-        else:
-            log.info("Reading fragments from " + path_to_fragments[sample_id])
-            fragments_df = read_fragments_from_file(path_to_fragments[sample_id], use_polars=use_polars).df
-            # Convert to int32 for memory efficiency
-            fragments_df.Start = np.int32(fragments_df.Start)
-            fragments_df.End = np.int32(fragments_df.End)
-            if "Score" in fragments_df:
-                fragments_df.Score = np.int32(fragments_df.Score)
-            if "barcode" in cell_data:
-                fragments_df = fragments_df.loc[
-                    fragments_df["Name"].isin(cell_data["barcode"].tolist())
-                ]
-            else:
-                fragments_df = fragments_df.loc[
-                    fragments_df["Name"].isin(
-                        prepare_tag_cells(cell_data.index.tolist(), split_pattern)
-                    )
-                ]
-            fragments_df_dict[sample_id] = fragments_df
-
-    # Set groups
-    if "barcode" in cell_data:
-        cell_data = cell_data.loc[:, [variable, sample_id_col, "barcode"]]
-    else:
-        cell_data = cell_data.loc[:, [variable, sample_id_col]]
-    cell_data[variable] = cell_data[variable].replace(" ", "", regex=True)
-    cell_data[variable] = cell_data[variable].replace("[^A-Za-z0-9]+", "_", regex=True)
-    groups = sorted(list(set(cell_data[variable])))
-    # Check chromosome sizes
-    if isinstance(chromsizes, pd.DataFrame):
-        chromsizes = chromsizes.loc[:, ["Chromosome", "Start", "End"]]
-        chromsizes = pr.PyRanges(chromsizes)
-    # Check that output dir exist and generate output paths
-    if isinstance(bed_path, str):
-        if not os.path.exists(bed_path):
-            os.makedirs(bed_path)
-        bed_paths = {
-            group: os.path.join(bed_path, str(group) + ".bed.gz") for group in groups
-        }
-    else:
-        bed_paths = {}
-    if isinstance(bigwig_path, str):
-        if not os.path.exists(bigwig_path):
-            os.makedirs(bigwig_path)
-        bw_paths = {
-            group: os.path.join(bigwig_path, str(group) + ".bw") for group in groups
-        }
-    else:
-        bw_paths = {}
-    # Create pseudobulks
-    if n_cpu > 1:
-        ray.init(num_cpus=n_cpu, **kwargs)
-        ray_handle = ray.wait(
-            [
-                export_pseudobulk_ray.remote(
-                    cell_data,
-                    group,
-                    fragments_df_dict,
-                    chromsizes,
-                    bigwig_path,
-                    bed_path,
-                    sample_id_col,
-                    normalize_bigwig,
-                    remove_duplicates,
-                    split_pattern,
-                )
-                for group in groups
-            ],
-            num_returns=len(groups),
+    # Check wether we have a path to fragments for each sample
+    if not all([sample_id in path_to_fragments.keys() for sample_id in sample_ids]):
+        raise ValueError("Please, provide a path to fragments for each sample in your cell metadata!")
+    # Check for NaNs in variable column
+    if cell_data[variable].isna().any():
+        log.warning(
+            f"NaNs detected in {variable} column. These will be converted to 'nan' string.")
+    # Check for numerical values in variable column
+    if not all([isinstance(x, str) for x in cell_data[variable].dropna()]):
+        log.warning(
+            f"Non-string values detected in {variable} column. These will be converted to strings.")
+    # Convert variable column to string
+    cell_data[variable] = cell_data[variable].astype(str)
+    # make output folders, if they don't exists
+    if not os.path.exists(bed_path):
+        os.makedirs(bed_path)
+    if not os.path.exists(bigwig_path):
+        os.makedirs(bigwig_path)
+    if "barcode" not in cell_data.columns:
+        cell_data["barcode"] = prepare_tag_cells(
+            cell_data.index.tolist(), split_pattern
         )
-        ray.shutdown()
-    else:
-        [
-            export_pseudobulk_one_sample(
-                cell_data,
-                group,
-                fragments_df_dict,
-                chromsizes,
-                bigwig_path,
-                bed_path,
-                sample_id_col,
-                normalize_bigwig,
-                remove_duplicates,
-                split_pattern,
-            )
-            for group in groups
-        ]
-
-    return bw_paths, bed_paths
-
-
-def export_pseudobulk_one_sample(
-    cell_data: pd.DataFrame,
-    group: str,
-    fragments_df_dict: Dict[str, pd.DataFrame],
-    chromsizes: pr.PyRanges,
-    bigwig_path: str,
-    bed_path: str,
-    sample_id_col: Optional[str] = "sample_id",
-    normalize_bigwig: Optional[bool] = True,
-    remove_duplicates: Optional[bool] = True,
-    split_pattern: Optional[str] = "___",
-):
-    """
-    Create pseudobulk as bed and bigwig from single cell fragments file given a barcode annotation and a group.
-
-    Parameters
-    ---------
-    cell_data: pd.DataFrame
-            A cell metadata :class:`pd.Dataframe` containing barcodes, their annotation and their sample of origin.
-    group: str
-            A character string indicating the group for which pseudobulks will be created.
-    fragments_df_dict: dict
-            A dictionary containing data frames as values with 'Chromosome', 'Start', 'End', 'Name', and 'Score' as columns; and sample label
-            as keys. 'Score' indicates the number of times that a fragments is found assigned to that barcode.
-    chromsizes: pr.PyRanges
-            A :class:`pr.PyRanges` containing size of each column, containing 'Chromosome', 'Start' and 'End' columns.
-    bigwig_path: str
-            Path to folder where the bigwig file will be saved.
-    bed_path: str
-            Path to folder where the fragments bed file will be saved.
-    sample_id_col: str, optional
-            Name of the column containing the sample name per barcode in the input :class:`CistopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
-    normalize_bigwig: bool, optional
-            Whether bigwig files should be CPM normalized. Default: True.
-    remove_duplicates: bool, optional
-            Whether duplicates should be removed before converting the data to bigwig.
-    split_pattern: str
-            Pattern to split cell barcode from sample id. Default: ___ .
-    """
-    # Create logger
-    level = logging.INFO
-    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger("cisTopic")
-
-    log.info("Creating pseudobulk for " + str(group))
-    group_fragments_list = []
-    group_fragments_dict = {}
-    for sample_id in fragments_df_dict:
-        sample_data = cell_data[cell_data.loc[:, sample_id_col].isin([sample_id])]
-        if "barcode" in sample_data:
-            sample_data.index = sample_data["barcode"].tolist()
-        else:
-            sample_data.index = prepare_tag_cells(
-                sample_data.index.tolist(), split_pattern
-            )
-        group_var = sample_data.iloc[:, 0]
-        barcodes = group_var[group_var.isin([group])].index.tolist()
-        fragments_df = fragments_df_dict[sample_id]
-        group_fragments = fragments_df.loc[fragments_df["Name"].isin(barcodes)]
-        if len(fragments_df_dict) > 1:
-            group_fragments_dict[sample_id] = group_fragments
-
-    if len(fragments_df_dict) > 1:
-        group_fragments_list = [
-            group_fragments_dict[list(group_fragments_dict.keys())[x]]
-            for x in range(len(fragments_df_dict))
-        ]
-        group_fragments = group_fragments_list[0].append(group_fragments_list[1:])
-
-    del group_fragments_dict
-    del group_fragments_list
-    del fragments_df
-    gc.collect()
-
-    group_pr = pr.PyRanges(group_fragments)
-    if isinstance(bigwig_path, str):
-        bigwig_path_group = os.path.join(bigwig_path, str(group) + ".bw")
-        if remove_duplicates:
-            group_pr.to_bigwig(
-                path=bigwig_path_group,
-                chromosome_sizes=chromsizes,
-                rpm=normalize_bigwig,
-            )
-        else:
-            group_pr.to_bigwig(
-                path=bigwig_path_group,
-                chromosome_sizes=chromsizes,
-                rpm=normalize_bigwig,
-                value_col="Score",
-            )
-    if isinstance(bed_path, str):
-        bed_path_group = os.path.join(bed_path, str(group) + ".bed.gz")
-        group_pr.to_bed(
-            path=bed_path_group, keep=False, compression="infer", chain=False
-        )
-
-    log.info(str(group) + " done!")
-
-
-@ray.remote
-def export_pseudobulk_ray(
-    cell_data: pd.DataFrame,
-    group: str,
-    fragments_df_dict: Dict[str, pd.DataFrame],
-    chromsizes: pr.PyRanges,
-    bigwig_path: str,
-    bed_path: str,
-    sample_id_col: Optional[str] = "sample_id",
-    normalize_bigwig: Optional[bool] = True,
-    remove_duplicates: Optional[bool] = True,
-    split_pattern: Optional[str] = "___",
-):
-    """
-    Create pseudobulk as bed and bigwig from single cell fragments file given a barcode annotation and a group.
-
-    Parameters
-    ---------
-    cell_data: pd.DataFrame
-            A cell metadata :class:`pd.Dataframe` containing barcodes, their annotation and their sample of origin.
-    group: str
-            A character string indicating the group for which pseudobulks will be created.
-    fragments_df_dict: dict
-            A dictionary containing data frames as values with 'Chromosome', 'Start', 'End', 'Name', and 'Score' as columns; and sample label
-            as keys. 'Score' indicates the number of times that a fragments is found assigned to that barcode.
-    chromsizes: pr.PyRanges
-            A :class:`pr.PyRanges` containing size of each column, containing 'Chromosome', 'Start' and 'End' columns.
-    bed_path: str
-            Path to folder where the fragments bed file will be saved.
-    bigwig_path: str
-            Path to folder where the bigwig file will be saved.
-    sample_id_col: str, optional
-            Name of the column containing the sample name per barcode in the input :class:`CistopicObject.cell_data` or class:`pd.DataFrame`. Default: 'sample_id'.
-    normalize_bigwig: bool, optional
-            Whether bigwig files should be CPM normalized. Default: True.
-    remove_duplicates: bool, optional
-            Whether duplicates should be removed before converting the data to bigwig.
-    split_pattern: str
-            Pattern to split cell barcode from sample id. Default: ___ .
-    """
-    export_pseudobulk_one_sample(
-        cell_data,
-        group,
-        fragments_df_dict,
-        chromsizes,
-        bigwig_path,
-        bed_path,
-        sample_id_col,
-        normalize_bigwig,
-        remove_duplicates,
-        split_pattern,
+    sample_to_cell_type_to_barcodes = {}
+    for sample in sample_ids:
+        _sample_cell_data = cell_data.loc[cell_data[sample_id_col] == sample]
+        _cell_type_to_cell_barcodes = _sample_cell_data \
+            .groupby(variable, group_keys=False)["barcode"] \
+            .apply(list) \
+            .to_dict()
+        sample_to_cell_type_to_barcodes[sample] = _cell_type_to_cell_barcodes
+    chromsizes_dict = chromsizes.df.set_index("Chromosome").to_dict()["End"]
+    # For each sample, get fragments for each cell type
+    
+    log.info("Splitting fragments by cell type.")
+    split_fragment_files_by_cell_type(
+        sample_to_fragment_file = path_to_fragments,
+        path_to_temp_folder = temp_dir,
+        path_to_output_folder = bed_path,
+        sample_to_cell_type_to_cell_barcodes = sample_to_cell_type_to_barcodes,
+        chromsizes = chromsizes_dict,
+        n_cpu = n_cpu,
+        verbose = False,
+        clear_temp_folder = True
     )
 
+    bed_paths = {}
+    for cell_type in cell_data[variable].unique():
+        _bed_fname = os.path.join(
+            bed_path,
+            f"{_santize_string_for_filename(cell_type)}.fragments.tsv.gz")
+        if os.path.exists(_bed_fname):
+            bed_paths[cell_type] = _bed_fname
+        else:
+            log.warning(f"Missing fragments for {cell_type}!")
+    
+    log.info("generating bigwig files")
+    joblib.Parallel(n_jobs=n_cpu)(
+        joblib.delayed(_generate_bigwig)
+        (
+            path_to_fragments = bed_paths[cell_type],
+            chromsizes = chromsizes_dict,
+            normalize_bigwig = normalize_bigwig,
+            bw_filename = os.path.join(bigwig_path, f"{_santize_string_for_filename(cell_type)}.bw"),
+            log = log
+        )
+        for cell_type in bed_paths.keys()
+    )
+    bw_paths = {}
+    for cell_type in cell_data[variable].unique():
+        _bw_fname = os.path.join(
+            bigwig_path,
+            f"{_santize_string_for_filename(cell_type)}.bw")
+        if os.path.exists(_bw_fname):
+            bw_paths[cell_type] = _bw_fname
+        else:
+            log.warning(f"Missing bigwig for {cell_type}!")
+
+    return bw_paths, bed_paths
 
 def peak_calling(
     macs_path: str,
@@ -369,6 +214,7 @@ def peak_calling(
     keep_dup: Optional[str] = "all",
     q_value: Optional[float] = 0.05,
     nolambda: Optional[bool] = True,
+    skip_empty_peaks: bool = False,
     **kwargs
 ):
     """
@@ -426,6 +272,8 @@ def peak_calling(
                     keep_dup,
                     q_value,
                     nolambda,
+                    skip_empty_peaks
+
                 )
                 for name in list(bed_paths.keys())
             ]
@@ -444,12 +292,15 @@ def peak_calling(
                     keep_dup,
                     q_value,
                     nolambda,
+                    skip_empty_peaks
+
                 )
                 for name in list(bed_paths.keys())
             ]
     narrow_peaks_dict = {
         list(bed_paths.keys())[i]: narrow_peaks[i].narrow_peak
         for i in range(len(narrow_peaks))
+        if len(narrow_peaks[i].narrow_peak) > 0
     }
     return narrow_peaks_dict
 
@@ -465,6 +316,8 @@ def macs_call_peak(
     keep_dup: Optional[str] = "all",
     q_value: Optional[int] = 0.05,
     nolambda: Optional[bool] = True,
+    skip_empty_peaks: bool = False
+
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -521,6 +374,7 @@ def macs_call_peak(
         keep_dup=keep_dup,
         q_value=q_value,
         nolambda=nolambda,
+        skip_empty_peaks=skip_empty_peaks
     )
     log.info(f"{name} done!")
     return MACS_peak_calling
@@ -538,6 +392,8 @@ def macs_call_peak_ray(
     keep_dup: Optional[str] = "all",
     q_value: Optional[int] = 0.05,
     nolambda: Optional[bool] = True,
+    skip_empty_peaks: bool = False
+
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -594,6 +450,8 @@ def macs_call_peak_ray(
         keep_dup=keep_dup,
         q_value=q_value,
         nolambda=nolambda,
+        skip_empty_peaks=skip_empty_peaks
+
     )
     log.info(name + " done!")
     return MACS_peak_calling
@@ -643,6 +501,7 @@ class MACSCallPeak:
         keep_dup: Optional[str] = "all",
         q_value: Optional[int] = 0.05,
         nolambda: Optional[bool] = True,
+        skip_empty_peaks: bool = False,
     ):
         self.macs_path = macs_path
         self.treatment = bed_path
@@ -655,6 +514,8 @@ class MACSCallPeak:
         self.keep_dup = keep_dup
         self.qvalue = q_value
         self.nolambda = nolambda
+        self.skip_empty_peaks = skip_empty_peaks
+
         self.call_peak()
 
     def call_peak(self):
@@ -701,12 +562,23 @@ class MACSCallPeak:
                     e.cmd, e.returncode, e.output
                 )
             )
-        self.narrow_peak = self.load_narrow_peak()
+        self.narrow_peak = self.load_narrow_peak(self.skip_empty_peaks)
 
-    def load_narrow_peak(self):
+    def load_narrow_peak(self, skip_empty_peaks: bool):
         """
         Load MACS2 narrow peak files as :class:`pr.PyRanges`.
         """
+        # check if file is empty
+        file_is_empty = False
+        with open(os.path.join(self.outdir, f"{self.name}_peaks.narrowPeak")) as f:
+            first_line = f.readline()
+            if len(first_line) == 0:
+                file_is_empty = True
+        if file_is_empty and skip_empty_peaks:
+            print(f"{self.name} has no peaks, skipping")
+            return  pr.PyRanges()
+        elif file_is_empty and not skip_empty_peaks:
+            raise ValueError(f"{self.name} has no peaks, exiting. Set skip_empty_peaks to True to skip empty peaks.")
         narrow_peak = pd.read_csv(
             os.path.join(self.outdir, f"{self.name}_peaks.narrowPeak"),
             sep="\t",

@@ -247,12 +247,14 @@ class CistopicObject:
         cell_names = subset_list(self.cell_names, keep_cells_index)
         # Subset regions with all zeros
         region_names = subset_list(region_names, keep_regions_index)
+        
         cell_data = self.cell_data.iloc[
             keep_cells_index,
         ]
         region_data = self.region_data.iloc[
             keep_regions_index,
         ]
+        
         path_to_fragments = self.path_to_fragments
         project = self.project
         # Create new object

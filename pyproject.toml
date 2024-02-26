@@ -7,9 +7,11 @@ name = "pycisTopic"
 authors = [
   { name = "Carmen Bravo", email = "carmen.bravogonzalezblas@kuleuven.be" },
   { name = "Gert Hulselmans", email = "gert.hulselmans@kuleuven.be" },
+  { name = "Seppe De Winter", email = "seppe.dewinter@kuleuven.be" }
 ]
 description = "pycisTopic is a Python module to simultaneously identify cell states and cis-regulatory topics from single cell epigenomics data."
 readme = "README.rst"
+version = "2.0"
 requires-python = ">=3.8"
 keywords = ["scATAC", "cell state", "topic modeling", "LDA", "enhancer"]
 license = { file = "LICENSE.txt" }

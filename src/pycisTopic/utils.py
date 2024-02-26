@@ -204,7 +204,6 @@ def regions_overlap(target, query):
     ).to_list()
     return selected_regions
 
-
 def load_cisTopic_model(path_to_cisTopic_model_matrices):
     metrics = None
     coherence = None
@@ -374,3 +373,124 @@ def get_tss_matrix(fragments, flank_window, tss_space_annotation):
     gc.collect()
 
     return TSS_matrix
+
+def read_fragments_from_file(
+    fragments_bed_filename, use_polars: bool = True
+) -> pr.PyRanges:
+    """
+    Read fragments BED file to PyRanges object.
+
+    Parameters
+    ----------
+    fragments_bed_filename: Fragments BED filename.
+    use_polars: Use polars instead of pandas for reading the fragments BED file.
+
+    Returns
+    -------
+    PyRanges object of fragments.
+    """
+
+    bed_column_names = (
+        "Chromosome",
+        "Start",
+        "End",
+        "Name",
+        "Score",
+        "Strand",
+        "ThickStart",
+        "ThickEnd",
+        "ItemRGB",
+        "BlockCount",
+        "BlockSizes",
+        "BlockStarts",
+    )
+
+    # Set the correct open function depending if the fragments BED file is gzip compressed or not.
+    open_fn = gzip.open if fragments_bed_filename.endswith(".gz") else open
+
+    skip_rows = 0
+    nbr_columns = 0
+    with open_fn(fragments_bed_filename, "rt") as fragments_bed_fh:
+        for line in fragments_bed_fh:
+            # Remove newlines and spaces.
+            line = line.strip()
+
+            if not line or line.startswith("#"):
+                # Count number of empty lines and lines which start with a comment before the actual data.
+                skip_rows += 1
+            else:
+                # Get number of columns from the first real BED entry.
+                nbr_columns = len(line.split("\t"))
+
+                # Stop reading the BED file.
+                break
+
+    if nbr_columns < 4:
+        raise ValueError(
+            f'Fragments BED file needs to have at least 4 columns. "{fragments_bed_filename}" contains only '
+            f"{nbr_columns} columns."
+        )
+
+    if use_polars:
+        import polars as pl
+
+        # Read fragments BED file with polars.
+        df = (
+            pl.read_csv(
+                fragments_bed_filename,
+                has_header=False,
+                skip_rows=skip_rows,
+                separator="\t",
+                use_pyarrow=False,
+                new_columns=bed_column_names[:nbr_columns],
+            )
+            .with_columns(
+                [
+                    pl.col("Chromosome").cast(pl.Utf8),
+                    pl.col("Start").cast(pl.Int32),
+                    pl.col("End").cast(pl.Int32),
+                    pl.col("Name").cast(pl.Utf8),
+                ]
+            )
+            .to_pandas()
+        )
+
+        # Convert "Name" column to pd.Categorical as groupby operations will be done on it later.
+        df["Name"] = df["Name"].astype("category")
+    else:
+        # Read fragments BED file with pandas.
+        df = pd.read_table(
+            fragments_bed_filename,
+            sep="\t",
+            skiprows=skip_rows,
+            header=None,
+            names=bed_column_names[:nbr_columns],
+            doublequote=False,
+            engine="c",
+            dtype={
+                "Chromosome": str,
+                "Start'": np.int32,
+                "End": np.int32,
+                "Name": "category",
+                "Strand": str,
+            },
+        )
+
+    # Convert pandas dataframe to PyRanges dataframe.
+    # This will convert "Chromosome" and "Strand" columns to pd.Categorical.
+    return pr.PyRanges(df)
+
+
+def coord_to_region_names(coord):
+    """
+    PyRanges to region names
+    """
+    if isinstance(coord, pr.PyRanges):
+        coord = coord.as_df()
+        return list(
+            coord["Chromosome"].astype(str)
+            + ":"
+            + coord["Start"].astype(str)
+            + "-"
+            + coord["End"].astype(str)
+        )

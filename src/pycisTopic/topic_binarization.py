@@ -98,7 +98,6 @@ def binarize_topics(
       Verbeiren, T., 2020.
       A scalable SCENIC workflow for single-cell gene regulatory network analysis.
       Nature Protocols, 15(7), pp.2247-2276.
-
     """
     # Create cisTopic logger
     level = logging.INFO
