@@ -153,7 +153,10 @@ def export_pseudobulk(
             .apply(list) \
             .to_dict()
         sample_to_cell_type_to_barcodes[sample] = _cell_type_to_cell_barcodes
-    chromsizes_dict = chromsizes.df.set_index("Chromosome").to_dict()["End"]
+    if isinstance(chromsizes, pr.PyRanges):
+        chromsizes_dict = chromsizes.df.set_index("Chromosome").to_dict()["End"]
+    else:
+        chromsizes_dict = chromsizes.set_index("Chromosome").to_dict()["End"]
     # For each sample, get fragments for each cell type
     
     log.info("Splitting fragments by cell type.")
