@@ -1215,3 +1215,22 @@ def evaluate_models(
 
     if return_model:
         return models[all_topics.index(best_model)]
+
+def load_cisTopic_model(path_to_cisTopic_model_matrices):
+    metrics = None
+    coherence = None
+    marg_topic = None
+    topic_ass = None
+    cell_topic = pd.read_feather(path_to_cisTopic_model_matrices + "cell_topic.feather")
+    cell_topic.index = ["Topic" + str(x) for x in range(1, cell_topic.shape[0] + 1)]
+    topic_region = pd.read_feather(
+        path_to_cisTopic_model_matrices + "topic_region.feather"
+    )
+    topic_region.index = ["Topic" + str(x) for x in range(1, topic_region.shape[0] + 1)]
+    topic_region = topic_region.T
+    parameters = None
+    model = CistopicLDAModel(
+        metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters
+    )
+    return model
+
