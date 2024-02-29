@@ -261,26 +261,30 @@ def peak_calling(
 
     if n_cpu > 1:
         ray.init(num_cpus=n_cpu, **kwargs)
-        narrow_peaks = ray.get(
-            [
-                macs_call_peak_ray.remote(
-                    macs_path,
-                    bed_paths[name],
-                    name,
-                    outdir,
-                    genome_size,
-                    input_format,
-                    shift,
-                    ext_size,
-                    keep_dup,
-                    q_value,
-                    nolambda,
-                    skip_empty_peaks
+        try:
+            narrow_peaks = ray.get(
+                [
+                    macs_call_peak_ray.remote(
+                        macs_path,
+                        bed_paths[name],
+                        name,
+                        outdir,
+                        genome_size,
+                        input_format,
+                        shift,
+                        ext_size,
+                        keep_dup,
+                        q_value,
+                        nolambda,
+                        skip_empty_peaks
 
-                )
-                for name in list(bed_paths.keys())
-            ]
-        )
+                    )
+                    for name in list(bed_paths.keys())
+                ]
+            )
+        except Exception as e:
+            ray.shutdown()
+            raise(e)
         ray.shutdown()
     else:
         narrow_peaks = [macs_call_peak(
