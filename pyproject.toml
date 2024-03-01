@@ -35,6 +35,16 @@ dependencies = [
     "pandas == 1.5",
     "polars >= 0.18.3",
     "pyarrow >= 8.0.0",
+    "pyranges < 0.0.128",
+    "ray",
+    "scatac_fragment_tools",
+    "scikit-learn",
+    "lda",
+    "matplotlib < 3.7",
+    "tmtoolkit",
+    "gensim",
+    "macs2",
+    "pybiomart"
 ]
 
 [project.urls]
