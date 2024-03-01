@@ -185,7 +185,9 @@ def get_tss_annotation_from_ensembl(
                 pl.when(pl.col("Strand") == 1)
                 .then(pl.lit("+"))
                 .otherwise(
-                    pl.when(pl.col("Strand") == -1).then(pl.lit("-")).otherwise(".")
+                    pl.when(pl.col("Strand") == -1)
+                    .then(pl.lit("-"))
+                    .otherwise(pl.lit("."))
                 )
                 .alias("Strand")
             ),
