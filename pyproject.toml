@@ -45,7 +45,20 @@ dependencies = [
     "gensim",
     "macs2",
     "pybiomart",
-    "pyscenic"
+    "pyscenic",
+    "scrublet",
+    "harmonypy",
+    "igraph",
+    "leidenalg",
+    "seaborn",
+    "adjustText",
+    "statsmodels",
+    "scanpy",
+    "scanorama",
+    "bbknn",
+    "loomxpy",
+    "bs4",
+    "lxml"
 ]
 
 [project.urls]
