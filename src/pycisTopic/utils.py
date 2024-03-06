@@ -73,8 +73,7 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
 
     region_df = (
         pl.DataFrame(
-            data=region_names,
-            columns=["RegionIDs"],
+            data = {"RegionIDs": region_names},
         )
         .with_columns(
             pl.col("RegionIDs")
