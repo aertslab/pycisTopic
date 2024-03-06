@@ -276,17 +276,17 @@ def plot_barcode_stats(
             or (duplication_ratio_threshold is not None):
             title += "Thresholds:\n"
         if unique_fragments_threshold is not None:
-            title += f"\tUnique fragments: {unique_fragments_threshold:.2f}\n"
+            title += f"    Unique fragments: {unique_fragments_threshold:.2f}\n"
         if tss_enrichment_threshold is not None:
-            title += f"\tTSS enrichment: {tss_enrichment_threshold:.2f}\n"
+            title += f"    TSS enrichment: {tss_enrichment_threshold:.2f}\n"
         if frip_threshold is not None:
-            title += f"\tFRIP: {frip_threshold:.2f}\n"
+            title += f"    FRIP: {frip_threshold:.2f}\n"
         if duplication_ratio_threshold is not None:
-            title += f"\tDuplication rate: {duplication_ratio_threshold:.2f}\n"
+            title += f"    Duplication rate: {duplication_ratio_threshold:.2f}\n"
     else:
         title = sample_id if sample_alias is None else sample_alias
 
-    fig.suptitle(title)
+    fig.suptitle(title, horizontalalignment = "left")
 
     if save:
         fig.savefig(save)
