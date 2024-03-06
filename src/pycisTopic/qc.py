@@ -192,7 +192,7 @@ def compute_qc_stats(
     tss_smoothing_rolling_window: int = 10,
     tss_minimum_signal_window: int = 100,
     tss_window: int = 50,
-    tss_min_norm: int = 0.2,
+    tss_min_norm: float = 0.2,
     use_genomic_ranges: bool = True,
     min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
