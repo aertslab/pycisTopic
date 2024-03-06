@@ -104,7 +104,9 @@ def plot_sample_stats(
     nrows = 1
     figsize = (6.4 * ncols, 4.8 * nrows)
 
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
+    fig, axs = plt.subplots(
+        nrows=nrows, ncols=ncols, figsize=figsize,
+        layout = "constrained")
 
     # Set centered sample title for 3 combined plots.
     fig.suptitle(sample_id if sample_alias is None else sample_alias)
@@ -127,8 +129,6 @@ def plot_sample_stats(
         tss_norm_matrix_sample_df,
         ax = axs[2]
     )
-
-    fig.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 
     if save:
         fig.savefig(save)
@@ -186,8 +186,9 @@ def plot_barcode_stats(
     nrows = 1
     figsize = (4 * ncols, 4 * nrows)
     fig, axs = plt.subplots(
-        figsize=figsize, nrows=nrows, ncols=ncols,
-        sharex=True)
+        figsize = figsize, nrows = nrows, ncols = ncols,
+        sharex = True,
+        layout = "constrained")
 
     # Plot TSS enrichment vs unique number of fragments on the left.
     axs[0] = _plot_fragment_stats(
@@ -250,12 +251,6 @@ def plot_barcode_stats(
         ax.set_xscale("log")
         ax.set_xlabel("Number of (unique) fragments in regions")
 
-    fig.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-    if save:
-        fig.savefig(save)
-    else:
-        fig.show()
-
     if detailed_title and bc_passing_filters is not None:
         (
             median_no_fragments,
@@ -271,21 +266,31 @@ def plot_barcode_stats(
             .row(0)
         )
         title = f"{sample_id}\n" if sample_alias is None else f"{sample_alias}\n"
-        title += f"Kept {len(bc_passing_filters)} cells using Otsu filtering\n"
+        title += f"Kept {len(bc_passing_filters)} cells after filtering\n"
         title += f"Median Unique Fragments: {median_no_fragments:.0f}\n"
         title += f"Median TSS Enrichment: {median_tss_enrichment:.2f}\n"
         title += f"Median FRIP: {fraction_of_fragments_in_peaks:.2f}\n"
+        if (unique_fragments_threshold is not None) \
+            or (tss_enrichment_threshold is not None) \
+            or (frip_threshold is not None) \
+            or (duplication_ratio_threshold is not None):
+            title += "Thresholds:\n"
         if unique_fragments_threshold is not None:
-            title += f"Used a minimum of {unique_fragments_threshold:.2f}\n"
+            title += f"\tUnique fragments: {unique_fragments_threshold:.2f}\n"
         if tss_enrichment_threshold is not None:
-            title += f"TSS enrichment of {tss_enrichment_threshold:.2f}\n"
+            title += f"\tTSS enrichment: {tss_enrichment_threshold:.2f}\n"
         if frip_threshold is not None:
-            title += f"FRIP of {frip_threshold:.2f}\n"
+            title += f"\tFRIP: {frip_threshold:.2f}\n"
         if duplication_ratio_threshold is not None:
-            title += f"Duplication ratio of {duplication_ratio_threshold:.2f}\n"
-        fig.suptitle(title, x=0.5, y=1.12, fontsize=9)
+            title += f"\tDuplication rate: {duplication_ratio_threshold:.2f}\n"
     else:
         title = sample_id if sample_alias is None else sample_alias
-        fig.suptitle(title, x=0.5, y=0.95, fontsize=9)
+
+    fig.suptitle(title)
+
+    if save:
+        fig.savefig(save)
+    else:
+        fig.show()
 
     return fig
