@@ -152,7 +152,7 @@ def plot_sample_stats(
     Returns
     -------
     plt.Figure
-        Figure containing the barcode rank, insert size distribution, 
+        Figure containing the barcode rank, insert size distribution,
         and TSS enrichment plots.
 
     Raises
@@ -283,7 +283,7 @@ def plot_barcode_stats(
     save: str | Path | None = None,
 ) -> plt.Figure:
     """
-    Plot TSS enrichment, FRIP, and duplication ratio vs unique number of fragments for a sample.
+    Plot TSS enrichment, FRIP, and duplication ratio vs unique number of fragments.
 
     Parameters
     ----------
@@ -311,7 +311,8 @@ def plot_barcode_stats(
     Returns
     -------
     plt.Figure
-        Figure containing the TSS enrichment, FRIP, and duplication ratio vs unique number of fragments plot.
+        Figure containing the TSS enrichment, FRIP, and
+        duplication ratio vs unique number of fragments plot.
 
     Raises
     ------
