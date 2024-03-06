@@ -69,7 +69,6 @@ def get_barcodes_passing_qc_for_sample(
         If the file with fragments statistics per cell barcode does not exist.
 
     """
-
     # Check wether files exist
     if not os.path.exists(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet")):
         raise FileNotFoundError(f"File {os.path.join(pycistopic_qc_output_dir, f'{sample_id}.fragments_stats_per_cb.parquet')} does not exist")
