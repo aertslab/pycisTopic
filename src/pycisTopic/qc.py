@@ -73,6 +73,8 @@ def get_barcodes_passing_qc_for_sample(
     if not os.path.exists(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet")):
         raise FileNotFoundError(f"File {os.path.join(pycistopic_qc_output_dir, f'{sample_id}.fragments_stats_per_cb.parquet')} does not exist")
 
+    first_print = True
+
     if use_automatic_thresholds:
         # Check wether files exist
         if not os.path.exists(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.otsu_thresholds.tsv")):
@@ -84,27 +86,48 @@ def get_barcodes_passing_qc_for_sample(
                 separator = "\t"
             ).select(["unique_fragments_in_peaks_count_otsu_threshold", "tss_enrichment_otsu_threshold"]).to_numpy()[0]
             if unique_fragments_threshold is None:
-                print(f"Using automatic threshold for unique fragments: {otsu_unique_fragments_threshold}")
+                if first_print:
+                    print(f"{sample_id}:")
+                    first_print = False
+                print(f"\tUsing automatic threshold for unique fragments: {otsu_unique_fragments_threshold}")
                 unique_fragments_threshold = otsu_unique_fragments_threshold
             else:
-                print(f"Using user-defined threshold for unique fragments: {unique_fragments_threshold}")
+                if first_print:
+                    print(f"{sample_id}:")
+                    first_print = False
+                print(f"\tUsing user-defined threshold for unique fragments: {unique_fragments_threshold}")
             if tss_enrichment_threshold is None:
-                print(f"Using automatic threshold for TSS enrichment: {otsu_tss_enrichment_threshold}")
+                if first_print:
+                    print(f"{sample_id}:")
+                    first_print = False
+                print(f"\tUsing automatic threshold for TSS enrichment: {otsu_tss_enrichment_threshold}")
                 tss_enrichment_threshold = otsu_tss_enrichment_threshold
             else:
-                print(f"Using user-defined threshold for TSS enrichment: {tss_enrichment_threshold}")
+                if first_print:
+                    print(f"{sample_id}:")
+                    first_print = False
+                print(f"\tUsing user-defined threshold for TSS enrichment: {tss_enrichment_threshold}")
 
     # Set thresholds to 0 if not defined
     if unique_fragments_threshold is None:
-        print("No threshold for unique fragments defined, setting to 0")
+        if first_print:
+            print(f"{sample_id}:")
+            first_print = False
+        print("\tNo threshold for unique fragments defined, setting to 0")
         unique_fragments_threshold = 0
 
     if tss_enrichment_threshold is None:
-        print("No threshold for TSS enrichment defined, setting to 0")
+        if first_print:
+            print(f"{sample_id}:")
+            first_print = False
+        print("\tNo threshold for TSS enrichment defined, setting to 0")
         tss_enrichment_threshold = 0
 
     if frip_threshold is None:
-        print("No threshold for FRiP defined, setting to 0")
+        if first_print:
+            print(f"{sample_id}:")
+            first_print = False
+        print("\tNo threshold for FRiP defined, setting to 0")
         frip_threshold = 0
 
     # Get barcodes passing filters
