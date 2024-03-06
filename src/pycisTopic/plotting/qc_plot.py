@@ -10,6 +10,24 @@ def plot_barcode_rank(
     ax: plt.Axes | None = None,
     **matplotlib_plot_kwargs
 ) -> plt.Axes:
+    """
+    Plot barcode rank vs number of fragments in a log-log scale.
+
+    Parameters
+    ----------
+    fragments_stats_per_cb_df : pl.DataFrame
+        DataFrame containing barcode statistics.
+    ax : plt.Axes, optional
+        Axes to plot the barcode rank vs number of fragments, by default None.
+    matplotlib_plot_kwargs : dict
+        Additional keyword arguments to be passed to the ax.plot function.
+
+    Returns
+    -------
+    plt.Axes
+        Axes containing the barcode rank vs number of fragments plot.
+
+    """
     if ax is None:
         ax = plt.gca()
     ax.plot(
@@ -29,6 +47,26 @@ def plot_insert_size_distribution(
     insert_size_distriubtion_xlim: tuple[int, int] = (0, 1000),
     **matplotlib_plot_kwargs,
 ) -> plt.Axes:
+    """
+    Plot insert size distribution.
+
+    Parameters
+    ----------
+    fragments_insert_size_dist_df : pl.DataFrame
+        DataFrame containing insert size distribution.
+    ax : plt.Axes, optional
+        Axes to plot the insert size distribution, by default None.
+    insert_size_distriubtion_xlim : tuple, optional
+        X-axis limits for the insert size distribution plot, by default (0, 1000).
+    matplotlib_plot_kwargs : dict
+        Additional keyword arguments to be passed to the ax.plot function.
+
+    Returns
+    -------
+    plt.Axes
+        Axes containing the insert size distribution plot.
+
+    """
     if ax is None:
         ax = plt.gca()
     ax.plot(
@@ -46,6 +84,24 @@ def plot_tss_enrichment(
         ax: plt.Axes | None = None,
         **matplotlib_plot_kwargs
 ) -> plt.Axes:
+    """
+    Plot TSS enrichment.
+
+    Parameters
+    ----------
+    tss_norm_matrix_sample_df : pl.DataFrame
+        DataFrame containing TSS enrichment.
+    ax : plt.Axes, optional
+        Axes to plot the TSS enrichment, by default None.
+    matplotlib_plot_kwargs : dict
+        Additional keyword arguments to be passed to the ax.plot function.
+
+    Returns
+    -------
+    plt.Axes
+        Axes containing the TSS enrichment plot.
+
+    """
     if ax is None:
         ax = plt.gca()
     ax.plot(
@@ -71,6 +127,34 @@ def plot_sample_stats(
     insert_size_distriubtion_xlim: tuple[int, int] = (0, 1000),
     sample_alias: str | None = None,
 ) -> plt.Figure:
+    """
+    Plot barcode rank, insert size distribution, and TSS enrichment for a sample.
+
+    Parameters
+    ----------
+    sample_id : str
+        Sample ID.
+    pycistopic_qc_output_dir : str | Path
+        Directory containing the output of the pycistopic qc command.
+    save : str | Path, optional
+        Path to save the plot, by default None.
+    insert_size_distriubtion_xlim : tuple, optional
+        X-axis limits for the insert size distribution plot, by default (0, 1000).
+    sample_alias : str, optional
+        Sample alias, by default None.
+
+    Returns
+    -------
+    plt.Figure
+        Figure containing the barcode rank, insert size distribution, 
+        and TSS enrichment plots.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the files are not found in the pycistopic_qc_output_dir.
+
+    """
     # check if files exist
     for file_name in [
         f"{sample_id}.fragments_insert_size_dist.parquet",
@@ -145,6 +229,30 @@ def _plot_fragment_stats(
     c_var: str,
     **matplotlib_plot_kwargs
 ) -> plt.Axes:
+    """
+    Helper function to plot fragment statistics.
+
+    Parameters
+    ----------
+    fragments_stats_per_cb_df : pl.DataFrame
+        DataFrame containing fragment statistics.
+    ax : plt.Axes
+        Axes to plot the fragment statistics.
+    x_var : str
+        X-axis variable.
+    y_var : str
+        Y-axis variable.
+    c_var : str
+        Color variable.
+    matplotlib_plot_kwargs : dict
+        Additional keyword arguments to be passed to the ax.scatter function.
+
+    Returns
+    -------
+    plt.Axes
+        Axes containing the fragment statistics plot.
+
+    """
     fragments_stats_per_cb_df = fragments_stats_per_cb_df.sort(
         by = c_var, descending = False
     )
@@ -168,6 +276,43 @@ def plot_barcode_stats(
     sample_alias: str | None = None,
     save: str | Path | None = None,
 ) -> plt.Figure:
+    """
+    Plot TSS enrichment, FRIP, and duplication ratio vs unique number of fragments for a sample.
+
+    Parameters
+    ----------
+    sample_id : str
+        Sample ID.
+    pycistopic_qc_output_dir : str | Path
+        Directory containing the output of the pycistopic qc command.
+    unique_fragments_threshold : int, optional
+        Unique fragments threshold, by default None.
+    tss_enrichment_threshold : float, optional
+        TSS enrichment threshold, by default None.
+    frip_threshold : float, optional
+        FRIP threshold, by default None.
+    duplication_ratio_threshold : float, optional
+        Duplication ratio threshold, by default None.
+    detailed_title : bool, optional
+        Whether to show a detailed title, by default True.
+    bc_passing_filters : list, optional
+        List of barcodes passing filters, by default None.
+    sample_alias : str, optional
+        Sample alias, by default None.
+    save : str | Path, optional
+        Path to save the plot, by default None.
+
+    Returns
+    -------
+    plt.Figure
+        Figure containing the TSS enrichment, FRIP, and duplication ratio vs unique number of fragments plot.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the files are not found in the pycistopic_qc_output_dir.
+
+    """
     # check if files exist
     if not os.path.isfile(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet")):
         raise FileNotFoundError(
