@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import gzip
 import logging
 import math
 import os
