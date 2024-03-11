@@ -5,5 +5,6 @@ Tutorials
 **********
 
 .. toctree::
-        ::maxdepth: 1
-        notebooks/human_cerebellum.ipynb
+    :maxdepth: 3
+    
+    notebooks/human_cerebellum.ipynb
