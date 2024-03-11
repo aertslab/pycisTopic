@@ -61,6 +61,20 @@ dependencies = [
     "lxml"
 ]
 
+[project.optional-dependencies]
+docs = [
+	"sphinx_rtd_theme",
+	"nbsphinx",
+	"nbsphinx_link",
+	"numpydoc",
+	"sphinx_autosummary_accessors",
+	"autodocsumm",
+	"sphinx_copybutton",
+	"sphinx_design",
+	"sphinx_favicon",
+	"pandoc"
+]
+
 [project.urls]
 Homepage = "https://github.com/aertslab/pycisTopic"
 Documentation = "https://pycistopic.readthedocs.io/"
