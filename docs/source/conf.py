@@ -51,6 +51,7 @@ extensions = [
     # ----------------------
     # third-party extensions
     # ----------------------
+    "nbsphinx",
     "autodocsumm",
     "numpydoc",
     "sphinx_autosummary_accessors",
