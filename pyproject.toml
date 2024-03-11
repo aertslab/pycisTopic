@@ -67,10 +67,6 @@ Documentation = "https://pycistopic.readthedocs.io/"
 Repository = "https://github.com/aertslab/pycisTopic"
 Changelog = "https://github.com/aertslab/pycisTopic/releases"
 
-[project.optional-dependencies]
-pybiomart = ["pybiomart"]
-pyranges = ["pyranges"]
-
 [project.scripts]
 pycistopic = "pycisTopic.cli.pycistopic:main"
 
