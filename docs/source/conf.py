@@ -108,8 +108,8 @@ html_theme_options = {
         },
     ],
     "logo": {
-        "image_light": "https://raw.githubusercontent.com/pola-rs/polars-static/master/logos/polars-logo-dark-medium.png",
-        "image_dark": "https://raw.githubusercontent.com/pola-rs/polars-static/master/logos/polars-logo-dimmed-medium.png",
+        "image_light": "https://raw.githubusercontent.com/aertslab/scenicplus/development/docs/images/SCENIC%2B_Logo_v5_no_text.png",
+        "image_dark": "https://raw.githubusercontent.com/aertslab/scenicplus/development/docs/images/SCENIC%2B_Logo_v5_no_text.png",
     },
 }
 
