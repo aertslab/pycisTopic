@@ -1,181 +1,200 @@
 import argparse
 import pickle
+import tempfile
 
 from pycisTopic.lda_models import run_cgs_models
 
 
 def make_argument_parser():
-    """
-    Creates an ArgumentParser to read the options for this script from
-    sys.argv
-    """
+    """Creates an ArgumentParser to read the options for this script."""
     parser = argparse.ArgumentParser(
-        description="Run topic models.",
+        description="Run LDA topic modeling.",
     )
     parser.add_argument(
-        "--inputcisTopic_obj",
         "-i",
+        "--input",
+        dest="input",
+        action="store",
         type=str,
         required=True,
-        help="Path to cisTopic object pickle file.",
+        help="cisTopic object pickle input filename.",
     )
     parser.add_argument(
-        "--output",
         "-o",
+        "--output",
+        dest="output",
+        action="store",
         type=str,
         required=True,
-        help="Path to save final model list.",
+        help="Topic model list pickle output filename.",
     )
     parser.add_argument(
-        "--n_topics",
-        "-nt",
-        type=str,
-        required=True,
-        nargs="+",
-        help="Txt file containing selected topic id.",
-    )
-    parser.add_argument(
-        "--n_cpu",
-        "-c",
+        "-t",
+        "--topics",
+        dest="topics",
         type=int,
         required=True,
-        help="Number of cores",
+        nargs="+",
+        help="Number(s) of topics to create during topic modeling.",
     )
     parser.add_argument(
-        "--n_iter",
-        "-it",
+        "-p",
+        "--parallel",
+        dest="parallel",
+        type=int,
+        required=True,
+        help="Number of topic models to run in parallel.",
+    )
+    parser.add_argument(
+        "-n",
+        "--iterations",
+        dest="iterations",
         type=int,
         required=False,
         default=150,
-        help="Number of iterations",
+        help="Number of iterations. Default: 150.",
     )
     parser.add_argument(
-        "--alpha",
         "-a",
+        "--alpha",
+        dest="alpha",
         type=int,
         required=False,
         default=50,
-        help="Alpha value",
+        help="Alpha value. Default: 50.",
     )
     parser.add_argument(
+        "-A",
         "--alpha_by_topic",
-        "-abt",
-        type=str,
+        dest="alpha_by_topic",
+        type=str_to_bool,
+        choices=(True, False),
         required=False,
         default=True,
-        help="Whether the alpha value should by divided by the number of topics",
+        help="Whether the alpha value should by divided by the number of topics. Default: True.",
     )
     parser.add_argument(
-        "--eta",
         "-e",
+        "--eta",
+        dest="eta",
         type=float,
         required=False,
         default=0.1,
-        help="Eta value.",
+        help="Eta value. Default: 0.1.",
     )
     parser.add_argument(
+        "-E",
         "--eta_by_topic",
-        "-ebt",
-        type=str,
+        dest="eta_by_topic",
+        type=str_to_bool,
+        choices=(True, False),
         required=False,
         default=False,
-        help="Whether the eta value should by divided by the number of topics",
+        help="Whether the eta value should by divided by the number of topics. Default: False.",
     )
     parser.add_argument(
-        "--save_path",
-        "-sp",
-        type=str,
+        "-k",
+        "--keep",
+        dest="keep_intermediate_topic_models",
+        type=str_to_bool,
         required=False,
-        default=None,
-        help="Whether intermediate models should be saved",
+        default=False,
+        help="Whether intermediate topic models should be kept. "
+        "Useful to enable if running with a lot of topic numbers, to not loose finished topic model runs. "
+        "Default: False.",
     )
     parser.add_argument(
-        "--seed",
         "-s",
+        "--seed",
+        dest="seed",
         type=int,
         required=False,
         default=555,
-        help="Seed for ensuring reproducibility",
+        help="Seed for ensuring reproducibility. Default: 555.",
     )
     parser.add_argument(
+        "-T",
         "--temp_dir",
-        "-td",
+        dest="temp_dir",
         type=str,
         required=False,
         default=None,
-        help="Path to TMP directory",
+        help=f'TMP directory to use instead of the default ("{tempfile.gettempdir()}").',
     )
     return parser
 
 
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
+def str_to_bool(v: str) -> bool:
+    """
+    Convert string representation of a boolean value to a boolean.
+
+    Parameters
+    ----------
+    v
+        String representation of a boolean value.
+        After conversion to lowercase, the following string values can be converted:
+          - "yes", "true", "t", "y", "1" -> True
+          - "no", "false", "f", "n", "0" -> False
+
+    Returns
+    -------
+    True or False
+
+    """
+    if isinstance(v, str):
+        v = v.lower()
+        if v.lower() in ("yes", "true", "t", "y", "1"):
+            return True
+        elif v.lower() in ("no", "false", "f", "n", "0"):
+            return False
+    raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
 def main():
-    """
-    The main executable function
-    """
     parser = make_argument_parser()
     args = parser.parse_args()
-    filename = args.inputcisTopic_obj
 
-    with open(filename, "rb") as fh:
-        cistopic_obj = pickle.load(fh)
-
-    print("Input cisTopic_object:", filename)
-
-    output = args.output
-    print("Output file:", output)
-
-    n_topics = args.n_topics
-    n_topics = list(map(int, n_topics[0].split(",")))
-    print("Number of topics:", n_topics)
-
+    input_filename = args.input
+    output_filename = args.output
+    topics = args.topics
     alpha = args.alpha
-    print("Alpha:", alpha)
-
-    alpha_by_topic = str2bool(args.alpha_by_topic)
-    print("Divide alpha by the number of topics:", alpha_by_topic)
-
+    alpha_by_topic = args.alpha_by_topic
     eta = args.eta
-    print("Eta:", eta)
-
-    eta_by_topic = str2bool(args.eta_by_topic)
-    print("Divide eta by the number of topics:", eta_by_topic)
-
-    n_iter = args.n_iter
-    print("Number of iterations:", n_iter)
-
-    n_cpu = args.n_cpu
-    print("Number of cores:", n_cpu)
-
-    save_path = args.save_path
-    print("Path to save intermediate files:", save_path)
-    if save_path == "None":
-        save_path = None
-
+    eta_by_topic = args.eta_by_topic
+    iterations = args.iterations
+    parallel = args.parallel
+    save_path = (
+        (output_filename[:-4] if output_filename.endswith(".pkl") else output_filename)
+        if args.keep_intermediate_topic_models
+        else None
+    )
     random_state = args.seed
-    print("Seed:", random_state)
-
     temp_dir = args.temp_dir
-    print("Path to TMP dir:", temp_dir)
+
+    print(f"Input cisTopic object filename:             {input_filename}")
+    print(f"Topic modeling output filename:             {output_filename}")
+    print(f"Number of topics to run topic modeling for: {topics}")
+    print(f"Alpha:                                      {alpha}")
+    print(f"Divide alpha by the number of topics:       {alpha_by_topic}")
+    print(f"Eta:                                        {eta}")
+    print(f"Divide eta by the number of topics:         {eta_by_topic}")
+    print(f"Number of iterations:                       {iterations}")
+    print(f"Number of topic models to run in parallel:  {parallel}")
+    print(f"Seed:                                       {random_state}")
+    print(f"Path to TMP dir:                            {temp_dir}")
+
+    print(f'\nLoading cisTopic object from "{input_filename}"...\n')
+    with open(input_filename, "rb") as fh:
+        cistopic_obj = pickle.load(fh)
 
     # Run models
     print("Running models")
     print("--------------")
     models = run_cgs_models(
         cistopic_obj,
-        n_topics=n_topics,
-        n_cpu=n_cpu,
-        n_iter=n_iter,
+        n_topics=topics,
+        n_cpu=parallel,
+        n_iter=iterations,
         random_state=random_state,
         alpha=alpha,
         alpha_by_topic=alpha_by_topic,
@@ -185,8 +204,8 @@ def main():
         _temp_dir=temp_dir,
     )
 
-    # Save
-    with open(output, "wb") as fh:
+    print(f'\nWriting topic modeling output to "{output_filename}"...')
+    with open(output_filename, "wb") as fh:
         pickle.dump(models, fh)
 
 
