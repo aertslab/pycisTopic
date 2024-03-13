@@ -31,7 +31,7 @@ def binarize_topics(
     Parameters
     ----------
     cistopic_obj
-        A cisTopic object with a model in :class:`cisTopicObject`.
+        A cisTopic object with a model in :class:`CistopicObject`.
     target
         Whether cell-topic ("cell") or region-topic ("region") distributions should be
         binarized. Default: "region".
