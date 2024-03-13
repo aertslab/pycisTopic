@@ -464,57 +464,59 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         if corpus is not None:
             self.train(corpus, reuse_corpus)
 
-    def corpus2mallet(self, corpus, file_like):
+    def corpus_to_mallet(self, corpus, file_like):
         """
         Convert `corpus` to Mallet format and write it to `file_like` descriptor.
 
         Parameters
         ----------
-        corpus : iterable of iterable of (int, int)
-        Collection of texts in BoW format.
-        file_like : file-like object.
+        corpus
+            iterable of iterable of (int, int)
+            Collection of texts in BoW format.
+        file_like
+             Writable file-like object in text mode.
+
+        Returns
+        -------
+        None.
 
         """
-        for docno, doc in enumerate(corpus):
-            if self.id2word:
-                tokens = chain.from_iterable(
-                    [self.id2word[tokenid]] * int(cnt) for tokenid, cnt in doc
-                )
-            else:
-                tokens = chain.from_iterable(
-                    [str(tokenid)] * int(cnt) for tokenid, cnt in doc
-                )
-            file_like.write(utils.to_utf8("%s 0 %s\n" % (docno, " ".join(tokens))))
+        # Iterate over each cell ("document").
+        for doc_idx, doc in enumerate(corpus):
+            # Get all accessible regions for the current cell.
+            tokens = chain.from_iterable([str(token_id)] for token_id, _cnt in doc)
 
-    def convert_input(self, corpus, infer=False, serialize_corpus=True):
+            file_like.write(f'{doc_idx}\t0\t{" ".join(tokens)}\n')
+
+    def convert_input(self, corpus):
         """
         Convert corpus to Mallet format and save it to a temporary text file.
 
         Parameters
         ----------
-        corpus : iterable of iterable of (int, int)
-        Collection of texts in BoW format.
-        infer : bool, optional
-        serialize_corpus : bool, optional
+        corpus
+            iterable of iterable of (int, int)
+            Collection of texts in BoW format.
+
+        Returns
+        -------
+        None.
 
         """
         logger = logging.getLogger("LDAMalletWrapper")
-        if serialize_corpus:
-            logger.info("Serializing temporary corpus to %s", self.fcorpustxt())
-            with utils.open(self.fcorpustxt(), "wb") as fout:
-                self.corpus2mallet(corpus, fout)
+
+        logger.info(f"Serializing temporary corpus to {self.fcorpustxt()}")
+
+        with utils.open(self.fcorpustxt(), "wt") as fh:
+            self.corpus_to_mallet(corpus, fh)
 
         cmd = (
-            self.mallet_path + " import-file --preserve-case --keep-sequence "
-            '--token-regex "\\S+" --input %s --output %s'
+            f"{self.mallet_path} import-file "
+            '--preserve-case --keep-sequence --token-regex "\\S+" '
+            f"--input {self.fcorpustxt()} --output {self.fcorpusmallet()}"
         )
 
-        if infer:
-            cmd += " --use-pipe-from " + self.fcorpusmallet()
-            cmd = cmd % (self.fcorpustxt(), self.fcorpusmallet() + ".infer")
-        else:
-            cmd = cmd % (self.fcorpustxt(), self.fcorpusmallet())
-        logger.info("Converting temporary corpus to MALLET format with %s", cmd)
+        logger.info(f"Converting temporary corpus to MALLET format with: {cmd}")
         check_output(args=cmd, shell=True)
 
     def train(self, corpus, reuse_corpus):
@@ -531,7 +533,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         """
         logger = logging.getLogger("LDAMalletWrapper")
         if os.path.isfile(self.fcorpusmallet()) is False or reuse_corpus is False:
-            self.convert_input(corpus, infer=False)
+            self.convert_input(corpus)
         else:
             logger.info("MALLET corpus already exists, training model")
         cmd = (
