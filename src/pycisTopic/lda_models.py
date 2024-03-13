@@ -7,10 +7,8 @@ import sys
 import tempfile
 import time
 import warnings
-import xml.etree.ElementTree as et
-import zipfile
 from itertools import chain
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Iterable, List, Optional, Tuple
 
 import lda
 import matplotlib.backends.backend_pdf
@@ -21,12 +19,10 @@ import ray
 import tmtoolkit
 from gensim import corpora, matutils, utils
 from gensim.models import basemodel
-from gensim.models.ldamodel import LdaModel
 from gensim.utils import check_output, revdict
+from pycisTopic.cistopic_class import CistopicObject
+from pycisTopic.utils import loglikelihood, subset_list
 from scipy import sparse
-
-from pycisTopic.cistopic_class import *
-from pycisTopic.utils import *
 
 
 class CistopicLDAModel:
@@ -67,6 +63,7 @@ class CistopicLDAModel:
     Cao, J., Xia, T., Li, J., Zhang, Y., & Tang, S. (2009). A density-based method for adaptive LDA model selection. Neurocomputing, 72(7-9), 1775-1781.
 
     Arun, R., Suresh, V., Madhavan, C. V., & Murthy, M. N. (2010). On finding the natural number of topics with latent dirichlet allocation: Some observations. In Pacific-Asia conference on knowledge discovery and data mining (pp. 391-402). Springer, Berlin, Heidelberg.
+
     """
 
     def __init__(
@@ -97,7 +94,7 @@ class CistopicLDAModel:
 
 
 def run_cgs_models(
-    cistopic_obj: "cisTopicObject",
+    cistopic_obj: "CistopicObject",
     n_topics: List[int],
     n_cpu: Optional[int] = 1,
     n_iter: Optional[int] = 150,
@@ -115,8 +112,8 @@ def run_cgs_models(
 
     Parameters
     ----------
-    cistopic_obj: cisTopicObject
-        A :class:`cisTopicObject`. Note that cells/regions have to be filtered before running any LDA model.
+    cistopic_obj: CistopicObject
+        A :class:`CistopicObject`. Note that cells/regions have to be filtered before running any LDA model.
     n_topics: list of int
         A list containing the number of topics to use in each model.
     n_cpu: int, optional
@@ -146,8 +143,8 @@ def run_cgs_models(
     References
     ----------
     Griffiths, T. L., & Steyvers, M. (2004). Finding scientific topics. Proceedings of the National academy of Sciences, 101(suppl 1), 5228-5235.
-    """
 
+    """
     binary_matrix = sparse.csr_matrix(cistopic_obj.binary_matrix.transpose())
     region_names = cistopic_obj.region_names
     cell_names = cistopic_obj.cell_names
@@ -228,6 +225,7 @@ def run_cgs_model(
     References
     ----------
     Griffiths, T. L., & Steyvers, M. (2004). Finding scientific topics. Proceedings of the National academy of Sciences, 101(suppl 1), 5228-5235.
+
     """
     # Create cisTopic logger
     level = logging.INFO
@@ -421,6 +419,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         Threshold of the probability above which we consider a topic. Default: 0.0.
     random_seed: int, optional
         Random seed to ensure consistent results, if 0 - use system clock. Default: 555.
+
     """
 
     def __init__(
@@ -439,7 +438,6 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         random_seed: Optional[int] = 555,
         reuse_corpus: Optional[bool] = False,
     ):
-
         logger = logging.getLogger("LDAMalletWrapper")
         self.mallet_path = mallet_path
         self.id2word = id2word
@@ -470,12 +468,12 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         """
         Convert `corpus` to Mallet format and write it to `file_like` descriptor.
 
-
         Parameters
         ----------
         corpus : iterable of iterable of (int, int)
         Collection of texts in BoW format.
         file_like : file-like object.
+
         """
         for docno, doc in enumerate(corpus):
             if self.id2word:
@@ -498,6 +496,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         Collection of texts in BoW format.
         infer : bool, optional
         serialize_corpus : bool, optional
+
         """
         logger = logging.getLogger("LDAMalletWrapper")
         if serialize_corpus:
@@ -527,6 +526,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             Corpus in BoW format
         reuse_corpus: bool, optional
             Whether to reuse the mallet corpus in the tmp directory. Default: False
+
         """
         logger = logging.getLogger("LDAMalletWrapper")
         if os.path.isfile(self.fcorpusmallet()) is False or reuse_corpus is False:
@@ -562,9 +562,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(
-                "command '{}' return with error (code {}): {}".format(
-                    e.cmd, e.returncode, e.output
-                )
+                f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
             )
         self.word_topics = self.load_word_topics()
         self.wordtopics = self.word_topics
@@ -578,6 +576,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         -------
         np.ndarray
             Matrix words X topics.
+
         """
         logger = logging.getLogger("LDAMalletWrapper")
         logger.info("loading assigned topics from %s", self.fstate())
@@ -593,7 +592,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             assert (
                 len(self.alpha) == self.num_topics
             ), "Mismatch between MALLET vs. requested topics"
-            _ = next(fin)  # noqa:F841 beta
+            _ = next(fin)  # beta
             for lineno, line in enumerate(fin):
                 line = utils.to_unicode(line)
                 doc, source, pos, typeindex, token, topic = line.split(" ")
@@ -611,6 +610,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         -------
         np.ndarray
             Topics X words matrix, shape `num_topics` x `vocabulary_size`.
+
         """
         topics = self.word_topics
         return topics / topics.sum(axis=1)[:, None]
@@ -623,6 +623,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         -------
         str
             Path to corpus text file.
+
         """
         return os.path.join(self.tmp_dir, "corpus.txt")
 
@@ -634,6 +635,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         -------
         str
             Path to corpus.mallet file.
+
         """
         return os.path.join(self.tmp_dir, "corpus.mallet")
 
@@ -657,6 +659,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         -------
         str
             Path to document topic text file.
+
         """
         return os.path.join(self.tmp_dir, f"{self.random_label}_doctopics.txt")
 
@@ -668,8 +671,9 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         -------
         str
             Path to inferencer.mallet file.
+
         """
-        return os.path.join(self.tmp_dir,  f"{self.random_label}_inferencer.mallet")
+        return os.path.join(self.tmp_dir, f"{self.random_label}_inferencer.mallet")
 
     def ftopickeys(self):
         """
@@ -686,7 +690,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
 
 def run_cgs_models_mallet(
     path_to_mallet_binary: str,
-    cistopic_obj: "cisTopicObject",
+    cistopic_obj: "CistopicObject",
     n_topics: List[int],
     n_cpu: Optional[int] = 1,
     n_iter: Optional[int] = 150,
@@ -707,8 +711,8 @@ def run_cgs_models_mallet(
     ----------
     path_to_mallet_binary: str
         Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet).
-    cistopic_obj: cisTopicObject
-        A :class:`cisTopicObject`. Note that cells/regions have to be filtered before running any LDA model.
+    cistopic_obj: CistopicObject
+        A :class:`CistopicObject`. Note that cells/regions have to be filtered before running any LDA model.
     n_topics: list of int
         A list containing the number of topics to use in each model.
     n_cpu: int, optional
@@ -741,6 +745,7 @@ def run_cgs_models_mallet(
     References
     ----------
     McCallum, A. K. (2002). Mallet: A machine learning for language toolkit. http://mallet.cs.umass.edu.
+
     """
     # Create cisTopic logger
     level = logging.INFO
@@ -753,7 +758,7 @@ def run_cgs_models_mallet(
     region_names = cistopic_obj.region_names
     cell_names = cistopic_obj.cell_names
 
-    log.info(f"Formatting input to corpus")
+    log.info("Formatting input to corpus")
     corpus = matutils.Sparse2Corpus(binary_matrix)
     names_dict = {x: str(x) for x in range(len(region_names))}
     id2word = corpora.Dictionary.from_corpus(corpus, names_dict)
@@ -849,6 +854,7 @@ def run_cgs_model_mallet(
     References
     ----------
     McCallum, A. K. (2002). Mallet: A machine learning for language toolkit. http://mallet.cs.umass.edu.
+
     """
     # Create cisTopic logger
     level = logging.INFO
@@ -1052,6 +1058,7 @@ def evaluate_models(
     Cao, J., Xia, T., Li, J., Zhang, Y., & Tang, S. (2009). A density-based method for adaptive LDA model selection. Neurocomputing, 72(7-9), 1775-1781.
 
     Arun, R., Suresh, V., Madhavan, C. V., & Murthy, M. N. (2010). On finding the natural number of topics with latent dirichlet allocation: Some observations. In Pacific-Asia conference on knowledge discovery and data mining (pp. 391-402). Springer, Berlin, Heidelberg.
+
     """
     models = [models[i] for i in np.argsort([m.n_topic for m in models])]
     all_topics = sorted([models[x].n_topic for x in range(0, len(models))])
@@ -1216,6 +1223,7 @@ def evaluate_models(
     if return_model:
         return models[all_topics.index(best_model)]
 
+
 def load_cisTopic_model(path_to_cisTopic_model_matrices):
     metrics = None
     coherence = None
@@ -1233,4 +1241,3 @@ def load_cisTopic_model(path_to_cisTopic_model_matrices):
         metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters
     )
     return model
-
