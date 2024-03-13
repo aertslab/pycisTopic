@@ -225,8 +225,8 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         dest="iterations",
         type=int,
         required=False,
-        default=150,
-        help="Number of iterations. Default: 150.",
+        default=500,
+        help="Number of iterations. Default: 500.",
     )
     parser_topic_modeling_lda.add_argument(
         "-a",
@@ -344,7 +344,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=int,
         required=False,
         default=150,
-        help="Number of iterations. Default: 150.",
+        help="Number of iterations. Default: 500.",
     )
     parser_topic_modeling_mallet.add_argument(
         "-a",
