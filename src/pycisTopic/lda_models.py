@@ -506,8 +506,9 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
 
         cmd = (
             self.mallet_path + " import-file --preserve-case --keep-sequence "
-            '--remove-stopwords --token-regex "\\S+" --input %s --output %s'
+            '--token-regex "\\S+" --input %s --output %s'
         )
+
         if infer:
             cmd += " --use-pipe-from " + self.fcorpusmallet()
             cmd = cmd % (self.fcorpustxt(), self.fcorpusmallet() + ".infer")
