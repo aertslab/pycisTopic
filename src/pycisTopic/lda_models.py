@@ -405,7 +405,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         Collection of texts in BoW format. Default: None.
     alpha: float, optional
         Scalar value indicating the symmetric Dirichlet hyperparameter for topic proportions. Default: 50.
-    id2word : :class:`gensim.corpora.dictionary.Dictionary`, optional
+    id2word : :class:`gensim.utils.FakeDict`, optional
         Mapping between tokens ids and words from corpus, if not specified - will be inferred from `corpus`. Default: None.
     n_cpu : int, optional
         Number of threads that will be used for training. Default: 1.
@@ -429,7 +429,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         corpus: Optional[Iterable] = None,
         alpha: Optional[float] = 50,
         eta: Optional[float] = 0.1,
-        id2word: Optional["gensim.corpora.dictionary.Dictionary"] = None,
+        id2word: Optional[utils.FakeDict] = None,
         n_cpu: Optional[int] = 1,
         tmp_dir: Optional[str] = None,
         optimize_interval: Optional[int] = 0,
@@ -440,17 +440,17 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
     ):
         logger = logging.getLogger("LDAMalletWrapper")
         self.mallet_path = mallet_path
-        self.id2word = id2word
-        if self.id2word is None:
+        if id2word is None:
             logger.warning(
-                "No word id mapping provided; initializing from corpus, assuming identity"
+                "No id2word mapping provided; initializing from corpus, assuming identity"
             )
-            self.id2word = utils.dict_from_corpus(corpus)
-            self.num_terms = len(self.id2word)
+            self.num_terms = utils.get_max_id(corpus) + 1
         else:
-            self.num_terms = 0 if not self.id2word else 1 + max(self.id2word.keys())
+            self.num_terms = id2word.num_terms
+
         if self.num_terms == 0:
             raise ValueError("Cannot compute LDA over an empty collection (no terms)")
+
         self.num_topics = num_topics
         self.topic_threshold = topic_threshold
         self.alpha = alpha
@@ -582,10 +582,6 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         logger = logging.getLogger("LDAMalletWrapper")
         logger.info("loading assigned topics from %s", self.fstate())
         word_topics = np.zeros((self.num_topics, self.num_terms), dtype=np.float64)
-        if hasattr(self.id2word, "token2id"):
-            word2id = self.id2word.token2id
-        else:
-            word2id = revdict(self.id2word)
 
         with utils.open(self.fstate(), "rb") as fin:
             _ = next(fin)  # header
@@ -597,10 +593,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             for lineno, line in enumerate(fin):
                 line = utils.to_unicode(line)
                 doc, source, pos, typeindex, token, topic = line.split(" ")
-                if token not in word2id:
-                    continue
-                tokenid = word2id[token]
-                word_topics[int(topic), tokenid] += 1.0
+                word_topics[int(topic), int(token)] += 1.0
         return word_topics
 
     def get_topics(self):
@@ -761,8 +754,7 @@ def run_cgs_models_mallet(
 
     log.info("Formatting input to corpus")
     corpus = matutils.Sparse2Corpus(binary_matrix)
-    names_dict = {x: str(x) for x in range(len(region_names))}
-    id2word = corpora.Dictionary.from_corpus(corpus, names_dict)
+    id2word = utils.FakeDict(len(region_names))
 
     model_list = [
         run_cgs_model_mallet(
@@ -794,7 +786,7 @@ def run_cgs_model_mallet(
     path_to_mallet_binary: str,
     binary_matrix: sparse.csr_matrix,
     corpus: Iterable,
-    id2word: "gensim.corpora.dictionary.Dictionary",
+    id2word: utils.FakeDict,
     n_topics: List[int],
     cell_names: List[str],
     region_names: List[str],
