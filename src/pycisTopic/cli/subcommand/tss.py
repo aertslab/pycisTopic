@@ -510,7 +510,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
     subparser_tss = parser_tss.add_subparsers(
         title="TSS",
         dest="tss",
-        help="Get TSS gene annotation from Ensembl BioMart.",
+        help="List of TSS subcommands.",
     )
     subparser_tss.required = True
 
