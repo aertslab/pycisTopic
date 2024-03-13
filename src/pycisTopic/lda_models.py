@@ -193,7 +193,7 @@ def run_cgs_model(
     Parameters
     ----------
     binary_matrix: sparse.csr_matrix
-        Binary sparse matrix containing cells as columns, regions as rows, and 1 if a regions is considered accesible on a cell (otherwise, 0).
+        Binary sparse matrix containing cells as columns, regions as rows, and 1 if a regions is considered accessible on a cell (otherwise, 0).
     n_topics: int
         Number of topics to use in the model.
     cell_names: list of str
@@ -817,7 +817,7 @@ def run_cgs_model_mallet(
     path_to_mallet_binary: str
         Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet).
     binary_matrix: sparse.csr_matrix
-        Binary sparse matrix containing cells as columns, regions as rows, and 1 if a regions is considered accesible on a cell (otherwise, 0).
+        Binary sparse matrix containing cells as columns, regions as rows, and 1 if a regions is considered accessible on a cell (otherwise, 0).
     n_topics: list of int
         A list containing the number of topics to use in each model.
     cell_names: list of str
