@@ -271,6 +271,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         "--keep",
         dest="keep_intermediate_topic_models",
         type=str_to_bool,
+        choices=(True, False),
         required=False,
         default=False,
         help="Whether intermediate topic models should be kept. "
@@ -389,6 +390,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         "--keep",
         dest="keep_intermediate_topic_models",
         type=str_to_bool,
+        choices=(True, False),
         required=False,
         default=False,
         help="Whether intermediate topic models should be kept. "
