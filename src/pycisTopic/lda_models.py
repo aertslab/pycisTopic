@@ -17,9 +17,8 @@ import numpy as np
 import pandas as pd
 import ray
 import tmtoolkit
-from gensim import corpora, matutils, utils
+from gensim import matutils, utils
 from gensim.models import basemodel
-from gensim.utils import check_output, revdict
 from pycisTopic.cistopic_class import CistopicObject
 from pycisTopic.utils import loglikelihood, subset_list
 from scipy import sparse
@@ -517,7 +516,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         )
 
         logger.info(f"Converting temporary corpus to MALLET format with: {cmd}")
-        check_output(args=cmd, shell=True)
+        utils.check_output(args=cmd, shell=True)
 
     def train(self, corpus, reuse_corpus):
         """
@@ -568,7 +567,6 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
                 f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
             )
         self.word_topics = self.load_word_topics()
-        self.wordtopics = self.word_topics
         self.time = time.time() - start
 
     def load_word_topics(self):
