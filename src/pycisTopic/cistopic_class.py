@@ -6,12 +6,17 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
 import pyranges as pr
-import ray
 import sklearn.preprocessing as sp
+from pycisTopic.utils import (
+    collapse_duplicates,
+    get_position_index,
+    non_zero_rows,
+    prepare_tag_cells,
+    read_fragments_from_file,
+    region_names_to_coordinates,
+    subset_list,
+)
 from scipy import sparse
-
-from .lda_models import *
-from .utils import *
 
 dtype = pd.SparseDtype(int, fill_value=0)
 pd.options.mode.chained_assignment = None
@@ -27,7 +32,7 @@ class CistopicObject:
     LDA models from :class:`CisTopicLDAModel` can be stored :attr:`selected_model` as well as cell/region projections :attr:`projections` as a dictionary.
 
     Attributes
-    ---------
+    ----------
     fragment_matrix: sparse.csr_matrix
         A matrix containing cell names as column names, regions as row names and fragment counts as values.
     binary_matrix: sparse.csr_matrix
@@ -44,6 +49,7 @@ class CistopicObject:
         A list containing the paths to the fragments files used to generate the :class:`CistopicObject`.
     project: str
         Name of the cisTopic project.
+
     """
 
     def __init__(
@@ -81,7 +87,7 @@ class CistopicObject:
         Add cell metadata to :class:`CistopicObject`. If the column already exist on the cell metadata, it will be overwritten.
 
         Parameters
-        ---------
+        ----------
         cell_data: pd.DataFrame
             A data frame containing metadata information, with cell names as indexes. If cells are missing from the metadata, values will be filled with Nan.
         split_pattern: str
@@ -91,8 +97,8 @@ class CistopicObject:
         ------
         CistopicObject
             The input :class:`CistopicObject` with :attr:`cell_data` updated.
-        """
 
+        """
         flag = False
         obj_cell_data = self.cell_data.copy()
         obj_cell_names = self.cell_names.copy()
@@ -115,9 +121,7 @@ class CistopicObject:
                 :, list(set(obj_cell_data.columns).difference(set(cell_data.columns)))
             ]
         if not flag:
-            cell_data = cell_data.loc[
-                list(set(obj_cell_names) & set(cell_data.index)),
-            ]
+            cell_data = cell_data.loc[list(set(obj_cell_names) & set(cell_data.index)),]
             new_cell_data = pd.concat([obj_cell_data, cell_data], axis=1, sort=False)
         elif flag:
             obj_cell_data.index = prepare_tag_cells(obj_cell_names, split_pattern)
@@ -137,7 +141,7 @@ class CistopicObject:
         Add region metadata to :class:`CistopicObject`. If the column already exist on the region metadata, it will be overwritten.
 
         Parameters
-        ---------
+        ----------
         region_data: pd.DataFrame
             A data frame containing metadata information, with region names as indexes. If regions are missing from the metadata, values will be filled with Nan.
 
@@ -145,6 +149,7 @@ class CistopicObject:
         ------
         CistopicObject
             The input :class:`CistopicObject` with :attr:`region_data` updated.
+
         """
         obj_region_names = self.region_names.copy()
         obj_region_data = self.region_data.copy()
@@ -186,7 +191,7 @@ class CistopicObject:
         models contained in a :class:`CistopicObject` are derived from the cells it contains.
 
         Parameters
-        ---------
+        ----------
         cells: list, optional
             A list containing the names of the cells to keep.
         regions: list, optional
@@ -200,6 +205,7 @@ class CistopicObject:
         ------
         CistopicObject
             A :class:`CistopicObject` containing the selected cells and/or regions.
+
         """
         # Create logger
         level = logging.INFO
@@ -237,24 +243,16 @@ class CistopicObject:
             self.region_names, keep_regions_index
         )  # Subset selected regions
         keep_regions_index = non_zero_rows(binary_matrix)
-        fragment_matrix = fragment_matrix[
-            keep_regions_index,
-        ]
-        binary_matrix = binary_matrix[
-            keep_regions_index,
-        ]
+        fragment_matrix = fragment_matrix[keep_regions_index,]
+        binary_matrix = binary_matrix[keep_regions_index,]
         # Update
         cell_names = subset_list(self.cell_names, keep_cells_index)
         # Subset regions with all zeros
         region_names = subset_list(region_names, keep_regions_index)
-        
-        cell_data = self.cell_data.iloc[
-            keep_cells_index,
-        ]
-        region_data = self.region_data.iloc[
-            keep_regions_index,
-        ]
-        
+
+        cell_data = self.cell_data.iloc[keep_cells_index,]
+        region_data = self.region_data.iloc[keep_regions_index,]
+
         path_to_fragments = self.path_to_fragments
         project = self.project
         # Create new object
@@ -292,7 +290,7 @@ class CistopicObject:
         Merge a list of :class:`CistopicObject` to the input :class:`CistopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`CistopicObject` are derived from the cells it contains.
 
         Parameters
-        ---------
+        ----------
         cistopic_obj_list: list
             A list containing one or more :class:`CistopicObject` to merge.
         is_acc: int, optional
@@ -307,6 +305,7 @@ class CistopicObject:
         ------
         CistopicObject
             A combined :class:`CistopicObject`. Two new columns in :attr:`cell_data` indicate the :class:`CistopicObject` of origin (`cisTopic_id`) and the fragment file from which the cell comes from (`path_to_fragments`).
+
         """
         # Create logger
         level = logging.INFO
@@ -402,12 +401,8 @@ class CistopicObject:
             )
             fragment_matrix_common = sparse.hstack(
                 [
-                    fragment_matrix[
-                        common_index_fm,
-                    ],
-                    fragment_matrix_to_add[
-                        common_index_fm_to_add,
-                    ],
+                    fragment_matrix[common_index_fm,],
+                    fragment_matrix_to_add[common_index_fm_to_add,],
                 ]
             )
 
@@ -416,9 +411,7 @@ class CistopicObject:
                 diff_index_fm_1 = get_position_index(diff_regions_1, region_names)
                 fragment_matrix_diff_1 = sparse.hstack(
                     [
-                        fragment_matrix[
-                            diff_index_fm_1,
-                        ],
+                        fragment_matrix[diff_index_fm_1,],
                         np.zeros(
                             (len(diff_regions_1), fragment_matrix_to_add.shape[1])
                         ),
@@ -432,9 +425,7 @@ class CistopicObject:
                 fragment_matrix_diff_2 = sparse.hstack(
                     [
                         np.zeros((len(diff_regions_2), fragment_matrix.shape[1])),
-                        fragment_matrix_to_add[
-                            diff_index_fm_2,
-                        ],
+                        fragment_matrix_to_add[diff_index_fm_2,],
                     ]
                 )
 
@@ -494,9 +485,10 @@ class CistopicObject:
         Add LDA model to a cisTopic object.
 
         Parameters
-        ---
+        ----------
         model: CistopicLDAModel
             Selected cisTopic LDA model results (see `LDAModels.evaluate_models`)
+
         """
         # Check that region and cell names are in the same order
         model.region_topic = model.topic_region.loc[self.region_names]
@@ -521,7 +513,7 @@ def create_cistopic_object(
     Creates a CistopicObject from a count matrix.
 
     Parameters
-    ---------
+    ----------
     fragment_matrix: pd.DataFrame or sparse.csr_matrix
         A data frame containing cell names as column names, regions as row names and fragment counts as values or :class:`sparse.csr_matrix` containing cells as columns and regions as rows.
     cell_names: list, optional
@@ -550,8 +542,9 @@ def create_cistopic_object(
     CistopicObject
 
     References
-    ------
+    ----------
     Amemiya, H. M., Kundaje, A., & Boyle, A. P. (2019). The ENCODE blacklist: identification of problematic regions of the genome. Scientific reports, 9(1), 1-5.
+
     """
     # Create logger
     level = logging.INFO
@@ -584,20 +577,14 @@ def create_cistopic_object(
             + regions.End.astype(str)
         ).to_list()
         index = get_position_index(selected_regions, region_names)
-        fragment_matrix = fragment_matrix[
-            index,
-        ]
+        fragment_matrix = fragment_matrix[index,]
         region_names = selected_regions
 
     log.info("Creating CistopicObject")
     binary_matrix = sp.binarize(fragment_matrix, threshold=is_acc - 1)
     selected_regions = non_zero_rows(binary_matrix)
-    fragment_matrix = fragment_matrix[
-        selected_regions,
-    ]
-    binary_matrix = binary_matrix[
-        selected_regions,
-    ]
+    fragment_matrix = fragment_matrix[selected_regions,]
+    binary_matrix = binary_matrix[selected_regions,]
     region_names = subset_list(region_names, selected_regions)
 
     cisTopic_nr_frag = np.array(fragment_matrix.sum(axis=0)).flatten()
@@ -625,9 +612,7 @@ def create_cistopic_object(
         selected_cells = cell_data.cisTopic_nr_frag >= min_frag
         fragment_matrix = fragment_matrix[:, selected_cells]
         binary_matrix = binary_matrix[:, selected_cells]
-        cell_data = cell_data.loc[
-            selected_cells,
-        ]
+        cell_data = cell_data.loc[selected_cells,]
         cell_names = cell_data.index.to_list()
 
     region_data = region_names_to_coordinates(region_names)
@@ -674,7 +659,7 @@ def create_cistopic_object_from_matrix_file(
     Creates a CistopicObject from a count matrix file (tsv).
 
     Parameters
-    ---------
+    ----------
     fragment_matrix: str
         Path to a tsv file containing cell names as column names, regions as row names and fragment counts as values.
     path_to_blacklist: str, optional
@@ -701,8 +686,9 @@ def create_cistopic_object_from_matrix_file(
     CistopicObject
 
     References
-    ------
+    ----------
     Amemiya, H. M., Kundaje, A., & Boyle, A. P. (2019). The ENCODE blacklist: identification of problematic regions of the genome. Scientific reports, 9(1), 1-5.
+
     """
     # Create logger
     level = logging.INFO
@@ -755,13 +741,13 @@ def create_cistopic_object_from_fragments(
     partition: Optional[int] = 5,
     fragments_df: Optional[Union[pd.DataFrame, pr.PyRanges]] = None,
     split_pattern: Optional[str] = "___",
-    use_polars: Optional[bool] = True
+    use_polars: Optional[bool] = True,
 ):
     """
     Creates a CistopicObject from a fragments file and defined genomic intervals (compatible with CellRangerATAC output)
 
     Parameters
-    ---------
+    ----------
     path_to_fragments: str
         The path to the fragments file containing chromosome, start, end and assigned barcode for each read (e.g. from CellRanger ATAC (/outs/fragments.tsv.gz)).
     path_to_regions: str
@@ -798,8 +784,9 @@ def create_cistopic_object_from_fragments(
     CistopicObject
 
     References
-    ------
+    ----------
     Amemiya, H. M., Kundaje, A., & Boyle, A. P. (2019). The ENCODE blacklist: identification of problematic regions of the genome. Scientific reports, 9(1), 1-5.
+
     """
     # Create logger
     level = logging.INFO
@@ -979,7 +966,7 @@ def merge(
     Merge a list of :class:`CistopicObject` to the input :class:`CistopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`CistopicObject` are derived from the cells it contains.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj_list: list
         A list containing one or more :class:`CistopicObject` to merge.
     is_acc: int, optional
@@ -991,8 +978,8 @@ def merge(
     ------
     CistopicObject
         A combined :class:`CistopicObject`. Two new columns in :attr:`cell_data` indicate the :class:`CistopicObject` of origin (`cisTopic_id`) and the fragment file from which the cell comes from (`path_to_fragments`).
-    """
 
+    """
     merged_cistopic_obj = cistopic_obj_list[0].merge(
         cistopic_obj_list[1:],
         is_acc=is_acc,
