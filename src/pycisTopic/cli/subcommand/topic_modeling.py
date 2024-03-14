@@ -41,6 +41,7 @@ def run_topic_modeling_lda(args):
     print(f"  - Number of iterations:                       {iterations}")
     print(f"  - Number of topic models to run in parallel:  {parallel}")
     print(f"  - Seed:                                       {random_state}")
+    print(f"  - Save intermediate topic models in dir:      {save_path}")
     print(f"  - TMP dir:                                    {temp_dir}")
 
     print(f'\nLoading cisTopic object from "{input_filename}"...\n')
@@ -90,6 +91,7 @@ def run_topic_modeling_mallet(args):
     memory_in_gb = f"{args.memory_in_gb}G"
     temp_dir = args.temp_dir
     reuse_corpus = args.reuse_corpus
+    mallet_path = args.mallet_path
 
     print("Run topic modeling with Mallet with the following settings:")
     print(f"  - Input cisTopic object filename:             {input_filename}")
@@ -102,9 +104,11 @@ def run_topic_modeling_mallet(args):
     print(f"  - Number of iterations:                       {iterations}")
     print(f"  - Number threads Mallet is allowed to use:    {parallel}")
     print(f"  - Seed:                                       {random_state}")
+    print(f"  - Save intermediate topic models in dir:      {save_path}")
     print(f"  - TMP dir:                                    {temp_dir}")
-    print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}")
     print(f"  - Reuse Mallet corpus:                        {reuse_corpus}")
+    print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}")
+    print(f"  - Mallet binary:                              {mallet_path}")
 
     print(f'\nLoading cisTopic object from "{input_filename}"...\n')
     with open(input_filename, "rb") as fh:
@@ -117,7 +121,6 @@ def run_topic_modeling_mallet(args):
     os.environ["MALLET_MEMORY"] = memory_in_gb
 
     models = run_cgs_models_mallet(
-        "mallet",
         cistopic_obj,
         n_topics=topics,
         n_cpu=parallel,
@@ -131,6 +134,7 @@ def run_topic_modeling_mallet(args):
         top_topics_coh=5,
         tmp_path=temp_dir,
         reuse_corpus=reuse_corpus,
+        mallet_path=mallet_path,
     )
 
     print(f'\nWriting topic modeling output to "{output_filename}"...')
@@ -432,4 +436,13 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=False,
         default=False,
         help="Whether to reuse the corpus from Mallet. Default: False.",
+    )
+    parser_topic_modeling_mallet.add_argument(
+        "-b",
+        "--mallet_path",
+        dest="mallet_path",
+        type=str,
+        required=False,
+        default="mallet",
+        help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
     )

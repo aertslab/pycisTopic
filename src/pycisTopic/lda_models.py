@@ -385,7 +385,9 @@ def run_cgs_model(
     log.info(f"Model with {n_topics} topics done!")
     if isinstance(save_path, str):
         log.info(f"Saving model with {n_topics} topics at {save_path}")
-        with open(os.path.join(save_path, "Topic" + str(n_topics) + ".pkl"), "wb") as f:
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+        with open(os.path.join(save_path, f"Topic{n_topics}.pkl"), "wb") as f:
             pickle.dump(model, f)
     return model
 
@@ -396,8 +398,6 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
 
     Parameters
     ----------
-    mallet_path: str
-        Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet).
     num_topics: int
         The number of topics to use in the model.
     corpus: iterable of iterable of (int, int), optional
@@ -418,12 +418,13 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         Threshold of the probability above which we consider a topic. Default: 0.0.
     random_seed: int, optional
         Random seed to ensure consistent results, if 0 - use system clock. Default: 555.
+    mallet_path: str
+        Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet). Default: "mallet".
 
     """
 
     def __init__(
         self,
-        mallet_path: str,
         num_topics: int,
         corpus: Optional[Iterable] = None,
         alpha: Optional[float] = 50,
@@ -436,9 +437,9 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         topic_threshold: Optional[float] = 0.0,
         random_seed: Optional[int] = 555,
         reuse_corpus: Optional[bool] = False,
+        mallet_path: str = "mallet",
     ):
         logger = logging.getLogger("LDAMalletWrapper")
-        self.mallet_path = mallet_path
         if id2word is None:
             logger.warning(
                 "No id2word mapping provided; initializing from corpus, assuming identity"
@@ -460,6 +461,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         self.optimize_interval = optimize_interval
         self.iterations = iterations
         self.random_seed = random_seed
+        self.mallet_path = mallet_path
         if corpus is not None:
             self.train(corpus, reuse_corpus)
 
@@ -706,7 +708,6 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
 
 
 def run_cgs_models_mallet(
-    path_to_mallet_binary: str,
     cistopic_obj: "CistopicObject",
     n_topics: List[int],
     n_cpu: Optional[int] = 1,
@@ -720,14 +721,13 @@ def run_cgs_models_mallet(
     tmp_path: Optional[str] = None,
     save_path: Optional[str] = None,
     reuse_corpus: Optional[bool] = False,
+    mallet_path: str = "mallet",
 ):
     """
     Run Latent Dirichlet Allocation per model as implemented in Mallet (McCallum, 2002).
 
     Parameters
     ----------
-    path_to_mallet_binary: str
-        Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet).
     cistopic_obj: CistopicObject
         A :class:`CistopicObject`. Note that cells/regions have to be filtered before running any LDA model.
     n_topics: list of int
@@ -754,6 +754,9 @@ def run_cgs_models_mallet(
         Path to save models as independent files as they are completed. This is recommended for large data sets. Default: None.
     reuse_corpus: bool, optional
         Whether to reuse the mallet corpus in the tmp directory. Default: False
+    mallet_path: str
+        Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".
+
     Return
     ------
     list of :class:`CistopicLDAModel`
@@ -781,10 +784,9 @@ def run_cgs_models_mallet(
 
     model_list = [
         run_cgs_model_mallet(
-            path_to_mallet_binary,
-            binary_matrix,
-            corpus,
-            id2word,
+            binary_matrix=binary_matrix,
+            corpus=corpus,
+            id2word=id2word,
             n_topics=n_topic,
             cell_names=cell_names,
             region_names=region_names,
@@ -799,6 +801,7 @@ def run_cgs_models_mallet(
             tmp_path=tmp_path,
             save_path=save_path,
             reuse_corpus=reuse_corpus,
+            mallet_path=mallet_path,
         )
         for n_topic in n_topics
     ]
@@ -806,7 +809,6 @@ def run_cgs_models_mallet(
 
 
 def run_cgs_model_mallet(
-    path_to_mallet_binary: str,
     binary_matrix: sparse.csr_matrix,
     corpus: Iterable,
     id2word: utils.FakeDict,
@@ -824,14 +826,13 @@ def run_cgs_model_mallet(
     tmp_path: Optional[str] = None,
     save_path: Optional[str] = None,
     reuse_corpus: Optional[bool] = False,
+    mallet_path: str = "mallet",
 ):
     """
     Run Latent Dirichlet Allocation in a model as implemented in Mallet (McCallum, 2002).
 
     Parameters
     ----------
-    path_to_mallet_binary: str
-        Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet).
     binary_matrix: sparse.csr_matrix
         Binary sparse matrix containing cells as columns, regions as rows, and 1 if a regions is considered accessible on a cell (otherwise, 0).
     n_topics: list of int
@@ -862,6 +863,9 @@ def run_cgs_model_mallet(
         Path to save models as independent files as they are completed. This is recommended for large data sets. Default: None.
     reuse_corpus: bool, optional
         Whether to reuse the mallet corpus in the tmp directory. Default: False
+    mallet_path: str
+        Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".
+
     Return
     ------
     CistopicLDAModel
@@ -889,7 +893,6 @@ def run_cgs_model_mallet(
     start = time.time()
     log.info(f"Running model with {n_topics} topics")
     model = LDAMallet(
-        path_to_mallet_binary,
         corpus=corpus,
         id2word=id2word,
         num_topics=n_topics,
@@ -900,6 +903,7 @@ def run_cgs_model_mallet(
         tmp_dir=tmp_path,
         random_seed=random_state,
         reuse_corpus=reuse_corpus,
+        mallet_path=mallet_path,
     )
     end_time = time.time() - start
 
@@ -1010,7 +1014,9 @@ def run_cgs_model_mallet(
     log.info(f"Model with {n_topics} topics done!")
     if isinstance(save_path, str):
         log.info(f"Saving model with {n_topics} topics at {save_path}")
-        with open(os.path.join(save_path, "Topic" + str(n_topics) + ".pkl"), "wb") as f:
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+        with open(os.path.join(save_path, f"Topic{n_topics}.pkl"), "wb") as f:
             pickle.dump(model, f)
     return model
 
