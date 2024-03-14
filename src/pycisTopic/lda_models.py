@@ -15,6 +15,7 @@ import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import polars as pl
 import ray
 import tmtoolkit
 from gensim import matutils, utils
@@ -614,11 +615,31 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             assert (
                 len(self.alpha) == self.num_topics
             ), "Mismatch between MALLET vs. requested topics"
-            _ = next(fin)  # beta
-            for lineno, line in enumerate(fin):
-                line = utils.to_unicode(line)
-                doc, source, pos, typeindex, token, topic = line.split(" ")
-                word_topics[int(topic), int(token)] += 1.0
+
+        # Get occurrence of each found topic-region combination:
+        #   - Get region (type) and topic column from Mallet state file.
+        #   - Count occurrence of each topic-region combination.
+        topic_region_occurrence_df_pl = (
+            pl.read_csv(
+                self.fstate(),
+                separator=" ",
+                has_header=False,
+                skip_rows=3,
+                columns=[4, 5],
+                new_columns=["region", "topic"],
+            )
+            .lazy()
+            .group_by(["topic", "region"])
+            .agg(pl.len().alias("occurrence"))
+            .collect()
+        )
+
+        # Fill in word topics matrix values.
+        word_topics[
+            topic_region_occurrence_df_pl.get_column("topic"),
+            topic_region_occurrence_df_pl.get_column("region"),
+        ] = topic_region_occurrence_df_pl.get_column("occurrence")
+
         return word_topics
 
     def get_topics(self):
