@@ -509,14 +509,28 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         with utils.open(self.fcorpustxt(), "wt") as fh:
             self.corpus_to_mallet(corpus, fh)
 
-        cmd = (
-            f"{self.mallet_path} import-file "
-            '--preserve-case --keep-sequence --token-regex "\\S+" '
-            f"--input {self.fcorpustxt()} --output {self.fcorpusmallet()}"
-        )
+        cmd = [
+            self.mallet_path,
+            "import-file",
+            "--preserve-case",
+            "--keep-sequence",
+            "--token-regex",
+            "\\S+",
+            "--input",
+            self.fcorpustxt(),
+            "--output",
+            self.fcorpusmallet(),
+        ]
 
-        logger.info(f"Converting temporary corpus to MALLET format with: {cmd}")
-        utils.check_output(args=cmd, shell=True)
+        logger.info(
+            f"Converting temporary corpus to MALLET format with: {' '.join(cmd)}"
+        )
+        try:
+            subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
+            )
 
     def train(self, corpus, reuse_corpus):
         """
@@ -535,31 +549,40 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             self.convert_input(corpus)
         else:
             logger.info("MALLET corpus already exists, training model")
-        cmd = (
-            self.mallet_path
-            + " train-topics --input %s --num-topics %s  --alpha %s --beta %s --optimize-interval %s "
-            "--num-threads %s --output-state %s --output-doc-topics %s --output-topic-keys %s "
-            "--num-iterations %s --inferencer-filename %s --doc-topics-threshold %s  --random-seed %s"
-        )
 
-        cmd = cmd % (
+        cmd = [
+            self.mallet_path,
+            "train-topics",
+            "--input",
             self.fcorpusmallet(),
-            self.num_topics,
-            self.alpha,
-            self.eta,
-            self.optimize_interval,
-            self.n_cpu,
+            "--num-topics",
+            str(self.num_topics),
+            "--alpha",
+            str(self.alpha),
+            "--beta",
+            str(self.eta),
+            "--optimize-interval",
+            str(self.optimize_interval),
+            "--num-threads",
+            str(self.n_cpu),
+            "--output-state",
             self.fstate(),
+            "--output-doc-topics",
             self.fdoctopics(),
+            "--output-topic-keys",
             self.ftopickeys(),
-            self.iterations,
+            "--num-iterations",
+            str(self.iterations),
+            "--inferencer-filename",
             self.finferencer(),
-            self.topic_threshold,
+            "--doc-topics-threshold",
+            str(self.topic_threshold),
+            "--random-seed",
             str(self.random_seed),
-        )
+        ]
+
         start = time.time()
-        logger.info("Training MALLET LDA with %s", cmd)
-        cmd = cmd.split()
+        logger.info(f"Training MALLET LDA with: {' '.join(cmd)}")
         try:
             subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
