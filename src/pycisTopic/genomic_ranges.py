@@ -35,12 +35,12 @@ def _get_start_end_and_indexes_for_chrom(
     """
     starts, ends, indexes = list(
         regions_per_chrom_dfs_pl[chrom]
-        .with_row_count()
+        .with_row_index()
         .select(
             [
                 pl.col("Start").cast(pl.Int64),
                 pl.col("End").cast(pl.Int64),
-                pl.col("row_nr").cast(pl.Int64),
+                pl.col("index").cast(pl.Int64),
             ]
         )
         .to_numpy()
@@ -580,11 +580,11 @@ def intersection(
     """
     # TODO: chrom, stranded partitioning
     regions1_per_chrom_dfs_pl = regions1_df_pl.partition_by(
-        "Chromosome", as_dict=True, maintain_order=True
+        ["Chromosome"], as_dict=True, maintain_order=True
     )
 
     regions2_per_chrom_dfs_pl = regions2_df_pl.partition_by(
-        "Chromosome", as_dict=True, maintain_order=True
+        ["Chromosome"], as_dict=True, maintain_order=True
     )
 
     intersection_chrom_dfs_pl = {}
@@ -609,10 +609,10 @@ def intersection(
             # index positions calculated above.
             intersection_chrom_df_pl = (
                 regions1_per_chrom_dfs_pl.pop(chrom)[regions1_indexes]
-                .select(pl.all().suffix(regions1_suffix))
+                .select(pl.all().name.suffix(regions1_suffix))
                 .hstack(
                     (regions2_per_chrom_dfs_pl.pop(chrom)[regions2_indexes]).select(
-                        pl.all().suffix(regions2_suffix)
+                        pl.all().name.suffix(regions2_suffix)
                     )
                 )
             )
@@ -672,9 +672,11 @@ def intersection(
     if len(list(intersection_chrom_dfs_pl.values())) == 0:
         # Return empty dataframe if there was no shared chromosome.
         return (
-            regions1_df_pl.select(pl.all().suffix(regions1_suffix))
+            regions1_df_pl.select(pl.all().name.suffix(regions1_suffix))
             .head(0)
-            .hstack(regions2_df_pl.select(pl.all().suffix(regions2_suffix)).head(0))
+            .hstack(
+                regions2_df_pl.select(pl.all().name.suffix(regions2_suffix)).head(0)
+            )
             .with_columns(
                 [
                     # Chromosome name for intersection.
@@ -865,11 +867,11 @@ def overlap(
     """
     # TODO: chrom, stranded partitioning
     regions1_per_chrom_dfs_pl = regions1_df_pl.partition_by(
-        "Chromosome", as_dict=True, maintain_order=True
+        ["Chromosome"], as_dict=True, maintain_order=True
     )
 
     regions2_per_chrom_dfs_pl = regions2_df_pl.partition_by(
-        "Chromosome", as_dict=True, maintain_order=True
+        ["Chromosome"], as_dict=True, maintain_order=True
     )
 
     overlap_chrom_dfs_pl = {}
@@ -894,13 +896,13 @@ def overlap(
                 # Get inverse selection of regions from first dataframe for the
                 # overlap.
                 regions1_per_chrom_dfs_pl.pop(chrom)
-                .with_row_count()
+                .with_row_index()
                 .filter(
-                    ~pl.col("row_nr").is_in(
+                    ~pl.col("index").is_in(
                         pl.Series("regions1_indexes", regions1_indexes)
                     )
                 )
-                .drop("row_nr")
+                .drop("index")
                 if invert
                 # Get selection of regions from first dataframe for the overlap.
                 else regions1_per_chrom_dfs_pl.pop(chrom)[regions1_indexes]

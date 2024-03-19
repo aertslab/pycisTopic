@@ -363,9 +363,9 @@ def read_fragments_to_polars_df(
         "Score" not in fragments_df_pl.columns
         or fragments_df_pl.schema["Score"] == pl.Utf8
     ):
-        fragments_df_pl = fragments_df_pl.groupby(
+        fragments_df_pl = fragments_df_pl.group_by(
             ["Chromosome", "Start", "End", "Name"]
-        ).agg(pl.count().cast(pl.Int32()).alias("Score"))
+        ).agg(pl.len().cast(pl.Int32()).alias("Score"))
     else:
         fragments_df_pl = fragments_df_pl.with_columns(pl.col("Score").cast(pl.Int32()))
 
@@ -498,7 +498,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     bed_with_idx_df_pl = (
         bed_df_pl
         # Add index column and cast it from UInt32 to Int64
-        .with_row_count("__index_level_0__").with_columns(
+        .with_row_index("__index_level_0__").with_columns(
             pl.col("__index_level_0__").cast(pl.Int64)
         )
         # Put index column as last column.
@@ -630,16 +630,16 @@ def get_fragments_per_cb(
     fragments_stats_per_cb_df_pl = (
         fragments_df_pl.lazy()
         .rename({"Name": "CB"})
-        .groupby(by="CB", maintain_order=True)
+        .group_by(by="CB", maintain_order=True)
         .agg(
             [
                 pl.col("Score").sum().alias("total_fragments_count"),
-                pl.count().alias("unique_fragments_count"),
+                pl.len().alias("unique_fragments_count"),
             ]
         )
         .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
         .sort(by=fragments_count_column, descending=True)
-        .with_row_count(name="barcode_rank", offset=1)
+        .with_row_index(name="barcode_rank", offset=1)
         .with_columns(
             (pl.col("total_fragments_count") - pl.col("unique_fragments_count")).alias(
                 "duplication_count"
@@ -874,7 +874,7 @@ def filter_fragments_by_cb(
 
 def get_insert_size_distribution(
     fragments_df_pl: pl.DataFrame,
-):
+) -> pl.DataFrame:
     """
     Get insert size distribution of fragments.
 
@@ -918,8 +918,8 @@ def get_insert_size_distribution(
         .with_columns(
             (pl.col("End") - pl.col("Start")).abs().alias("insert_size"),
         )
-        .groupby("insert_size")
-        .agg([pl.count().alias("fragments_count")])
+        .group_by("insert_size")
+        .agg([pl.len().alias("fragments_count")])
         .sort(by="insert_size", descending=True)
         .with_columns(
             (pl.col("fragments_count") / pl.col("fragments_count").sum()).alias(
@@ -932,7 +932,7 @@ def get_insert_size_distribution(
     return insert_size_distribution_df_pl
 
 
-def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.DataFrame):
+def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.DataFrame) -> pl.DataFrame:
     """
     Get number of total and unique fragments in peaks.
 
@@ -999,11 +999,11 @@ def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.Data
             pl.col("Name").alias("CB"),
             pl.col("Score"),
         )
-        .groupby(by="CB", maintain_order=True)
+        .group_by(by="CB", maintain_order=True)
         .agg(
             [
                 pl.col("Score").sum().alias("total_fragments_in_peaks_count"),
-                pl.count().alias("unique_fragments_in_peaks_count"),
+                pl.len().alias("unique_fragments_in_peaks_count"),
             ]
         )
     )
