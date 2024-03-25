@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
