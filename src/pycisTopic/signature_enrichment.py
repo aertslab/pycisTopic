@@ -1,25 +1,32 @@
-from typing import Dict, Union
+from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import pyranges as pr
 from ctxcore.genesig import GeneSignature
 from pyscenic.aucell import aucell4r
 
+if TYPE_CHECKING:
+    from pycisTopic.diff_features import CistopicImputedFeatures
+
+# FIXME
 from .diff_features import *
 from .utils import *
 
 
 def signature_enrichment(
-    rankings: "CistopicImputedFeatures",
-    signatures: Union[Dict[str, pr.PyRanges], Dict[str, List]],
+    rankings: CistopicImputedFeatures,
+    signatures: dict[str, pr.PyRanges] | dict[str, list],
     enrichment_type: str = "region",
     auc_threshold: float = 0.05,
     normalize: bool = False,
     n_cpu: int = 1,
 ):
     """
-    Get enrichment of a region signature in cells or topics using AUCell (Van de Sande et al., 2020)
+    Get enrichment of a region signature in cells or topics using AUCell (Van de Sande et al., 2020).
 
     Parameters
-    ---------
+    ----------
     rankings: CistopicImputedFeatures
         A CistopicImputedFeatures object with ranking values
     signatures: Dictionary of pr.PyRanges (for regions) or list (for genes)
@@ -34,13 +41,14 @@ def signature_enrichment(
         The number of cores to use. Default: 1
 
     Return
-    ---------
+    ------
         A pd.DataFrame containing signatures as columns, cells/topics as rows and AUC scores as values
 
     References
-    ---------
+    ----------
     Van de Sande, B., Flerin, C., Davie, K., De Waegeneer, M., Hulselmans, G., Aibar, S., ... & Aerts, S. (2020). A scalable SCENIC workflow for single-cell gene
     regulatory network analysis. Nature Protocols, 15(7), 2247-2276.
+
     """
     # Compute rankings if needed and format input
     rankings = pd.DataFrame(
@@ -80,10 +88,10 @@ def region_set_to_signature(
     query_region_set: pr.PyRanges, target_region_set: pr.PyRanges, name: str
 ):
     """
-    A helper function to intersect query regions with the input data set regions
+    A helper function to intersect query regions with the input data set regions.
 
     Parameters
-    ---------
+    ----------
     query_region_set: pr.PyRanges
         Pyranges with regions to query
     target_region_set: pr.PyRanges
@@ -92,8 +100,9 @@ def region_set_to_signature(
         Name for the signature
 
     Return
-    ---------
+    ------
         A GeneSignature object to use with AUCell
+
     """
     query_in_target = query_region_set.join(target_region_set)
     query_in_target = query_in_target.df[["Chromosome", "Start_b", "End_b"]]
@@ -106,20 +115,21 @@ def region_set_to_signature(
     return signature
 
 
-def gene_set_to_signature(gene_set: List, name: str):
+def gene_set_to_signature(gene_set: list, name: str):
     """
-    A helper function to generat gene signatures
+    A helper function to generat gene signatures.
 
     Parameters
-    ---------
+    ----------
     gene_set: pr.PyRanges
         List of genes
     name: str
         Name for the signature
 
     Return
-    ---------
+    ------
         A GeneSignature object to use with AUCell
+
     """
     weights = np.ones(len(gene_set))
     signature = GeneSignature(name=name, gene2weight=dict(zip(gene_set, weights)))

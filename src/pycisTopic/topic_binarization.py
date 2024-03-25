@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import sys
 from typing import TYPE_CHECKING
@@ -13,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def binarize_topics(
-    cistopic_obj: "CistopicObject",
+    cistopic_obj: CistopicObject,
     target: str | None = "region",
     method: str | None = "otsu",
     smooth_topics: bool = True,
@@ -98,6 +100,7 @@ def binarize_topics(
       Verbeiren, T., 2020.
       A scalable SCENIC workflow for single-cell gene regulatory network analysis.
       Nature Protocols, 15(7), pp.2247-2276.
+
     """
     # Create cisTopic logger
     level = logging.INFO

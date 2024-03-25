@@ -1,31 +1,31 @@
+from __future__ import annotations
+
 import logging
 import os
 import subprocess
 import sys
-from typing import Dict, Optional, Tuple, Union
 
+import joblib
 import pandas as pd
 import pyranges as pr
 import ray
-
+from pycisTopic.cistopic_class import CistopicObject
+from scatac_fragment_tools.library.bigwig.fragments_to_bigwig import (
+    fragments_to_bw,
+    read_fragments_to_polars_df,
+)
 from scatac_fragment_tools.library.split.split_fragments_by_cell_type import (
+    _santize_string_for_filename,
     split_fragment_files_by_cell_type,
-    _santize_string_for_filename
 )
 
-from scatac_fragment_tools.library.bigwig.fragments_to_bigwig import (
-        fragments_to_bw,
-        read_fragments_to_polars_df,
-    )
-
-from .cistopic_class import CistopicObject
+# FIXME
 from .utils import *
 
-import joblib
 
 def _generate_bigwig(
         path_to_fragments: str,
-        chromsizes: Dict[str, int],
+        chromsizes: dict[str, int],
         normalize_bigwig: bool,
         bw_filename: str,
         log: logging.Logger):
@@ -46,14 +46,13 @@ def export_pseudobulk(
     chromsizes: Union[pd.DataFrame, pr.PyRanges],
     bed_path: str,
     bigwig_path: str,
-    path_to_fragments: Optional[Dict[str, str]] = None,
+    path_to_fragments: dict[str, str] | None = None,
     sample_id_col: str = "sample_id",
     n_cpu: int = 1,
     normalize_bigwig: bool = True,
     split_pattern: str = "___",
     temp_dir: str = "/tmp"
-) -> Tuple[Dict[str, str], Dict[str, str]]:
-
+) -> tuple[dict[str, str], dict[str, str]]:
     """
     Create pseudobulks as bed and bigwig from single cell fragments file given a barcode annotation.
 
@@ -158,7 +157,7 @@ def export_pseudobulk(
     else:
         chromsizes_dict = chromsizes.set_index("Chromosome").to_dict()["End"]
     # For each sample, get fragments for each cell type
-    
+
     log.info("Splitting fragments by cell type.")
     split_fragment_files_by_cell_type(
         sample_to_fragment_file = path_to_fragments,
@@ -180,7 +179,7 @@ def export_pseudobulk(
             bed_paths[cell_type] = _bed_fname
         else:
             log.warning(f"Missing fragments for {cell_type}!")
-    
+
     log.info("generating bigwig files")
     joblib.Parallel(n_jobs=n_cpu)(
         joblib.delayed(_generate_bigwig)
@@ -207,16 +206,16 @@ def export_pseudobulk(
 
 def peak_calling(
     macs_path: str,
-    bed_paths: Dict,
+    bed_paths: dict,
     outdir: str,
     genome_size: str,
-    n_cpu: Optional[int] = 1,
-    input_format: Optional[str] = "BEDPE",
-    shift: Optional[int] = 73,
-    ext_size: Optional[int] = 146,
-    keep_dup: Optional[str] = "all",
-    q_value: Optional[float] = 0.05,
-    nolambda: Optional[bool] = True,
+    n_cpu: int = 1,
+    input_format: str = "BEDPE",
+    shift: int = 73,
+    ext_size: int = 146,
+    keep_dup: str = "all",
+    q_value: float = 0.05,
+    nolambda: bool = True,
     skip_empty_peaks: bool = False,
     **kwargs
 ):
@@ -317,14 +316,13 @@ def macs_call_peak(
     name: str,
     outdir: str,
     genome_size: str,
-    input_format: Optional[str] = "BEDPE",
-    shift: Optional[int] = 73,
-    ext_size: Optional[int] = 146,
-    keep_dup: Optional[str] = "all",
-    q_value: Optional[int] = 0.05,
-    nolambda: Optional[bool] = True,
+    input_format: str = "BEDPE",
+    shift: int = 73,
+    ext_size: int = 146,
+    keep_dup: str = "all",
+    q_value: int = 0.05,
+    nolambda: bool = True,
     skip_empty_peaks: bool = False
-
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -393,14 +391,13 @@ def macs_call_peak_ray(
     name: str,
     outdir: str,
     genome_size: str,
-    input_format: Optional[str] = "BEDPE",
-    shift: Optional[int] = 73,
-    ext_size: Optional[int] = 146,
-    keep_dup: Optional[str] = "all",
-    q_value: Optional[int] = 0.05,
-    nolambda: Optional[bool] = True,
+    input_format: str = "BEDPE",
+    shift: int = 73,
+    ext_size: int = 146,
+    keep_dup: str = "all",
+    q_value: int = 0.05,
+    nolambda: bool = True,
     skip_empty_peaks: bool = False
-
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -502,12 +499,12 @@ class MACSCallPeak:
         name: str,
         outdir: str,
         genome_size: str,
-        input_format: Optional[str] = "BEDPE",
-        shift: Optional[int] = 73,
-        ext_size: Optional[int] = 146,
-        keep_dup: Optional[str] = "all",
-        q_value: Optional[int] = 0.05,
-        nolambda: Optional[bool] = True,
+        input_format: str = "BEDPE",
+        shift: int = 73,
+        ext_size: int = 146,
+        keep_dup: str = "all",
+        q_value: int = 0.05,
+        nolambda: bool = True,
         skip_empty_peaks: bool = False,
     ):
         self.macs_path = macs_path

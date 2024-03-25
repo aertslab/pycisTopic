@@ -1,31 +1,34 @@
+from __future__ import annotations
+
 import logging
 import sys
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 import ray
 import scanorama
 import scanpy as sc
-from anndata import AnnData
 from sklearn.cross_decomposition import CCA
 from sklearn.metrics.pairwise import cosine_distances
 from sklearn.preprocessing import StandardScaler
 
+if TYPE_CHECKING:
+    from anndata import AnnData
 
 def label_transfer(
     ref_anndata: AnnData,
     query_anndata: AnnData,
-    labels_to_transfer: List[str],
-    sample_id_col: Optional[str] = "sample_id",
-    n_cpu: Optional[int] = 1,
-    variable_genes: Optional[bool] = True,
-    methods: Optional[List[str]] = ["ingest", "harmony", "bbknn", "scanorama", "cca"],
-    pca_ncomps: Optional[List[int]] = [50, 50],
-    n_neighbours: Optional[List[int]] = [10, 10],
-    bbknn_components: Optional[int] = 30,
-    cca_components: Optional[int] = 30,
-    return_label_weights: Optional[bool] = False,
+    labels_to_transfer: list[str],
+    sample_id_col: str = "sample_id",
+    n_cpu: int = 1,
+    variable_genes: bool = True,
+    methods: list[str] = ["ingest", "harmony", "bbknn", "scanorama", "cca"],
+    pca_ncomps: list[int] = [50, 50],
+    n_neighbours: list[int] = [10, 10],
+    bbknn_components: int = 30,
+    cca_components: int = 30,
+    return_label_weights: bool = False,
     **kwargs
 ):
     """
@@ -33,7 +36,7 @@ def label_transfer(
     Wrapper function of Ray processes to compute label transfer from single reference to multiple query samples.
 
     Parameters
-    ---------
+    ----------
     ref_anndata: AnnData
         An AnnData object containing the reference data set (typically, scRNA-seq data)
     query_anndata: AnnData
@@ -73,7 +76,7 @@ def label_transfer(
         with the label scores per method and variable.
 
     References
-    -----------
+    ----------
     Korsunsky, I., Millard, N., Fan, J., Slowikowski, K., Zhang, F., Wei, K., ... & Raychaudhuri, S. (2019). Fast,
     sensitive and accurate integration of single-cell data with Harmony. Nature methods, 16(12), 1289-1296.
 
@@ -82,8 +85,8 @@ def label_transfer(
 
     Hie, B., Bryson, B., & Berger, B. (2019). Efficient integration of heterogeneous single-cell transcriptomes
     using Scanorama. Nature biotechnology, 37(6), 685-691.
-    """
 
+    """
     # Create cisTopic logger
     level = logging.INFO
     log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
@@ -147,22 +150,22 @@ def label_transfer(
 def label_transfer_ray(
     ref_anndata: AnnData,
     query_anndata: AnnData,
-    labels_to_transfer: List[str],
+    labels_to_transfer: list[str],
     sample_id: str,
-    sample_id_col: Optional[str] = "sample_id",
-    variable_genes: Optional[bool] = True,
-    methods: Optional[List[str]] = ["ingest", "harmony", "bbknn", "scanorama", "cca"],
-    pca_ncomps: Optional[List[int]] = [50, 50],
-    n_neighbours: Optional[List[int]] = [10, 10],
-    bbknn_components: Optional[int] = 30,
-    cca_components: Optional[int] = 30,
-    return_label_weights: Optional[bool] = False,
+    sample_id_col: str = "sample_id",
+    variable_genes: bool = True,
+    methods: list[str] = ["ingest", "harmony", "bbknn", "scanorama", "cca"],
+    pca_ncomps: list[int] = [50, 50],
+    n_neighbours: list[int] = [10, 10],
+    bbknn_components: int = 30,
+    cca_components: int = 30,
+    return_label_weights: bool = False,
 ):
     """
     Function to compute label transfer from single reference to single query sample.
 
     Parameters
-    ---------
+    ----------
     ref_anndata: AnnData
         An AnnData object containing the reference data set (typically, scRNA-seq data)
     query_anndata: AnnData
@@ -200,7 +203,7 @@ def label_transfer_ray(
         with the label scores per method and variable.
 
     References
-    -----------
+    ----------
     Korsunsky, I., Millard, N., Fan, J., Slowikowski, K., Zhang, F., Wei, K., ... & Raychaudhuri, S. (2019). Fast,
     sensitive and accurate integration of single-cell data with Harmony. Nature methods, 16(12), 1289-1296.
 
@@ -209,6 +212,7 @@ def label_transfer_ray(
 
     Hie, B., Bryson, B., & Berger, B. (2019). Efficient integration of heterogeneous single-cell transcriptomes
     using Scanorama. Nature biotechnology, 37(6), 685-691.
+
     """
     # Create cisTopic logger
     level = logging.INFO

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import sys
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Self
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -13,6 +15,10 @@ import scipy.sparse as sparse
 import sklearn
 from scipy.stats import ranksums
 
+if TYPE_CHECKING:
+    from pycisTopic.cistopic_class import CistopicObject
+
+# FIXME
 from .cistopic_class import *
 from .utils import *
 
@@ -39,8 +45,8 @@ class CistopicImputedFeatures:
     def __init__(
         self,
         imputed_acc: sparse.csr_matrix,
-        feature_names: List[str],
-        cell_names: List[str],
+        feature_names: list[str],
+        cell_names: list[str],
         project: str,
     ):
         self.mtx = imputed_acc
@@ -54,16 +60,16 @@ class CistopicImputedFeatures:
 
     def subset(
         self,
-        cells: Optional[List[str]] = None,
-        features: Optional[List[str]] = None,
-        copy: Optional[bool] = False,
-        split_pattern: Optional[str] = "___",
+        cells: list[str] | None = None,
+        features: list[str] | None = None,
+        copy: bool = False,
+        split_pattern: str = "___",
     ):
         """
         Subset cells and/or regions from :class:`CistopicImputedFeatures`.
 
         Parameters
-        ---------
+        ----------
         cells: list, optional
             A list containing the names of the cells to keep.
         features: list, optional
@@ -77,6 +83,7 @@ class CistopicImputedFeatures:
         ------
         CistopicImputedFeatures
             A :class:`CistopicImputedFeatures` containing the selected cells and/or features.
+
         """
         mtx = self.mtx
         cell_names = self.cell_names
@@ -115,15 +122,15 @@ class CistopicImputedFeatures:
 
     def merge(
         self,
-        cistopic_imputed_features_list: List["CistopicImputedFeatures"],
-        project: Optional[str] = "cisTopic_impute_merge",
-        copy: Optional[bool] = False,
+        cistopic_imputed_features_list: list[Self],
+        project: str = "cisTopic_impute_merge",
+        copy: bool = False,
     ):
         """
         Merge a list of :class:`CistopicImputedFeatures` to the input :class:`CistopicImputedFeatures`. Reference coordinates (for regions) must be the same between the objects.
 
         Parameters
-        ---------
+        ----------
         cistopic_imputed_features_list: list
             A list containing one or more :class:`CistopicImputedFeatures` to merge.
         project: str, optional
@@ -134,6 +141,7 @@ class CistopicImputedFeatures:
         ------
         CistopicImputedFeatures
             A combined :class:`CistopicImputedFeatures`.
+
         """
         # Create cisTopic logger
         level = logging.INFO
@@ -260,13 +268,14 @@ class CistopicImputedFeatures:
         A function to generate rankings per cell based on the imputed accessibility scores per region.
 
         Parameters
-        ---------
+        ----------
         seed: int, optional
             Random seed to ensure reproducibility of the rankings when there are ties
         Return
         ------
            CistopicImputedFeatures
             A :class:`CistopicImputedFeatures` containing with ranking values rather than scores.
+
         """
         # Initialize random number generator, for handling ties
         rng = np.random.default_rng(seed=seed)
@@ -321,12 +330,12 @@ class CistopicImputedFeatures:
 
 
 def impute_accessibility(
-    cistopic_obj: "CistopicObject",
-    selected_cells: Optional[List[str]] = None,
-    selected_regions: Optional[List[str]] = None,
-    scale_factor: Optional[int] = 10**6,
+    cistopic_obj: CistopicObject,
+    selected_cells: list[str] | None = None,
+    selected_regions: list[str] | None = None,
+    scale_factor: int = 10**6,
     chunk_size: int = 20000,
-    project: Optional[str] = "cisTopic_Impute",
+    project: str = "cisTopic_Impute",
 ):
     """
     Impute region accessibility.
@@ -382,9 +391,9 @@ def impute_accessibility(
         topic_region: np.ndarray,
         cell_topic: np.ndarray,
         region_names: list,
-        scale_factor: Optional[int],
+        scale_factor: int,
         chunk_size: int
-    ) -> Tuple[np.ndarray, list]:
+    ) -> tuple[np.ndarray, list]:
         """
         Calculate imputed accessibility in chunks of chunk_size.
 
@@ -492,7 +501,7 @@ def impute_accessibility(
 
 
 def normalize_scores(
-    imputed_acc: Union[pd.DataFrame, "CistopicImputedFeatures"],
+    imputed_acc: pd.DataFrame | CistopicImputedFeatures,
     scale_factor: int = 10**4,
 ):
     """
@@ -558,21 +567,21 @@ def normalize_scores(
 
 
 def find_highly_variable_features(
-    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
-    min_disp: Optional[float] = 0.05,
-    min_mean: Optional[float] = 0.0125,
-    max_disp: Optional[float] = np.inf,
-    max_mean: Optional[float] = 3,
-    n_bins: Optional[int] = 20,
-    n_top_features: Optional[int] = None,
-    plot: Optional[bool] = True,
-    save: Optional[str] = None,
+    input_mat: pd.DataFrame | CistopicImputedFeatures,
+    min_disp: float = 0.05,
+    min_mean: float = 0.0125,
+    max_disp: float = np.inf,
+    max_mean: float = 3,
+    n_bins: int = 20,
+    n_top_features: int = None,
+    plot: bool = True,
+    save: str = None,
 ):
     """
     Find highly variable features.
 
     Parameters
-    ---------
+    ----------
     input_mat: pd.DataFrame or :class:`CistopicImputedFeatures`
         A dataframe with values to be normalize or cisTopic imputation data.
     min_disp: float, optional
@@ -596,6 +605,7 @@ def find_highly_variable_features(
     ------
     List
         List with selected features.
+
     """
     # Create cisTopic logger
     level = logging.INFO
@@ -696,22 +706,22 @@ def find_highly_variable_features(
 
 
 def find_diff_features(
-    cistopic_obj: "CistopicObject",
-    imputed_features_obj: "CistopicImputedFeatures",
+    cistopic_obj: CistopicObject,
+    imputed_features_obj: CistopicImputedFeatures,
     variable: str,
-    var_features: Optional[List[str]] = None,
-    contrasts: Optional[List[List[str]]] = None,
-    adjpval_thr: Optional[float] = 0.05,
-    log2fc_thr: Optional[float] = np.log2(1.5),
-    split_pattern: Optional[str] = "___",
-    n_cpu: Optional[int] = 1,
-    **kwargs,
+    var_features: str | None = None,
+    contrasts: list[list[str]] = None,
+    adjpval_thr: float = 0.05,
+    log2fc_thr: float = np.log2(1.5),
+    split_pattern: str = "___",
+    n_cpu: int = 1,
+    **kwargs
 ):
     """
     Find differential imputed features.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
         A cisTopic object including the cells in imputed_features_obj.
     imputed_features_obj: :class:`CistopicImputedFeatures`
@@ -739,6 +749,7 @@ def find_diff_features(
     ------
     List
         List of `class::pd.DataFrame` per contrast with the selected features and logFC and adjusted p-values.
+
     """
     # Create cisTopic logger.
     level = logging.INFO
@@ -818,12 +829,12 @@ def find_diff_features(
 
 
 def markers(
-    input_mat: Union[pd.DataFrame, "CistopicImputedFeatures"],
-    barcode_group: List[List[str]],
+    input_mat: pd.DataFrame | CistopicImputedFeatures,
+    barcode_group: list[list[str]],
     contrast_name: str,
-    adjpval_thr: Optional[float] = 0.05,
-    log2fc_thr: Optional[float] = 1,
-    n_cpu: Optional[int] = 1,
+    adjpval_thr: float = 0.05,
+    log2fc_thr: float = 1,
+    n_cpu: int = 1,
 ):
     """
     Find differential imputed features.
@@ -847,6 +858,7 @@ def markers(
     ------
     List
         `class::pd.DataFrame` with the selected features and logFC and adjusted p-values.
+
     """
     # Create cisTopic logger
     level = logging.INFO
@@ -989,6 +1001,7 @@ def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
         Starting row index (included).
     end
         Ending row index (excluded).
+
     """
     if fg_mat.shape[0] != bg_mat.shape[0]:
         raise ValueError(
@@ -1010,7 +1023,6 @@ def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
 def p_adjust_bh(p: float):
     """
     Benjamini-Hochberg p-value correction for multiple hypothesis testing.
-
     """
     p = np.asfarray(p)
     by_descend = p.argsort()[::-1]
@@ -1063,8 +1075,8 @@ def mean_axis1(arr):
     ----------
     arr
         2D-numpy array to calculate the mean per column for.
-    """
 
+    """
     mean_axis1_array = np.empty(arr.shape[0], dtype=np.float64)
     for i in numba.prange(arr.shape[0]):
         mean_axis1_array[i] = np.mean(arr[i, :])
@@ -1082,8 +1094,8 @@ def get_log2_fc(fg_mat, bg_mat):
         2D-numpy foreground matrix.
     bg_mat
         2D-numpy background matrix.
-    """
 
+    """
     if fg_mat.shape[0] != bg_mat.shape[0]:
         raise ValueError(
             "Foreground matrix and background matrix have a different first dimension:"

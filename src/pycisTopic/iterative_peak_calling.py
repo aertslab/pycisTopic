@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 import logging
 import sys
-from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import pyranges as pr
 
 
 def get_consensus_peaks(
-    narrow_peaks_dict: Dict[str, pr.PyRanges],
+    narrow_peaks_dict: dict[str, pr.PyRanges],
     peak_half_width: int,
-    chromsizes: Optional[Union[pr.PyRanges, pd.DataFrame]] = None,
-    path_to_blacklist: Optional[str] = None,
+    chromsizes: pr.PyRanges | pd.DataFrame | None = None,
+    path_to_blacklist: str | None = None,
 ):
     """
     Returns consensus peaks from a set of MACS narrow peak results. First, each summit is extended a `peak_half_width` in each direction
@@ -105,14 +106,14 @@ def cpm(x: pr.PyRanges, column: str):
 def calculate_peaks_and_extend(
     narrow_peaks: pr.PyRanges,
     peak_half_width: int,
-    chromsizes: Optional[Union[pr.PyRanges, pd.DataFrame]] = None,
-    path_to_blacklist: Optional[str] = None,
+    chromsizes: pr.PyRanges | pd.DataFrame | None = None,
+    path_to_blacklist: str | None = None,
 ):
     """
-    Extend peaks a number of base pairs in eca direction from the summit
+    Extend peaks a number of base pairs in eca direction from the summit.
 
     Parameters
-    ---------
+    ----------
     narrow_peaks: pr.PyRanges
             A pr.PyRanges with the narrowPeak results from MACS2.
     peak_half_width: int
@@ -126,6 +127,7 @@ def calculate_peaks_and_extend(
     ------
     pr.PyRanges
             A pyRanges containing chromosome, start and end coordinates of the extended peaks.
+
     """
     center_extended_peaks = pr.PyRanges(
         chromosomes=narrow_peaks.Chromosome,
@@ -160,7 +162,7 @@ def iterative_peak_filtering(center_extended_peaks: pr.PyRanges):
     This approach is described in Corces et al. 2018.
 
     Parameters
-    ---------
+    ----------
     center_extended_peaks: pr.PyRanges
             A pr.PyRanges with all the peaks to be combined (and their MACS score), after centering and extending the peaks.
 
@@ -176,6 +178,7 @@ def iterative_peak_filtering(center_extended_peaks: pr.PyRanges):
     landscape of primary human cancers. Science, 362(6413).
     Amemiya, H. M., Kundaje, A., & Boyle, A. P. (2019). The ENCODE blacklist: identification of problematic regions of the genome.
     Scientific reports, 9(1), 1-5.
+
     """
     center_extended_peaks_merged = center_extended_peaks.merge(count=True)
     # Take original print region if the number of merged regions is equal to 1

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import pickle
@@ -8,7 +10,7 @@ import tempfile
 import time
 import warnings
 from itertools import chain
-from typing import Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import lda
 import matplotlib.backends.backend_pdf
@@ -20,10 +22,11 @@ import ray
 import tmtoolkit
 from gensim import matutils, utils
 from gensim.models import basemodel
-from pycisTopic.cistopic_class import CistopicObject
 from pycisTopic.utils import loglikelihood, subset_list
 from scipy import sparse
 
+if TYPE_CHECKING:
+    from pycisTopic.cistopic_class import CistopicObject
 
 class CistopicLDAModel:
     """
@@ -94,17 +97,17 @@ class CistopicLDAModel:
 
 
 def run_cgs_models(
-    cistopic_obj: "CistopicObject",
-    n_topics: List[int],
-    n_cpu: Optional[int] = 1,
-    n_iter: Optional[int] = 150,
-    random_state: Optional[int] = 555,
-    alpha: Optional[float] = 50,
-    alpha_by_topic: Optional[bool] = True,
-    eta: Optional[float] = 0.1,
-    eta_by_topic: Optional[bool] = False,
-    top_topics_coh: Optional[int] = 5,
-    save_path: Optional[str] = None,
+    cistopic_obj: CistopicObject,
+    n_topics: list[int],
+    n_cpu: int = 1,
+    n_iter: int = 150,
+    random_state: int = 555,
+    alpha: float = 50,
+    alpha_by_topic: bool = True,
+    eta: float = 0.1,
+    eta_by_topic: bool = False,
+    top_topics_coh: int = 5,
+    save_path: str | None = None,
     **kwargs,
 ):
     """
@@ -176,16 +179,16 @@ def run_cgs_models(
 def run_cgs_model(
     binary_matrix: sparse.csr_matrix,
     n_topics: int,
-    cell_names: List[str],
-    region_names: List[str],
-    n_iter: Optional[int] = 150,
-    random_state: Optional[int] = 555,
-    alpha: Optional[float] = 50,
-    alpha_by_topic: Optional[bool] = True,
-    eta: Optional[float] = 0.1,
-    eta_by_topic: Optional[bool] = False,
-    top_topics_coh: Optional[int] = 5,
-    save_path: Optional[str] = None,
+    cell_names: list[str],
+    region_names: list[str],
+    n_iter: int = 150,
+    random_state: int = 555,
+    alpha: float = 50,
+    alpha_by_topic: bool = True,
+    eta: float = 0.1,
+    eta_by_topic: bool = False,
+    top_topics_coh: int = 5,
+    save_path: str = None,
 ):
     """
     Run Latent Dirichlet Allocation per model using Gibbs Sampling as described in Griffiths and Steyvers, 2004.
@@ -427,17 +430,17 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
     def __init__(
         self,
         num_topics: int,
-        corpus: Optional[Iterable] = None,
-        alpha: Optional[float] = 50,
-        eta: Optional[float] = 0.1,
-        id2word: Optional[utils.FakeDict] = None,
-        n_cpu: Optional[int] = 1,
-        tmp_dir: Optional[str] = None,
-        optimize_interval: Optional[int] = 0,
-        iterations: Optional[int] = 150,
-        topic_threshold: Optional[float] = 0.0,
-        random_seed: Optional[int] = 555,
-        reuse_corpus: Optional[bool] = False,
+        corpus: list | None = None,
+        alpha: float = 50,
+        eta: float = 0.1,
+        id2word: utils.FakeDict = None,
+        n_cpu: int = 1,
+        tmp_dir: str = None,
+        optimize_interval: int = 0,
+        iterations: int = 150,
+        topic_threshold: float = 0.0,
+        random_seed: int = 555,
+        reuse_corpus: bool = False,
         mallet_path: str = "mallet",
     ):
         logger = logging.getLogger("LDAMalletWrapper")
@@ -729,19 +732,19 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
 
 
 def run_cgs_models_mallet(
-    cistopic_obj: "CistopicObject",
-    n_topics: List[int],
-    n_cpu: Optional[int] = 1,
-    n_iter: Optional[int] = 150,
-    random_state: Optional[int] = 555,
-    alpha: Optional[float] = 50,
-    alpha_by_topic: Optional[bool] = True,
-    eta: Optional[float] = 0.1,
-    eta_by_topic: Optional[bool] = False,
-    top_topics_coh: Optional[int] = 5,
-    tmp_path: Optional[str] = None,
-    save_path: Optional[str] = None,
-    reuse_corpus: Optional[bool] = False,
+    cistopic_obj: CistopicObject,
+    n_topics: list[int],
+    n_cpu: int = 1,
+    n_iter: int = 150,
+    random_state: int = 555,
+    alpha: float = 50.0,
+    alpha_by_topic: bool = True,
+    eta: float = 0.1,
+    eta_by_topic: bool = False,
+    top_topics_coh: int = 5,
+    tmp_path: str = None,
+    save_path: str = None,
+    reuse_corpus: bool = False,
     mallet_path: str = "mallet",
 ):
     """
@@ -831,22 +834,22 @@ def run_cgs_models_mallet(
 
 def run_cgs_model_mallet(
     binary_matrix: sparse.csr_matrix,
-    corpus: Iterable,
+    corpus: list,
     id2word: utils.FakeDict,
-    n_topics: List[int],
-    cell_names: List[str],
-    region_names: List[str],
-    n_cpu: Optional[int] = 1,
-    n_iter: Optional[int] = 500,
-    random_state: Optional[int] = 555,
-    alpha: Optional[float] = 50,
-    alpha_by_topic: Optional[bool] = True,
-    eta: Optional[float] = 0.1,
-    eta_by_topic: Optional[bool] = False,
-    top_topics_coh: Optional[int] = 5,
-    tmp_path: Optional[str] = None,
-    save_path: Optional[str] = None,
-    reuse_corpus: Optional[bool] = False,
+    n_topics: list[int],
+    cell_names: list[str],
+    region_names: list[str],
+    n_cpu: int = 1,
+    n_iter: int = 500,
+    random_state: int = 555,
+    alpha: float = 50,
+    alpha_by_topic: bool = True,
+    eta: float = 0.1,
+    eta_by_topic: bool = False,
+    top_topics_coh: int = 5,
+    tmp_path: str = None,
+    save_path: str = None,
+    reuse_corpus: bool = False,
     mallet_path: str = "mallet",
 ):
     """
@@ -1043,20 +1046,20 @@ def run_cgs_model_mallet(
 
 
 def evaluate_models(
-    models: List["CistopicLDAModel"],
-    select_model: Optional[int] = None,
-    return_model: Optional[bool] = True,
-    metrics: Optional[str] = [
+    models: list[CistopicLDAModel],
+    select_model: int | None = None,
+    return_model: bool = True,
+    metrics: str = [
         "Minmo_2011",
         "loglikelihood",
         "Cao_Juan_2009",
         "Arun_2010",
     ],
-    min_topics_coh: Optional[int] = 5,
-    plot: Optional[bool] = True,
-    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-    plot_metrics: Optional[bool] = False,
-    save: Optional[str] = None,
+    min_topics_coh: int = 5,
+    plot: bool = True,
+    figsize: tuple[float, float] = (6.4, 4.8),
+    plot_metrics: bool = False,
+    save: str | None = None,
 ):
     """
     Model selection based on model quality metrics (model coherence (adaptation from Mimno et al., 2011), log-likelihood (Griffiths and Steyvers, 2004), density-based (Cao Juan et al., 2009) and divergence-based (Arun et al., 2010)).

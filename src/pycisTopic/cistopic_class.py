@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import collections as cl
 import logging
 import sys
-from typing import Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Self
 
 import numpy as np
 import pandas as pd
@@ -17,6 +19,9 @@ from pycisTopic.utils import (
     subset_list,
 )
 from scipy import sparse
+
+if TYPE_CHECKING:
+    from pycisTopic.lda_models import CistopicLDAModel
 
 dtype = pd.SparseDtype(int, fill_value=0)
 pd.options.mode.chained_assignment = None
@@ -56,12 +61,12 @@ class CistopicObject:
         self,
         fragment_matrix: sparse.csr_matrix,
         binary_matrix: sparse.csr_matrix,
-        cell_names: List[str],
-        region_names: List[str],
+        cell_names: list[str],
+        region_names: list[str],
         cell_data: pd.DataFrame,
         region_data: pd.DataFrame,
-        path_to_fragments: Union[str, Dict[str, str]],
-        project: Optional[str] = "cisTopic",
+        path_to_fragments: str | dict[str, str],
+        project: str = "cisTopic",
     ):
         self.fragment_matrix = fragment_matrix
         self.binary_matrix = binary_matrix
@@ -81,7 +86,7 @@ class CistopicObject:
         return descr
 
     def add_cell_data(
-        self, cell_data: pd.DataFrame, split_pattern: Optional[str] = "___"
+        self, cell_data: pd.DataFrame, split_pattern: str = "___"
     ):
         """
         Add cell metadata to :class:`CistopicObject`. If the column already exist on the cell metadata, it will be overwritten.
@@ -181,14 +186,17 @@ class CistopicObject:
 
     def subset(
         self,
-        cells: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None,
-        copy: Optional[bool] = False,
-        split_pattern: Optional[str] = "___",
+        cells: list[str] | None = None,
+        regions: list[str] | None = None,
+        copy: bool | None = False,
+        split_pattern: str = "___",
     ):
         """
-        Subset cells and/or regions from :class:`CistopicObject`. Existent :class:`CisTopicLDAModel` and projections will be deleted. This is to ensure that
-        models contained in a :class:`CistopicObject` are derived from the cells it contains.
+        Subset cells and/or regions from :class:`CistopicObject`.
+
+        Existent :class:`CisTopicLDAModel` and projections will be deleted. This is to
+        ensure thatmodels contained in a :class:`CistopicObject` are derived from the
+        cells it contains.
 
         Parameters
         ----------
@@ -280,11 +288,11 @@ class CistopicObject:
 
     def merge(
         self,
-        cistopic_obj_list: List["CistopicObject"],
-        is_acc: Optional[int] = 1,
-        project: Optional[str] = "cisTopic_merge",
-        copy: Optional[bool] = False,
-        split_pattern: Optional[str] = "___",
+        cistopic_obj_list: list[Self],
+        is_acc: int = 1,
+        project: str = "cisTopic_merge",
+        copy: bool = False,
+        split_pattern: str = "___",
     ):
         """
         Merge a list of :class:`CistopicObject` to the input :class:`CistopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`CistopicObject` are derived from the cells it contains.
@@ -480,7 +488,7 @@ class CistopicObject:
             self.selected_model = []
             self.projections = {}
 
-    def add_LDA_model(self, model: "CistopicLDAModel"):
+    def add_LDA_model(self, model: CistopicLDAModel):
         """
         Add LDA model to a cisTopic object.
 
@@ -497,17 +505,17 @@ class CistopicObject:
 
 
 def create_cistopic_object(
-    fragment_matrix: Union[pd.DataFrame, sparse.csr_matrix],
-    cell_names: Optional[List[str]] = None,
-    region_names: Optional[List[str]] = None,
-    path_to_blacklist: Optional[str] = None,
-    min_frag: Optional[int] = 1,
-    min_cell: Optional[int] = 1,
-    is_acc: Optional[int] = 1,
-    path_to_fragments: Optional[Union[str, Dict[str, str]]] = {},
-    project: Optional[str] = "cisTopic",
-    tag_cells: Optional[bool] = True,
-    split_pattern: Optional[str] = "___",
+    fragment_matrix: pd.DataFrame | sparse.csr_matrix,
+    cell_names: list[str] | None = None,
+    region_names: list[str] | None = None,
+    path_to_blacklist: str | None = None,
+    min_frag: int = 1,
+    min_cell: int = 1,
+    is_acc: int = 1,
+    path_to_fragments: str | dict[str, str] | None = None,
+    project: str = "cisTopic",
+    tag_cells: bool = True,
+    split_pattern: str = "___",
 ):
     """
     Creates a CistopicObject from a count matrix.
@@ -629,6 +637,9 @@ def create_cistopic_object(
         region_data = region_data[selected_regions, :]
         region_names = region_data.index.to_list()
 
+    if path_to_fragments is None:
+        path_to_fragments = {}
+
     cistopic_obj = CistopicObject(
         fragment_matrix,
         binary_matrix,
@@ -645,15 +656,15 @@ def create_cistopic_object(
 
 def create_cistopic_object_from_matrix_file(
     fragment_matrix_file: str,
-    path_to_blacklist: Optional[str] = None,
-    compression: Optional[str] = None,
-    min_frag: Optional[int] = 1,
-    min_cell: Optional[int] = 1,
-    is_acc: Optional[int] = 1,
-    path_to_fragments: Optional[Dict[str, str]] = {},
-    sample_id: Optional[pd.DataFrame] = None,
-    project: Optional[str] = "cisTopic",
-    split_pattern: Optional[str] = "___",
+    path_to_blacklist: str | None = None,
+    compression: str | None = None,
+    min_frag: int = 1,
+    min_cell: int = 1,
+    is_acc: int = 1,
+    path_to_fragments: dict[str, str] | None = None,
+    sample_id: pd.DataFrame = None,
+    project: str = "cisTopic",
+    split_pattern: str = "___",
 ):
     """
     Creates a CistopicObject from a count matrix file (tsv).
@@ -729,22 +740,22 @@ def create_cistopic_object_from_matrix_file(
 def create_cistopic_object_from_fragments(
     path_to_fragments: str,
     path_to_regions: str,
-    path_to_blacklist: Optional[str] = None,
-    metrics: Optional[Union[str, pd.DataFrame]] = None,
-    valid_bc: Optional[List[str]] = None,
-    n_cpu: Optional[int] = 1,
-    min_frag: Optional[int] = 1,
-    min_cell: Optional[int] = 1,
-    is_acc: Optional[int] = 1,
-    check_for_duplicates: Optional[bool] = True,
-    project: Optional[str] = "cisTopic",
-    partition: Optional[int] = 5,
-    fragments_df: Optional[Union[pd.DataFrame, pr.PyRanges]] = None,
-    split_pattern: Optional[str] = "___",
-    use_polars: Optional[bool] = True,
+    path_to_blacklist: str | None = None,
+    metrics: str | pd.DataFrame | None = None,
+    valid_bc: list[str] | None = None,
+    n_cpu: int = 1,
+    min_frag: int = 1,
+    min_cell: int = 1,
+    is_acc: int = 1,
+    check_for_duplicates: bool = True,
+    project: str = "cisTopic",
+    partition: int = 5,
+    fragments_df: pd.DataFrame | pr.PyRanges | None = None,
+    split_pattern: str = "___",
+    use_polars: bool = True,
 ):
     """
-    Creates a CistopicObject from a fragments file and defined genomic intervals (compatible with CellRangerATAC output)
+    Creates a CistopicObject from a fragments file and defined genomic intervals (compatible with CellRangerATAC output).
 
     Parameters
     ----------
@@ -957,10 +968,10 @@ def create_cistopic_object_chunk(
 
 
 def merge(
-    cistopic_obj_list: List["CistopicObject"],
-    is_acc: Optional[int] = 1,
-    project: Optional[str] = "cisTopic_merge",
-    split_pattern: Optional[str] = "___",
+    cistopic_obj_list: list[CistopicObject],
+    is_acc: int = 1,
+    project: str = "cisTopic_merge",
+    split_pattern: str = "___",
 ):
     """
     Merge a list of :class:`CistopicObject` to the input :class:`CistopicObject`. Reference coordinates must be the same between the objects. Existent :class:`cisTopicCGSModel` and projections will be deleted. This is to ensure that models contained in a :class:`CistopicObject` are derived from the cells it contains.

@@ -10,7 +10,6 @@ import polars as pl
 import pyarrow as pa  # type: ignore[import]
 import pyarrow.csv  # type: ignore[import]
 import pyranges as pr  # type: ignore[import]
-
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.utils import normalise_filepath
 

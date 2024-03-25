@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -6,9 +8,8 @@ from collections import OrderedDict
 from itertools import chain, islice, repeat
 from multiprocessing import cpu_count
 from operator import attrgetter
-from typing import Dict, List, Mapping, Optional, Sequence, Union
+from typing import TYPE_CHECKING
 
-import loompy
 import loompy as lp
 import numpy as np
 import pandas as pd
@@ -19,20 +20,24 @@ from pyscenic.aucell import aucell
 from pyscenic.binarization import binarize
 from sklearn.feature_extraction.text import CountVectorizer
 
+if TYPE_CHECKING:
+    from pycisTopic.diff_features import CistopicImputedFeatures
+    from pycisTopic.cistopic_class import CistopicObject
+
 
 def export_gene_activity_to_loom(
-    gene_activity_matrix: Union["CistopicImputedFeatures", pd.DataFrame],
-    cistopic_obj: "CistopicObject",
+    gene_activity_matrix: CistopicImputedFeatures | pd.DataFrame,
+    cistopic_obj: CistopicObject,
     out_fname: str,
-    regulons: List[Regulon] = None,
-    selected_genes: Optional[List[str]] = None,
-    selected_cells: Optional[List[str]] = None,
-    auc_mtx: Optional[pd.DataFrame] = None,
-    auc_thresholds: Optional[pd.DataFrame] = None,
-    cluster_annotation: List[str] = None,
-    cluster_markers: Dict[str, Dict[str, pd.DataFrame]] = None,
-    tree_structure: Sequence[str] = (),
-    title: str = None,
+    regulons: list[Regulon] | None = None,
+    selected_genes: list[str] | None = None,
+    selected_cells: list[str] | None = None,
+    auc_mtx: pd.DataFrame | None = None,
+    auc_thresholds: pd.DataFrame | None = None,
+    cluster_annotation: list[str] | None = None,
+    cluster_markers: dict[str, dict[str, pd.DataFrame]] | None = None,
+    tree_structure: tuple = (),
+    title: str | None = None,
     nomenclature: str = "Unknown",
     split_pattern="___",
     num_workers: int = 1,
@@ -237,12 +242,12 @@ def export_gene_activity_to_loom(
 
 def export_minimal_loom_gene(
     ex_mtx: pd.DataFrame,
-    embeddings: Mapping[str, pd.DataFrame],
+    embeddings: dict[str, pd.DataFrame],
     out_fname: str,
-    regulons: List[Regulon] = None,
-    cell_annotations: Optional[Mapping[str, str]] = None,
-    tree_structure: Sequence[str] = (),
-    title: Optional[str] = None,
+    regulons: list[Regulon] | None = None,
+    cell_annotations: dict[str, str] | None = None,
+    tree_structure: tuple = (),
+    title: str | None = None,
     nomenclature: str = "Unknown",
     num_workers: int = cpu_count(),
     auc_mtx=None,
@@ -484,17 +489,17 @@ def export_minimal_loom_gene(
 
 
 def export_region_accessibility_to_loom(
-    accessibility_matrix: Union["CistopicImputedFeatures", pd.DataFrame],
-    cistopic_obj: "CistopicObject",
-    binarized_topic_region: Dict[str, pd.DataFrame],
-    binarized_cell_topic: Dict[str, pd.DataFrame],
+    accessibility_matrix: CistopicImputedFeatures | pd.DataFrame,
+    cistopic_obj: CistopicObject,
+    binarized_topic_region: dict[str, pd.DataFrame],
+    binarized_cell_topic: dict[str, pd.DataFrame],
     out_fname: str,
-    selected_regions: List[str] = None,
-    selected_cells: List[str] = None,
-    cluster_annotation: List[str] = None,
-    cluster_markers: Dict[str, Dict[str, pd.DataFrame]] = None,
-    tree_structure: Sequence[str] = (),
-    title: str = None,
+    selected_regions: list[str] | None = None,
+    selected_cells: list[str] | None = None,
+    cluster_annotation: list[str]  | None = None,
+    cluster_markers: dict[str, dict[str, pd.DataFrame]] | None = None,
+    tree_structure: tuple = (),
+    title: str | None = None,
     nomenclature: str = "Unknown",
     split_pattern: str = "___",
     **kwargs,
@@ -727,16 +732,16 @@ def export_region_accessibility_to_loom(
 
 def export_minimal_loom_region(
     ex_mtx: sparse.csr_matrix,
-    cell_names: List[str],
-    feature_names: List[str],
+    cell_names: list[str],
+    feature_names: list[str],
     out_fname: str,
-    regulons: pd.DataFrame = None,
-    cell_annotations: Optional[Mapping[str, str]] = None,
-    tree_structure: Sequence[str] = (),
-    title: Optional[str] = None,
+    regulons: pd.DataFrame | None = None,
+    cell_annotations: dict[str, str] | None = None,
+    tree_structure: tuple = (),
+    title: str | None = None,
     nomenclature: str = "Unknown",
     num_workers: int = cpu_count(),
-    embeddings: Mapping[str, pd.DataFrame] = {},
+    embeddings: dict[str, pd.DataFrame] = {},
     auc_mtx=None,
     auc_thresholds=None,
     compress: bool = False,
@@ -1011,7 +1016,7 @@ def add_clusterings(loom: SCopeLoom, cluster_data: pd.DataFrame):
     loom.global_attrs["MetaData"].update({"clusterings": attrs_metadata["clusterings"]})
 
 
-def add_markers(loom: SCopeLoom, markers_dict: Dict[str, Dict[str, pd.DataFrame]]):
+def add_markers(loom: SCopeLoom, markers_dict: dict[str, dict[str, pd.DataFrame]]):
     """
     A helper function to add markers to clusterings
     """

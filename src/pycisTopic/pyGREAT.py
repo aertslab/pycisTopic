@@ -1,16 +1,16 @@
+from __future__ import annotations
+
 import os
 import random
 import sys
 import tempfile
-from typing import Dict
 
 import pandas as pd
 import pyranges as pr
 import ray
 import requests
 from bs4 import BeautifulSoup
-
-from .utils import coord_to_region_names, region_names_to_coordinates
+from pycisTopic.utils import coord_to_region_names, region_names_to_coordinates
 
 # Set stderr to null when using ray.init to avoid ray printing Broken pipe million times
 _stderr = sys.stderr
@@ -18,7 +18,7 @@ null = open(os.devnull, "wb")
 
 
 def pyGREAT(
-    region_sets: Dict[str, pr.PyRanges],
+    region_sets: dict[str, pr.PyRanges],
     species: str,
     rule: str = "basalPlusExt",
     span: float = 1000.0,
@@ -28,12 +28,12 @@ def pyGREAT(
     one_distance: float = 1000.0,
     include_curated_reg_doms: int = 1,
     bg_choice: str = "wholeGenome",
-    tmp_dir: str = None,
+    tmp_dir: str | None = None,
     n_cpu: int = 1,
     **kwargs
 ):
     """
-    Running GREAT (McLean et al., 2010) on a dictionary of pyranges. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/
+    Running GREAT (McLean et al., 2010) on a dictionary of pyranges. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/.
 
     Parameters
     ----------
@@ -72,6 +72,7 @@ def pyGREAT(
     ----------
     McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of
     cis-regulatory regions. Nature biotechnology, 28(5), 495-501.
+
     """
     if n_cpu > 1:
         ray.init(num_cpus=n_cpu, **kwargs)
@@ -132,10 +133,10 @@ def pyGREAT_oneset_ray(
     one_distance: float = 1000.0,
     include_curated_reg_doms: int = 1,
     bg_choice: str = "wholeGenome",
-    tmp_dir: str = None,
+    tmp_dir: str | None = None,
 ):
     """
-    Running GREAT (McLean et al., 2010) on a set of pyranges. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/
+    Running GREAT (McLean et al., 2010) on a set of pyranges. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/.
 
     Parameters
     ----------
@@ -170,6 +171,7 @@ def pyGREAT_oneset_ray(
     ----------
     McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of
     cis-regulatory regions. Nature biotechnology, 28(5), 495-501.
+
     """
     return pyGREAT_oneset(
         region_set,
@@ -197,10 +199,10 @@ def pyGREAT_oneset(
     one_distance: float = 1000.0,
     include_curated_reg_doms: int = 1,
     bg_choice: str = "wholeGenome",
-    tmp_dir: str = None,
+    tmp_dir: str | None = None,
 ):
     """
-    Running GREAT (McLean et al., 2010) on a pyranges object. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/
+    Running GREAT (McLean et al., 2010) on a pyranges object. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/.
 
     Parameters
     ----------
@@ -239,8 +241,8 @@ def pyGREAT_oneset(
     ----------
     McLean, C. Y., Bristor, D., Hiller, M., Clarke, S. L., Schaar, B. T., Lowe, C. B., ... & Bejerano, G. (2010). GREAT improves functional interpretation of
     cis-regulatory regions. Nature biotechnology, 28(5), 495-501.
-    """
 
+    """
     # Params
     region_set.Name = coord_to_region_names(region_set)
     random_label = hex(random.randint(0, 0xFFFFFF))[2:]
@@ -310,13 +312,13 @@ def pyGREAT_oneset(
 
 
 def get_region_signature(
-    pyGREAT_results: Dict[str, pd.DataFrame],
+    pyGREAT_results: dict[str, pd.DataFrame],
     region_set_key: str,
     ontology: str,
     term: str,
 ):
     """
-    Retriving GO region signature from GREAT results
+    Retriving GO region signature from GREAT results.
 
     Parameters
     ----------

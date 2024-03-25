@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 import random
 import sys
-from typing import Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import harmonypy as hm
 import igraph as ig
@@ -12,6 +14,7 @@ import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import sklearn
@@ -20,31 +23,32 @@ from adjustText import adjust_text
 from igraph import intersection
 from sklearn.neighbors import kneighbors_graph
 
-from .cistopic_class import *
-
+if TYPE_CHECKING:
+    from pycisTopic.cistopic_class import CistopicObject
+    from pycisTopic.diff_features import CistopicImputedFeatures
 
 def find_clusters(
-    cistopic_obj: "CistopicObject",
-    target: Optional[str] = "cell",
-    k: Optional[int] = 10,
-    res: Optional[List[float]] = [0.6],
-    seed: Optional[int] = 555,
-    scale: Optional[bool] = False,
-    prefix: Optional[str] = "",
-    selected_topics: Optional[List[int]] = None,
-    selected_features: Optional[List[str]] = None,
-    harmony: Optional[bool] = False,
-    rna_components: Optional[pd.DataFrame] = None,
-    use_umap_integration: Optional[bool] = False,
-    rna_weight: Optional[float] = 0.5,
-    split_pattern: Optional[str] = "___",
+    cistopic_obj: CistopicObject,
+    target: str = "cell",
+    k: int = 10,
+    res: list[float] = [0.6],
+    seed: int = 555,
+    scale: bool = False,
+    prefix: str = "",
+    selected_topics: list[int] | None = None,
+    selected_features: list[str] | None = None,
+    harmony: bool = False,
+    rna_components: pd.DataFrame | None = None,
+    use_umap_integration: bool = False,
+    rna_weight: float = 0.5,
+    split_pattern: str = "___",
     **kwargs,
 ):
     """
     Performing leiden cell or region clustering and add results to cisTopic object's metadata.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
     target: str, optional
@@ -73,8 +77,8 @@ def find_clusters(
             Whether to use a weighted UMAP representation for the clustering or directly integrating the two graphs. Default: True
     rna_weight: float, optional
             Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
-    """
 
+    """
     # Create cisTopic logger
     level = logging.INFO
     log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
@@ -156,23 +160,23 @@ def find_clusters(
 
 
 def run_umap(
-    cistopic_obj: "CistopicObject",
-    target: Optional[str] = "cell",
-    scale: Optional[bool] = False,
-    reduction_name: Optional[str] = "UMAP",
-    random_state: Optional[int] = 555,
-    selected_topics: Optional[List[int]] = None,
-    selected_features: Optional[List[str]] = None,
-    harmony: Optional[bool] = False,
-    rna_components: Optional[pd.DataFrame] = None,
-    rna_weight: Optional[float] = 0.5,
-    **kwargs,
+    cistopic_obj: CistopicObject,
+    target: str = "cell",
+    scale: bool = False,
+    reduction_name: str = "UMAP",
+    random_state: int = 555,
+    selected_topics: list[int] | None = None,
+    selected_features: list[str] | None = None,
+    harmony: bool = False,
+    rna_components: pd.DataFrame | None = None,
+    rna_weight: float = 0.5,
+    **kwargs
 ):
     """
     Run UMAP and add it to the dimensionality reduction dictionary.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
     target: str, optional
@@ -197,8 +201,8 @@ def run_umap(
             Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
     **kwargs
             Parameters to pass to umap.UMAP.
-    """
 
+    """
     # Create cisTopic logger
     level = logging.INFO
     log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
@@ -252,24 +256,24 @@ def run_umap(
 
 
 def run_tsne(
-    cistopic_obj: "CistopicObject",
-    target: Optional[str] = "cell",
-    scale: Optional[bool] = False,
-    reduction_name: Optional[str] = "tSNE",
-    random_state: Optional[int] = 555,
-    perplexity: Optional[int] = 30,
-    selected_topics: Optional[List[int]] = None,
-    selected_features: Optional[List[str]] = None,
-    harmony: Optional[bool] = False,
-    rna_components: Optional[pd.DataFrame] = None,
-    rna_weight: Optional[float] = 0.5,
-    **kwargs,
+    cistopic_obj: CistopicObject,
+    target: str = "cell",
+    scale: bool = False,
+    reduction_name: str = "tSNE",
+    random_state: int = 555,
+    perplexity: int = 30,
+    selected_topics: list[int] | None = None,
+    selected_features: list[str] | None = None,
+    harmony: bool = False,
+    rna_components: pd.DataFrame | None = None,
+    rna_weight: float = 0.5,
+    **kwargs
 ):
     """
     Run tSNE and add it to the dimensionality reduction dictionary. If FItSNE is installed it will be used, otherwise sklearn TSNE implementation will be used.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
     target: str, optional
@@ -367,29 +371,29 @@ def run_tsne(
 
 
 def plot_metadata(
-    cistopic_obj: "CistopicObject",
+    cistopic_obj: CistopicObject,
     reduction_name: str,
-    variables: List[str],
-    target: Optional[str] = "cell",
-    remove_nan: Optional[bool] = True,
-    show_label: Optional[bool] = True,
-    show_legend: Optional[bool] = False,
-    cmap: Optional[Union[str, "matplotlib.cm"]] = cm.viridis,
-    dot_size: Optional[int] = 10,
-    text_size: Optional[int] = 10,
-    alpha: Optional[Union[float, int]] = 1,
-    seed: Optional[int] = 555,
-    color_dictionary: Optional[Dict[str, str]] = {},
-    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-    num_columns: Optional[int] = 1,
-    selected_features: Optional[List[str]] = None,
-    save: Optional[str] = None,
+    variables: str,
+    target: str = "cell",
+    remove_nan: bool = True,
+    show_label: bool = True,
+    show_legend: bool = False,
+    cmap: str | matplotlib.cm = cm.viridis,
+    dot_size: int = 10,
+    text_size: int = 10,
+    alpha: float = 1.0,
+    seed: int = 555,
+    color_dictionary: dict[str, str] | None = None,
+    figsize: tuple[float, float] = (6.4, 4.8),
+    num_columns: int = 1,
+    selected_features: list[str] | None = None,
+    save: str | None = None,
 ):
     """
     Plot categorical and continuous metadata into dimensionality reduction.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with dimensionality reductions in `class::CistopicObject.projections`.
     reduction_name: str
@@ -428,6 +432,7 @@ def plot_metadata(
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
     save: str, optional
             Path to save plot. Default: None.
+
     """
     if target == "cell":
         data_mat = cistopic_obj.cell_data
@@ -474,6 +479,8 @@ def plot_metadata(
                     sort=False,
                 )
 
+            if color_dictionary is None:
+                color_dictionary = {}
             categories = set(var_data)
             try:
                 color_dict = color_dictionary[var]
@@ -591,25 +598,25 @@ def plot_metadata(
 
 
 def plot_topic(
-    cistopic_obj: "CistopicObject",
+    cistopic_obj: CistopicObject,
     reduction_name: str,
-    target: Optional[str] = "cell",
-    cmap: Optional[Union[str, "matplotlib.cm"]] = cm.viridis,
-    dot_size: Optional[int] = 10,
-    alpha: Optional[Union[float, int]] = 1,
-    scale: Optional[bool] = False,
-    selected_topics: Optional[List[int]] = None,
-    selected_features: Optional[List[str]] = None,
-    harmony: Optional[bool] = False,
-    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-    num_columns: Optional[int] = 1,
-    save: Optional[str] = None,
+    target: str = "cell",
+    cmap: str | matplotlib.cm = cm.viridis,
+    dot_size: int = 10,
+    alpha: float = 1.0,
+    scale: bool = False,
+    selected_topics: list[int] | None = None,
+    selected_features: str | None = None,
+    harmony: bool = False,
+    figsize: tuple[float, float] = (6.4, 4.8),
+    num_columns: int = 1,
+    save: str | None = None,
 ):
     """
     Plot topic distributions into dimensionality reduction.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with dimensionality reductions in `class::CistopicObject.projections`.
     reduction_name: str
@@ -638,8 +645,8 @@ def plot_topic(
             For multiplot figures, indicates the number of columns (the number of rows will be automatically determined based on the number of plots). Default: 1
     save: str, optional
             Path to save plot. Default: None.
-    """
 
+    """
     embedding = cistopic_obj.projections[target][reduction_name]
     model = cistopic_obj.selected_model
 
@@ -742,24 +749,24 @@ def plot_topic(
 
 
 def plot_imputed_features(
-    cistopic_obj: "CistopicObject",
+    cistopic_obj: CistopicObject,
     reduction_name: str,
-    imputed_data: "cisTopicImputedFeatures",
-    features: List[str],
-    scale: Optional[bool] = False,
-    cmap: Optional[Union[str, "matplotlib.cm"]] = cm.viridis,
-    dot_size: Optional[int] = 10,
-    alpha: Optional[Union[float, int]] = 1,
-    selected_cells: Optional[List[str]] = None,
-    figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-    num_columns: Optional[int] = 1,
-    save: Optional[str] = None,
+    imputed_data: CistopicImputedFeatures,
+    features: str,
+    scale: bool = False,
+    cmap: str | matplotlib.cm = cm.viridis,
+    dot_size: int = 10,
+    alpha: float = 1.0,
+    selected_cells: list[str] | None = None,
+    figsize: tuple[float, float] = (6.4, 4.8),
+    num_columns: int = 1,
+    save: str | None = None,
 ):
     """
     Plot imputed features into dimensionality reduction.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with dimensionality reductions in `class::CistopicObject.dr`.
     reduction_name: str
@@ -785,6 +792,7 @@ def plot_imputed_features(
             For multiplot figures, indicates the number of columns (the number of rows will be automatically determined based on the number of plots). Default: 1
     save: str, optional
             Path to save plot. Default: None.
+
     """
     pdf = None
     if (save is not None) & (num_columns == 1):
@@ -859,25 +867,27 @@ def plot_imputed_features(
         pdf = pdf.close()
 
 
-def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
-                       variables: Optional[List[str]] = None,
-                       remove_nan: Optional[bool] = True,
-                       scale: Optional[bool] = False,
-                       cluster_topics: Optional[bool] = False,
-                       color_dict: Optional[Dict[str, Dict[str, str]]] = {},
-                       seed: Optional[int] = 555,
-                       legend_loc_x: Optional[float] = 1.2,
-                       legend_loc_y: Optional[float] = -0.5,
-                       legend_dist_y: Optional[float] = -1,
-                       figsize: Optional[Tuple[float, float]] = (6.4, 4.8),
-                       selected_topics: Optional[List[int]] = None,
-                       selected_cells: Optional[List[str]] = None,
-                       harmony: Optional[bool] = False,
-                       save: Optional[str] = None):
+def cell_topic_heatmap(
+    cistopic_obj: CistopicObject,
+    variables: list[str] | None = None,
+    remove_nan: bool = True,
+    scale: bool = False,
+    cluster_topics: bool = False,
+    color_dict: dict[str, dict[str, str]] | None = None,
+    seed: int = 555,
+    legend_loc_x: float = 1.2,
+    legend_loc_y: float = -0.5,
+    legend_dist_y: float = -1,
+    figsize: tuple[float, float] = (6.4, 4.8),
+    selected_topics: list[int] | None = None,
+    selected_cells: list[str] | None = None,
+    harmony: bool = False,
+    save: str | None = None):
     """
     Plot heatmap with cell-topic distributions.
+
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
     variables: list
@@ -912,6 +922,7 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
             If target is 'cell', whether to use harmony processed topic contributions. Default: False
     save: str, optional
             Path to save plot. Default: None.
+
     """
     model = cistopic_obj.selected_model
     if harmony:
@@ -1004,17 +1015,17 @@ def cell_topic_heatmap(cistopic_obj: 'CistopicObject',
 
 
 def harmony(
-    cistopic_obj: "CistopicObject",
-    vars_use: List[str],
-    scale: Optional[bool] = True,
-    random_state: Optional[int] = 555,
+    cistopic_obj: CistopicObject,
+    vars_use: list[str],
+    scale: bool = True,
+    random_state: int = 555,
     **kwargs,
 ):
     """
-    Apply harmony batch effect correction (Korsunsky et al, 2019) over cell-topic distribution
+    Apply harmony batch effect correction (Korsunsky et al, 2019) over cell-topic distribution.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
     vars_use: list
@@ -1025,11 +1036,11 @@ def harmony(
             Random seed used to use with harmony. Default: 555
 
     References
-    ---------
+    ----------
     Korsunsky, I., Millard, N., Fan, J., Slowikowski, K., Zhang, F., Wei, K., ... & Raychaudhuri, S. (2019). Fast, sensitive and accurate integration of
     single-cell data with Harmony. Nature methods, 16(12), 1289-1296.
-    """
 
+    """
     cell_data = cistopic_obj.cell_data
     model = cistopic_obj.selected_model
     cell_topic = model.cell_topic
@@ -1069,7 +1080,7 @@ def input_check(atac_topics: pd.DataFrame, rna_pca: pd.DataFrame):
 def weighted_integration(
     atac_topics: pd.DataFrame,
     rna_pca: pd.DataFrame,
-    common_cells: List[str],
+    common_cells: list[str],
     weight=0.5,
     **kwargs,
 ):

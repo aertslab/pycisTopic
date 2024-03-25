@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 from itertools import compress
-from typing import Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import matplotlib.cm as cm
-import matplotlib.colors as mcolors
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,17 +11,21 @@ import pandas as pd
 from adjustText import adjust_text
 from statsmodels.stats import proportion
 
+if TYPE_CHECKING:
+    from pycisTopic.cistopic_class import CistopicObject
+
+# FIXME
 from .cistopic_class import *
 
 
 def compute_topic_metrics(
-    cistopic_obj: "CistopicObject", return_metrics: Optional[bool] = True
+    cistopic_obj: CistopicObject, return_metrics: bool = True
 ):
     """
     Compute topic quality control metrics.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
     return_metrics: bool, optional
@@ -73,27 +78,27 @@ def compute_topic_metrics(
 
 
 def plot_topic_qc(
-    topic_qc_metrics: Union[pd.DataFrame, "CistopicObject"],
+    topic_qc_metrics: pd.DataFrame | CistopicObject,
     var_x: str,
     var_y: str,
-    min_x: Optional[int] = None,
-    max_x: Optional[int] = None,
-    min_y: Optional[int] = None,
-    max_y: Optional[int] = None,
-    var_color: Optional[str] = None,
-    cmap: Optional[str] = "viridis",
-    dot_size: Optional[int] = 10,
-    text_size: Optional[int] = 10,
-    plot: Optional[bool] = False,
-    save: Optional[str] = None,
-    return_topics: Optional[bool] = False,
-    return_fig: Optional[bool] = False,
+    min_x: int | None = None,
+    max_x: int | None = None,
+    min_y: int | None = None,
+    max_y: int | None = None,
+    var_color: str | None = None,
+    cmap: str = "viridis",
+    dot_size: int = 10,
+    text_size: int = 10,
+    plot: bool = False,
+    save: str | None = None,
+    return_topics: bool = False,
+    return_fig: bool = False,
 ):
     """
     Plotting topic qc metrics and filtering.
 
     Parameters
-    ---------
+    ----------
     topic_qc_metrics: `class::pd.DataFrame` or `class::CistopicObject`
             A topic metrics dataframe or a cisTopic object with `class::CistopicObject.selected_model.topic_qc_metrics` filled.
     var_x: str
@@ -126,11 +131,11 @@ def plot_topic_qc(
             Whether to return the plot figure; if several samples it will return a dictionary with the figures per sample. Default: False.
 
     Return
-    ---
+    ------
     list
             A list with the selected topics.
-    """
 
+    """
     if not isinstance(topic_qc_metrics, pd.DataFrame):
         try:
             topic_qc_metrics = cistopic_obj.selected_model.topic_qc_metrics
@@ -226,17 +231,17 @@ def plot_topic_qc(
 
 
 def topic_annotation(
-    cistopic_obj: "CistopicObject",
+    cistopic_obj: CistopicObject,
     annot_var: str,
-    binarized_cell_topic: Optional[Dict[str, pd.DataFrame]] = None,
-    general_topic_thr: Optional[float] = 0.2,
+    binarized_cell_topic: dict[str, pd.DataFrame] | None = None,
+    general_topic_thr: float = 0.2,
     **kwargs
 ):
     """
     Automatic annotation of topics.
 
     Parameters
-    ---------
+    ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
     annot_var: str
@@ -256,6 +261,7 @@ def topic_annotation(
     pd.DataFrame
             Data frame containing a column with the annotations (separated by ,), the ratio of cells in the binarized topic and the ratio of
             cells assigned to a topic based on the annotated groups.
+
     """
     model = cistopic_obj.selected_model
     cell_topic = model.cell_topic

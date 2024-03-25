@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import logging
 import sys
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
 import pyranges as pr
 import scipy.sparse as sparse
+from pycisTopic.diff_features import CistopicImputedFeatures
 
+# FIXME
 from .diff_features import *
 from .utils import *
 
@@ -14,32 +17,32 @@ pd.options.mode.chained_assignment = None
 
 
 def get_gene_activity(
-    imputed_acc_object: "CistopicImputedFeatures",
+    imputed_acc_object: CistopicImputedFeatures,
     pr_annot: pr.PyRanges,
     chromsizes: pr.PyRanges,
-    predefined_boundaries: Optional[pr.PyRanges] = None,
-    use_gene_boundaries: Optional[bool] = True,
-    upstream: Optional[List[int]] = [1000, 100000],
-    downstream: Optional[List[int]] = [1000, 100000],
-    distance_weight: Optional[bool] = True,
-    decay_rate: Optional[float] = 1,
-    extend_gene_body_upstream: Optional[int] = 5000,
-    extend_gene_body_downstream: Optional[int] = 0,
-    gene_size_weight: Optional[bool] = False,
-    gene_size_scale_factor: Optional[Union[str, int]] = "median",
-    remove_promoters: Optional[bool] = False,
-    scale_factor: Optional[float] = 1,
-    average_scores: Optional[bool] = True,
-    extend_tss: Optional[List[int]] = [10, 10],
-    return_weights: Optional[bool] = True,
-    gini_weight: Optional[bool] = True,
-    project: Optional[str] = "Gene_activity",
+    predefined_boundaries: pr.PyRanges | None = None,
+    use_gene_boundaries: bool = True,
+    upstream: list[int] = [1000, 100000],
+    downstream: list[int] = [1000, 100000],
+    distance_weight: bool = True,
+    decay_rate: float = 1.0,
+    extend_gene_body_upstream: int = 5000,
+    extend_gene_body_downstream: int = 0,
+    gene_size_weight: bool = False,
+    gene_size_scale_factor: str | int = "median",
+    remove_promoters: bool = False,
+    scale_factor: float = 1,
+    average_scores: bool = True,
+    extend_tss: list[int] = [10, 10],
+    return_weights: bool = True,
+    gini_weight: bool = True,
+    project: str = "Gene_activity",
 ):
     """
     Infer gene activity.
 
     Parameters
-    ---------
+    ----------
     imputed_features_obj: :class:`CistopicImputedFeatures`
         A cisTopic imputation data object.
     pr_annot: pr.PyRanges
@@ -90,6 +93,7 @@ def get_gene_activity(
     Return
     ------
     CistopicImputedFeatures
+
     """
     # Create cisTopic logger
     level = logging.INFO
@@ -211,7 +215,7 @@ def region_weights(
     Calculate region weights.
 
     Parameters
-    ---------
+    ----------
     imputed_features_obj: :class:`CistopicImputedFeatures`
         A cisTopic imputation data object.
     pr_annot: pr.PyRanges
@@ -255,6 +259,7 @@ def region_weights(
     ------
     pd.DataFrame
         A data frame for with weights for each region and the gene they are linked to.
+
     """
     # Create cisTopic logger
     level = logging.INFO
