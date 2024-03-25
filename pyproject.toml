@@ -31,34 +31,34 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
-    "numpy >= 1.20.3",
-    "pandas == 1.5",
-    "polars >= 0.18.3",
-    "pyarrow >= 8.0.0",
-    "pyranges < 0.0.128",
-    "ray",
-    "scatac_fragment_tools",
-    "scikit-learn",
-    "lda",
-    "matplotlib < 3.7",
-    "tmtoolkit",
-    "gensim",
-    "macs2",
-    "pybiomart",
-    "pyscenic",
-    "scrublet",
-    "harmonypy",
-    "igraph",
-    "leidenalg",
-    "seaborn",
-    "adjustText",
-    "statsmodels",
-    "scanpy",
-    "scanorama",
-    "bbknn",
-    "loomxpy",
-    "bs4",
-    "lxml"
+  "numpy >= 1.20.3",
+  "pandas == 1.5",
+  "polars >= 0.18.3",
+  "pyarrow >= 8.0.0",
+  "pyranges < 0.0.128",
+  "ray",
+  "scatac_fragment_tools",
+  "scikit-learn",
+  "lda",
+  "matplotlib < 3.7",
+  "tmtoolkit",
+  "gensim",
+  "macs2",
+  "pybiomart",
+  "pyscenic",
+  "scrublet",
+  "harmonypy",
+  "igraph",
+  "leidenalg",
+  "seaborn",
+  "adjustText",
+  "statsmodels",
+  "scanpy",
+  "scanorama",
+  "bbknn",
+  "loomxpy",
+  "bs4",
+  "lxml"
 ]
 
 [project.optional-dependencies]
@@ -73,6 +73,10 @@ docs = [
 	"sphinx_design",
 	"sphinx_favicon",
 	"pandoc"
+]
+development = [
+  "mypy",
+  "ruff"
 ]
 
 [project.urls]
