@@ -4,6 +4,7 @@ import logging
 import sys
 from typing import TYPE_CHECKING, Self
 
+import joblib
 import matplotlib
 import matplotlib.pyplot as plt
 import numba
@@ -710,12 +711,12 @@ def find_diff_features(
     imputed_features_obj: CistopicImputedFeatures,
     variable: str,
     var_features: str | None = None,
-    contrasts: list[list[str]] = None,
+    contrasts: list[list[str]] | None = None,
     adjpval_thr: float = 0.05,
     log2fc_thr: float = np.log2(1.5),
     split_pattern: str = "___",
     n_cpu: int = 1,
-    **kwargs
+    _temp_dir: str = "/tmp"
 ):
     """
     Find differential imputed features.
@@ -742,8 +743,8 @@ def find_diff_features(
         Pattern to split cell barcode from sample id. Default: `___`
     n_cpu: int, optional
         Number of cores to use. Default: 1
-    **kwargs
-        Parameters to pass to ray.init()
+    _temp_dir: str
+        Temporary directory to store intermediate files. Default: `/tmp`
 
     Return
     ------
@@ -791,34 +792,17 @@ def find_diff_features(
     )
 
     # Compute p-val and log2FC.
-    if n_cpu > 1:
-        ray.init(num_cpus=n_cpu, **kwargs)
-
-        markers_list = [
-            markers(
-                subset_imputed_features_obj,
-                barcode_groups[i],
-                contrasts_names[i],
-                adjpval_thr=adjpval_thr,
-                log2fc_thr=log2fc_thr,
-                n_cpu=n_cpu,
-            )
-            for i in range(len(contrasts))
-        ]
-
-        ray.shutdown()
-    else:
-        markers_list = [
-            markers(
-                subset_imputed_features_obj,
-                barcode_groups[i],
-                contrasts_names[i],
-                adjpval_thr=adjpval_thr,
-                log2fc_thr=log2fc_thr,
-                n_cpu=1,
-            )
-            for i in range(len(contrasts))
-        ]
+    markers_list = joblib.Parallel(n_jobs = n_cpu, temp_folder = _temp_dir)(
+        joblib.delayed(markers)(
+            input_mat = subset_imputed_features_obj,
+            barcode_group = barcode_groups[i],
+            contrast_name = contrasts_names[i],
+            adjpval_thr = adjpval_thr,
+            log2fc_thr = log2fc_thr,
+            n_cpu = 1
+        )
+        for i in range(len(contrasts))
+    )
 
     markers_dict = {
         contrasts_name: marker
