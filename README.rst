@@ -11,36 +11,13 @@ Installation
 
 To install pycisTopic::
 
-	git clone https://github.com/aertslab/pycisTopic.git
-	cd pycisTopic
-	pip install . 
-	
-Depending on your pip version, you may need to run this pip command instead::
 
-	pip install -e .
-
-
-Creating a Docker/Singularity Image
------------------------------------
-
-To build a Docker image, then create a Singularity image from this::
-
-	# Clone repositories (pycisTopic and pycistarget)
-	git clone https://github.com/aertslab/pycisTopic.git
-	git clone https://github.com/aertslab/pycistarget.git
-
-	# Build image
-	podman build -t aertslab/pycistopic:latest . -f pycisTopic/Dockerfile
-
-	# Export to oci 
-	podman save --format oci-archive --output pycistopic_img.tar localhost/aertslab/pycistopic
-
-	# Build to singularity
-	singularity build pycistopic.sif oci-archive://pycistopic_img.tar
-
-	# Add all binding paths where you would need to access
-	singularity exec -B /lustre1,/staging,/data,/vsc-hard-mounts,/scratch pycistopic.sif ipython3
-
+	conda create --name scenicplus python=3.11 -y
+	conda activate scenicplus
+	git clone https://github.com/aertslab/scenicplus.git
+	cd scenicplus
+	git checkout development
+	pip install .
 
 Check version
 **********************
