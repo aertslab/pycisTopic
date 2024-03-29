@@ -267,6 +267,7 @@ def topic_annotation(
     cell_topic = model.cell_topic
     annot = cistopic_obj.cell_data[annot_var]
     if binarized_cell_topic is None:
+        from pycisTopic.topic_binarization import binarize_topics
         binarized_cell_topic = binarize_topics(cistopic_obj, target="cell", **kwargs)
 
     topic_annot_dict = {topic: [] for topic in cell_topic.index.tolist()}

@@ -21,6 +21,8 @@ import sklearn
 import umap
 from adjustText import adjust_text
 from igraph import intersection
+from pycisTopic.utils import subset_list
+from scipy import sparse
 from sklearn.neighbors import kneighbors_graph
 
 if TYPE_CHECKING:
