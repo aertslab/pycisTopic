@@ -598,7 +598,7 @@ def get_fragments_per_cb(
 
     Returns
     -------
-    Polars DataFrame with number of fragments and duplication ratio per cell barcode.
+    Polars DataFrame with number of fragments, duplication ratio and nucleosome signal per cell barcode.
 
     See Also
     --------
@@ -629,11 +629,19 @@ def get_fragments_per_cb(
     fragments_stats_per_cb_df_pl = (
         fragments_df_pl.lazy()
         .rename({"Name": "CB"})
+        .with_columns(
+                (pl.col("End") - pl.col("Start")).alias("fragment_length")
+        )
+        .with_columns(
+            pl.col("fragment_length").lt(147).alias("nucleosome_free"),
+            pl.col("fragment_length").is_between(147, 294).alias("mononucleosome"),
+        )
         .group_by(by="CB", maintain_order=True)
         .agg(
             [
                 pl.col("Score").sum().alias("total_fragments_count"),
                 pl.len().alias("unique_fragments_count"),
+                (pl.col("mononucleosome").sum() / pl.col("nucleosome_free").sum()).alias("nucleosome_signal")
             ]
         )
         .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
@@ -648,6 +656,9 @@ def get_fragments_per_cb(
             (pl.col("duplication_count") / pl.col("total_fragments_count")).alias(
                 "duplication_ratio"
             )
+        ).select(
+            pl.selectors.all() - pl.selectors.by_name("nucleosome_signal"),
+            pl.selectors.by_name("nucleosome_signal")
         )
         .collect()
     )

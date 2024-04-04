@@ -528,6 +528,7 @@ def compute_qc_stats(
             pl.col("fraction_of_fragments_in_peaks"),
             pl.col("duplication_count"),
             pl.col("duplication_ratio"),
+            pl.col("nucleosome_signal"),
         )
     )
 
