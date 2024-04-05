@@ -94,11 +94,7 @@ def find_clusters(
     model = cistopic_obj.selected_model
 
     if target == "cell":
-        if harmony:
-            data_mat = model.cell_topic_harmony
-        else:
-            data_mat = model.cell_topic
-
+        data_mat = model.cell_topic_harmony if harmony else model.cell_topic
         data_names = cistopic_obj.cell_names
 
     if target == "region":
@@ -121,19 +117,19 @@ def find_clusters(
 
     if rna_components is not None:
         atac_topics, rna_components, data_names = input_check(data_mat, rna_components)
-    if use_umap_integration == True:
+    if use_umap_integration:
         intersect, data_mat = weighted_integration(
             atac_topics, rna_components, data_names, rna_weight
         )
 
-    if rna_components is None or use_umap_integration == True:
+    if rna_components is None or use_umap_integration:
         A = kneighbors_graph(data_mat, k)
         sources, targets = A.nonzero()
         G = ig.Graph(directed=True)
         G.add_vertices(A.shape[0])
         edges = list(zip(sources, targets))
         G.add_edges(edges)
-    elif rna_components is not None and use_umap_integration == False:
+    elif rna_components is not None and not use_umap_integration:
         A = kneighbors_graph(atac_topics, k)
         sources, targets = A.nonzero()
         G1 = ig.Graph(directed=False)
@@ -217,11 +213,7 @@ def run_umap(
     model = cistopic_obj.selected_model
 
     if target == "cell":
-        if harmony:
-            data_mat = model.cell_topic_harmony
-        else:
-            data_mat = model.cell_topic
-
+        data_mat = model.cell_topic_harmony if harmony else model.cell_topic
         data_names = cistopic_obj.cell_names
 
     if target == "region":
@@ -319,11 +311,7 @@ def run_tsne(
     model = cistopic_obj.selected_model
 
     if target == "cell":
-        if harmony:
-            data_mat = model.cell_topic_harmony
-        else:
-            data_mat = model.cell_topic
-
+        data_mat = model.cell_topic_harmony if harmony else model.cell_topic
         data_names = cistopic_obj.cell_names
 
     if target == "region":
@@ -451,7 +439,7 @@ def plot_metadata(
 
     data_mat = data_mat.loc[embedding.index.to_list()]
     pdf = None
-    if (save is not None) & (num_columns == 1):
+    if (save is not None) and (num_columns == 1):
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 
     if num_columns > 1:
@@ -465,7 +453,7 @@ def plot_metadata(
     for var in variables:
         var_data = data_mat.copy().loc[:, var].dropna().to_list()
         if isinstance(var_data[0], str):
-            if (remove_nan) & (data_mat[var].isnull().sum() > 0):
+            if remove_nan and (data_mat[var].isnull().sum() > 0):
                 var_data = data_mat.copy().loc[:, var].dropna().to_list()
                 emb_nan = embedding.loc[
                     data_mat.copy().loc[:, var].dropna().index.tolist()
@@ -502,7 +490,7 @@ def plot_metadata(
                 plt.subplot(num_rows, num_columns, i)
                 i = i + 1
 
-            if (remove_nan) & (data_mat[var].isnull().sum() > 0):
+            if remove_nan and (data_mat[var].isnull().sum() > 0):
                 plt.scatter(
                     emb_nan.iloc[:, 0],
                     emb_nan.iloc[:, 1],
@@ -597,7 +585,7 @@ def plot_metadata(
         if save is not None:
             fig.savefig(save, bbox_inches="tight")
         plt.show()
-    if (save is not None) & (num_columns == 1):
+    if (save is not None) and (num_columns == 1):
         pdf = pdf.close()
 
 
@@ -685,7 +673,7 @@ def plot_topic(
     else:
         topic = ["Topic" + str(t) for t in selected_topics]
 
-    if (save is not None) & (num_columns == 1):
+    if (save is not None) and (num_columns == 1):
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 
     if num_columns > 1:
@@ -746,7 +734,7 @@ def plot_topic(
             fig.savefig(save, bbox_inches="tight")
         plt.show()
 
-    if (save is not None) & (num_columns == 1):
+    if (save is not None) and (num_columns == 1):
         pdf.close()
 
 
@@ -797,7 +785,7 @@ def plot_imputed_features(
 
     """
     pdf = None
-    if (save is not None) & (num_columns == 1):
+    if (save is not None) and (num_columns == 1):
         pdf = matplotlib.backends.backend_pdf.PdfPages(save)
 
     if num_columns > 1:
@@ -865,7 +853,7 @@ def plot_imputed_features(
             fig.savefig(save, bbox_inches="tight")
         plt.show()
 
-    if (save is not None) & (num_columns == 1):
+    if (save is not None) and (num_columns == 1):
         pdf = pdf.close()
 
 
@@ -926,10 +914,7 @@ def cell_topic_heatmap(
 
     """
     model = cistopic_obj.selected_model
-    if harmony:
-        cell_topic = model.cell_topic_harmony
-    else:
-        cell_topic = model.cell_topic
+    cell_topic = model.cell_topic_harmony if harmony else model.cell_topic
     cell_data = cistopic_obj.cell_data
 
     if selected_topics is not None:
@@ -945,7 +930,7 @@ def cell_topic_heatmap(
             columns=cell_topic.columns,
         )
 
-    if (remove_nan) & (sum(cell_data[variables].isnull().sum()) > 0):
+    if remove_nan and (sum(cell_data[variables].isnull().sum()) > 0):
         cell_data = cell_data[variables].dropna()
         cell_topic = cell_topic.loc[:, cell_data.index.tolist()]
 
