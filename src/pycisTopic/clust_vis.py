@@ -474,16 +474,15 @@ def plot_metadata(
             if color_dictionary is None:
                 color_dictionary = {}
             categories = set(var_data)
-            try:
+
+            if var in color_dictionary:
                 color_dict = color_dictionary[var]
-            except BaseException:
+            else:
                 random.seed(seed)
-                color = list(
-                    map(
-                        lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),
-                        range(len(categories)),
-                    )
-                )
+                color = [
+                    mcolors.to_rgb("#" + "%06x" % random.randint(0, 0xFFFFFF))
+                    for i in range(len(categories))
+                ]
                 color_dict = dict(zip(categories, color))
 
             if num_columns > 1:
@@ -948,21 +947,19 @@ def cell_topic_heatmap(
         for var in variables:
             var_data = cell_data.loc[:, var].sort_values()
             categories = set(var_data)
-            try:
-                color_dict = color_dictionary[var]
-            except BaseException:
+
+            if var not in color_dictionary:
                 random.seed(seed)
-                color = list(
-                    map(
-                        lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),
-                        range(len(categories)),
-                    )
-                )
-                color = [mcolors.to_rgb(x) for x in color]
-                color_dict[var] = dict(zip(categories, color))
-            col_colors[var] = var_data.map(color_dict[var])
-        col_colors = pd.concat([col_colors[var]
-                                for var in variables], axis=1, sort=False)
+                color = [
+                    mcolors.to_rgb("#" + "%06x" % random.randint(0, 0xFFFFFF))
+                    for i in range(len(categories))
+                ]
+                color_dict = dict(zip(categories, color))
+                color_dictionary[var] = color_dict
+            col_colors[var] = var_data.map(color_dictionary[var])
+        col_colors = pd.concat(
+            [col_colors[var] for var in variables], axis=1, sort=False
+        )
 
         g = sns.clustermap(
             cell_topic,
@@ -980,11 +977,12 @@ def cell_topic_heatmap(
         g.ax_row_dendrogram.set_visible(False)
 
         pos = legend_loc_y
-        for key in color_dict:
+        for key in color_dictionary:
             patchList = []
-            for subkey in color_dict[key]:
+            for subkey in color_dictionary[key]:
                 data_key = mpatches.Patch(
-                    color=color_dict[key][subkey], label=subkey)
+                    color=color_dictionary[key][subkey], label=subkey
+                )
                 patchList.append(data_key)
             legend = plt.legend(
                 handles=patchList,
