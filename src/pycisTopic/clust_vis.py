@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from pycisTopic.cistopic_class import CistopicObject
     from pycisTopic.diff_features import CistopicImputedFeatures
 
+
 def find_clusters(
     cistopic_obj: CistopicObject,
     target: str = "cell",
@@ -88,7 +89,7 @@ def find_clusters(
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger("cisTopic")
 
-    log.info(f"Finding neighbours")
+    log.info("Finding neighbours")
     model = cistopic_obj.selected_model
 
     if target == "cell":
@@ -145,7 +146,7 @@ def find_clusters(
         edges = list(zip(sources, targets))
         G2.add_edges(edges)
         G = intersection([G1, G2], keep_all_vertices=False)
-        log.info(f"Finding clusters")
+        log.info("Finding clusters")
     for C in res:
         partition = la.find_partition(
             G, la.RBConfigurationVertexPartition, resolution_parameter=C, seed=seed
@@ -172,7 +173,7 @@ def run_umap(
     harmony: bool = False,
     rna_components: pd.DataFrame | None = None,
     rna_weight: float = 0.5,
-    **kwargs
+    **kwargs,
 ):
     """
     Run UMAP and add it to the dimensionality reduction dictionary.
@@ -241,7 +242,7 @@ def run_umap(
 
     data_mat = data_mat.T
 
-    log.info(f"Running UMAP")
+    log.info("Running UMAP")
     if rna_components is None:
         reducer = umap.UMAP(random_state=random_state, **kwargs)
         embedding = reducer.fit_transform(data_mat)
@@ -269,7 +270,7 @@ def run_tsne(
     harmony: bool = False,
     rna_components: pd.DataFrame | None = None,
     rna_weight: float = 0.5,
-    **kwargs
+    **kwargs,
 ):
     """
     Run tSNE and add it to the dimensionality reduction dictionary. If FItSNE is installed it will be used, otherwise sklearn TSNE implementation will be used.
@@ -352,7 +353,7 @@ def run_tsne(
     try:
         import fitsne
 
-        log.info(f"Running FItSNE")
+        log.info("Running FItSNE")
         embedding = fitsne.FItSNE(
             np.ascontiguousarray(data_mat.to_numpy()),
             rand_seed=random_state,
@@ -360,7 +361,7 @@ def run_tsne(
             **kwargs,
         )
     except BaseException:
-        log.info(f"Running TSNE")
+        log.info("Running TSNE")
         embedding = sklearn.manifold.TSNE(
             n_components=2, random_state=random_state
         ).fit_transform(data_mat.to_numpy(), **kwargs)
@@ -668,9 +669,7 @@ def plot_topic(
     data_mat = data_mat.loc[:, embedding.index.to_list()]
 
     if selected_topics is not None:
-        data_mat = data_mat.loc[
-            ["Topic" + str(x) for x in selected_topics],
-        ]
+        data_mat = data_mat.loc[["Topic" + str(x) for x in selected_topics],]
 
     if scale:
         data_mat = pd.DataFrame(
@@ -884,7 +883,8 @@ def cell_topic_heatmap(
     selected_topics: list[int] | None = None,
     selected_cells: list[str] | None = None,
     harmony: bool = False,
-    save: str | None = None):
+    save: str | None = None,
+):
     """
     Plot heatmap with cell-topic distributions.
 
@@ -934,14 +934,17 @@ def cell_topic_heatmap(
     cell_data = cistopic_obj.cell_data
 
     if selected_topics is not None:
-        cell_topic = cell_topic.loc[['Topic' + str(x) for x in selected_topics], ]
+        cell_topic = cell_topic.loc[["Topic" + str(x) for x in selected_topics],]
     if selected_cells is not None:
         cell_topic = cell_topic.loc[:, selected_cells]
         cell_data = cell_data.loc[selected_cells]
 
     if scale:
-        cell_topic = pd.DataFrame(sklearn.preprocessing.StandardScaler().fit_transform(
-            cell_topic), index=cell_topic.index.to_list(), columns=cell_topic.columns)
+        cell_topic = pd.DataFrame(
+            sklearn.preprocessing.StandardScaler().fit_transform(cell_topic),
+            index=cell_topic.index.to_list(),
+            columns=cell_topic.columns,
+        )
 
     if (remove_nan) & (sum(cell_data[variables].isnull().sum()) > 0):
         cell_data = cell_data[variables].dropna()
@@ -965,22 +968,27 @@ def cell_topic_heatmap(
                 color_dict = color_dictionary[var]
             except BaseException:
                 random.seed(seed)
-                color = list(map(
-                    lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF), range(len(categories))
-                ))
+                color = list(
+                    map(
+                        lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),
+                        range(len(categories)),
+                    )
+                )
                 color = [mcolors.to_rgb(x) for x in color]
                 color_dict[var] = dict(zip(categories, color))
             col_colors[var] = var_data.map(color_dict[var])
         col_colors = pd.concat([col_colors[var]
                                 for var in variables], axis=1, sort=False)
 
-        g = sns.clustermap(cell_topic,
-                           row_cluster=cluster_topics,
-                           col_cluster=False,
-                           col_colors=col_colors,
-                           cmap=cm.viridis,
-                           xticklabels=False,
-                           figsize=figsize)
+        g = sns.clustermap(
+            cell_topic,
+            row_cluster=cluster_topics,
+            col_cluster=False,
+            col_colors=col_colors,
+            cmap=cm.viridis,
+            xticklabels=False,
+            figsize=figsize,
+        )
 
         cbar = g.cax
         cbar.set_position([legend_loc_x, 0.55, 0.05, 0.2])
@@ -996,23 +1004,24 @@ def cell_topic_heatmap(
                 patchList.append(data_key)
             legend = plt.legend(
                 handles=patchList,
-                bbox_to_anchor=(
-                    legend_loc_x,
-                    pos),
+                bbox_to_anchor=(legend_loc_x, pos),
                 loc="center",
-                title=key)
+                title=key,
+            )
             ax = plt.gca().add_artist(legend)
             pos += legend_dist_y
     else:
-        g = sns.clustermap(cell_topic,
-                           row_cluster=cluster_topics,
-                           col_cluster=True,
-                           cmap=cm.viridis,
-                           xticklabels=False,
-                           figsize=figsize)
+        g = sns.clustermap(
+            cell_topic,
+            row_cluster=cluster_topics,
+            col_cluster=True,
+            cmap=cm.viridis,
+            xticklabels=False,
+            figsize=figsize,
+        )
 
     if save is not None:
-        g.savefig(save, bbox_inches='tight')
+        g.savefig(save, bbox_inches="tight")
     plt.show()
 
 
