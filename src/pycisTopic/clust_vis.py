@@ -45,7 +45,6 @@ def find_clusters(
     use_umap_integration: bool = False,
     rna_weight: float = 0.5,
     split_pattern: str = "___",
-    **kwargs,
 ):
     """
     Performing leiden cell or region clustering and add results to cisTopic object's metadata.
@@ -54,32 +53,34 @@ def find_clusters(
     ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
-    target: str, optional
+    target: str
             Whether cells ('cell') or regions ('region') should be clustered. Default: 'cell'
-    k: int, optional
+    k: int
             Number of neighbours in the k-neighbours graph. Default: 10
-    res: float, optional
-            Resolution parameter for the leiden algorithm step. Default: 0.6
-    seed: int, optional
+    res: list[float]
+            Resolution parameter for the leiden algorithm step. Default: [0.6]
+    seed: int
             Seed parameter for the leiden algorithm step. Default: 555
-    scale: bool, optional
+    scale: bool
             Whether to scale the cell-topic or topic-regions contributions prior to the clustering. Default: False
-    prefix: str, optional
+    prefix: str
             Prefix to add to the clustering name when adding it to the correspondent metadata attribute. Default: ''
-    selected_topics: list, optional
+    selected_topics: list[int], optional
             A list with selected topics to be used for clustering. Default: None (use all topics)
-    selected_features: list, optional
+    selected_features: list[str], optional
             A list with selected features (cells or regions) to cluster. This is recommended when working with regions (e.g. selecting
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
-    harmony: bool, optional
+    harmony: bool
             If target is 'cell', whether to use harmony processed topic contributions. Default: False.
     rna_components: pd.DataFrame, optional
             A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna)
             will be considered for clustering.
-    use_umap_integration: bool, optional
+    use_umap_integration: bool
             Whether to use a weighted UMAP representation for the clustering or directly integrating the two graphs. Default: True
-    rna_weight: float, optional
+    rna_weight: float
             Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
+    split_pattern: str
+            Pattern to split cell barcode from sample id. Default: '___'.
 
     """
     # Create cisTopic logger
@@ -182,25 +183,25 @@ def run_umap(
     ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
-    target: str, optional
+    target: str
             Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
-    scale: bool, optional
+    scale: bool
             Whether to scale the cell-topic or topic-regions contributions prior to the dimensionality reduction. Default: False
-    reduction_name: str, optional
+    reduction_name: str
             Reduction name to use as key in the dimensionality reduction dictionary. Default: 'UMAP'
-    random_state: int, optional
+    random_state: int
             Seed parameter for running UMAP. Default: 555
     selected_topics: list, optional
             A list with selected topics to be used for clustering. Default: None (use all topics)
     selected_features: list, optional
             A list with selected features (cells or regions) to cluster. This is recommended when working with regions (e.g. selecting
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
-    harmony: bool, optional
+    harmony: bool
             If target is 'cell', whether to use harmony processed topic contributions. Default: False.
     rna_components: pd.DataFrame, optional
             A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna)
             will be considered for clustering.
-    rna_weight: float, optional
+    rna_weight: float
             Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
     **kwargs
             Parameters to pass to umap.UMAP.
@@ -279,27 +280,27 @@ def run_tsne(
     ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
-    target: str, optional
+    target: str
             Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
-    scale: bool, optional
+    scale: bool
             Whether to scale the cell-topic or topic-regions contributions prior to the dimensionality reduction. Default: False
-    reduction_name: str, optional
+    reduction_name: str
             Reduction name to use as key in the dimensionality reduction dictionary. Default: 'tSNE'
-    random_state: int, optional
+    random_state: int
             Seed parameter for running tSNE. Default: 555
-    perplexity: int, optional
+    perplexity: int
             Perplexity parameter for FitSNE. Default: 30
-    selected_topics: list, optional
+    selected_topics: list[int], optional
             A list with selected topics to be used for clustering. Default: None (use all topics)
-    selected_features: list, optional
+    selected_features: list[str], optional
             A list with selected features (cells or regions) to cluster. This is recommended when working with regions (e.g. selecting
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
-    harmony: bool, optional
+    harmony: bool
             If target is 'cell', whether to use harmony processed topic contributions. Default: False
     rna_components: pd.DataFrame, optional
             A pandas dataframe containing RNA dimensionality reduction (e.g. PCA) components. If provided, both layers (atac and rna)
             will be considered for clustering.
-    rna_weight: float, optional
+    rna_weight: float
             Weight of the RNA layer on the clustering (only applicable when clustering via UMAP). Default: 0.5 (same weight)
     **kwargs
             Parameters to pass to fitsne.FItSNE or sklearn.manifold.TSNE.
@@ -376,7 +377,7 @@ def run_tsne(
 def plot_metadata(
     cistopic_obj: CistopicObject,
     reduction_name: str,
-    variables: str,
+    variables: list[str],
     target: str = "cell",
     remove_nan: bool = True,
     show_label: bool = True,
@@ -386,7 +387,7 @@ def plot_metadata(
     text_size: int = 10,
     alpha: float = 1.0,
     seed: int = 555,
-    color_dictionary: dict[str, str] | None = None,
+    color_dictionary: dict[str, dict[str, str]] | None = None,
     figsize: tuple[float, float] = (6.4, 4.8),
     num_columns: int = 1,
     selected_features: list[str] | None = None,
@@ -401,36 +402,36 @@ def plot_metadata(
             A cisTopic object with dimensionality reductions in `class::CistopicObject.projections`.
     reduction_name: str
             Name of the dimensionality reduction to use
-    variables: list
+    variables: list[str]
             List of variables to plot. They should be included in `class::CistopicObject.cell_data` and `class::CistopicObject.region_data`, depending on which
             target is specified.
-    target: str, optional
+    target: str
             Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
-    remove_nan: bool, optional
+    remove_nan: bool
             Whether to remove data points for which the variable value is 'nan'. Default: True
-    show_label: bool, optional
+    show_label: bool
             For categorical variables, whether to show the label in the plot. Default: True
-    show_legend: bool, optional
+    show_legend: bool
             For categorical variables, whether to show the legend next to the plot. Default: False
-    cmap: str or 'matplotlib.cm', optional
+    cmap: str or 'matplotlib.cm'
             For continuous variables, color map to use for the legend color bar. Default: cm.viridis
-    dot_size: int, optional
+    dot_size: int
             Dot size in the plot. Default: 10
-    text_size: int, optional
+    text_size: int
             For categorical variables and if show_label is True, size of the labels in the plot. Default: 10
-    alpha: float, optional
+    alpha: float
             Transparency value for the dots in the plot. Default: 1
-    seed: int, optional
+    seed: int
             Random seed used to select random colors. Default: 555
     color_dictionary: dict, optional
             A dictionary containing an entry per variable, whose values are dictionaries with variable levels as keys and corresponding colors as values.
             Default: None
-    figsize: tuple, optional
+    figsize: tuple[float, float], optional
             Size of the figure. If num_columns is 1, this is the size for each figure; if num_columns is above 1, this is the overall size of the figure (if keeping
             default, it will be the size of each subplot in the figure). Default: (6.4, 4.8)
-    num_columns: int, optional
+    num_columns: int
             For multiplot figures, indicates the number of columns (the number of rows will be automatically determined based on the number of plots). Default: 1
-    selected_features: list, optional
+    selected_features: list,[str] optional
             A list with selected features (cells or regions) to plot. This is recommended when working with regions (e.g. selecting
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
     save: str, optional
@@ -624,27 +625,27 @@ def plot_topic(
             A cisTopic object with dimensionality reductions in `class::CistopicObject.projections`.
     reduction_name: str
             Name of the dimensionality reduction to use
-    target: str, optional
+    target: str
             Whether cells ('cell') or regions ('region') should be used. Default: 'cell'
-    cmap: str or 'matplotlib.cm', optional
+    cmap: str or 'matplotlib.cm'
             For continuous variables, color map to use for the legend color bar. Default: cm.viridis
-    dot_size: int, optional
+    dot_size: int
             Dot size in the plot. Default: 10
-    alpha: float, optional
+    alpha: float
             Transparency value for the dots in the plot. Default: 1
-    scale: bool, optional
+    scale: bool
             Whether to scale the cell-topic or topic-regions contributions prior to plotting. Default: False
-    selected_topics: list, optional
+    selected_topics: list[int], optional
             A list with selected topics to be used for plotting. Default: None (use all topics)
-    selected_features: list, optional
+    selected_features: list[str], optional
             A list with selected features (cells or regions) to plot. This is recommended when working with regions (e.g. selecting
             regions in binarized topics), as working with all regions can be time consuming. Default: None (use all features)
-    harmony: bool, optional
+    harmony: bool
             If target is 'cell', whether to use harmony processed topic contributions. Default: False
-    figsize: tuple, optional
+    figsize: tuple[float, float], optional
             Size of the figure. If num_columns is 1, this is the size for each figure; if num_columns is above 1, this is the overall size of the figure (if keeping
             default, it will be the size of each subplot in the figure). Default: (6.4, 4.8)
-    num_columns: int, optional
+    num_columns: int
             For multiplot figures, indicates the number of columns (the number of rows will be automatically determined based on the number of plots). Default: 1
     save: str, optional
             Path to save plot. Default: None.
@@ -753,7 +754,7 @@ def plot_imputed_features(
     cistopic_obj: CistopicObject,
     reduction_name: str,
     imputed_data: CistopicImputedFeatures,
-    features: str,
+    features: list[str],
     scale: bool = False,
     cmap: str | matplotlib.cm = cm.viridis,
     dot_size: int = 10,
@@ -774,22 +775,22 @@ def plot_imputed_features(
             Name of the dimensionality reduction to use
     imputed_data: `class::cisTopicImputedFeatures`
             A `class::cisTopicImputedFeatures` object derived from the input cisTopic object.
-    features: list
+    features: list[str]
             Names of the features to plot.
-    scale: bool, optional
+    scale: bool
             Whether to scale the imputed features prior to plotting. Default: False
-    cmap: str or 'matplotlib.cm', optional
+    cmap: str or 'matplotlib.cm'
             For continuous variables, color map to use for the legend color bar. Default: cm.viridis
-    dot_size: int, optional
+    dot_size: int
             Dot size in the plot. Default: 10
-    alpha: float, optional
+    alpha: float
             Transparency value for the dots in the plot. Default: 1
-    selected_cells: list, optional
+    selected_cells: list[str], optional
             A list with selected cells to plot. Default: None (use all cells)
-    figsize: tuple, optional
+    figsize: tuple[float, float], optional
             Size of the figure. If num_columns is 1, this is the size for each figure; if num_columns is above 1, this is the overall size of the figure (if keeping
             default, it will be the size of each subplot in the figure). Default: (6.4, 4.8)
-    num_columns: int, optional
+    num_columns: int
             For multiplot figures, indicates the number of columns (the number of rows will be automatically determined based on the number of plots). Default: 1
     save: str, optional
             Path to save plot. Default: None.
@@ -874,7 +875,7 @@ def cell_topic_heatmap(
     remove_nan: bool = True,
     scale: bool = False,
     cluster_topics: bool = False,
-    color_dict: dict[str, dict[str, str]] | None = None,
+    color_dictionary: dict[str, dict[str, str]] | None = None,
     seed: int = 555,
     legend_loc_x: float = 1.2,
     legend_loc_y: float = -0.5,
@@ -892,35 +893,33 @@ def cell_topic_heatmap(
     ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
-    variables: list
+    variables: list[str]
             List of variables to plot. They should be included in `class::CistopicObject.cell_data` and `class::CistopicObject.region_data`, depending on which
             target is specified.
-    remove_nan: bool, optional
+    remove_nan: bool
             Whether to remove data points for which the variable value is 'nan'. Default: True
-    reduction_name: str
-            Name of the dimensionality reduction to use
-    scale: bool, optional
+    scale: bool
             Whether to scale the cell-topic or topic-regions contributions prior to plotting. Default: False
-    cluster_topics: bool, optional
+    cluster_topics: bool
             Whether to cluster rows in the heatmap. Otherwise, they will be ordered based on the maximum values over the ordered cells. Default: False
     color_dictionary: dict, optional
             A dictionary containing an entry per variable, whose values are dictionaries with variable levels as keys and corresponding colors as values.
             Default: None
-    seed: int, optional
+    seed: int
             Random seed used to select random colors. Default: 555
-    legend_loc_x: float, optional
+    legend_loc_x: float
             X location for legend. Default: 1.2
-    legend_loc_y: float, optional
+    legend_loc_y: float
             Y location for legend. Default: -0.5
-    legend_dist_y: float, optional
+    legend_dist_y: float
             Y distance between legends. Default: -1
-    figsize: tuple, optional
+    figsize: tuple[float, float]
             Size of the figure. Default: (6.4, 4.8)
-    selected_topics: list, optional
+    selected_topics: list[int], optional
             A list with selected topics to be used for plotting. Default: None (use all topics)
-    selected_cellss: list, optional
+    selected_cells: list[str], optional
             A list with selected cells to plot. Default: None (use all cells)
-    harmony: bool, optional
+    harmony: bool
             If target is 'cell', whether to use harmony processed topic contributions. Default: False
     save: str, optional
             Path to save plot. Default: None.
@@ -1039,12 +1038,14 @@ def harmony(
     ----------
     cistopic_obj: `class::CistopicObject`
             A cisTopic object with a model in `class::CistopicObject.selected_model`.
-    vars_use: list
+    vars_use: list[str]
             List of variables to correct batch effect with.
-    scale: bool, optional
+    scale: bool
             Whether to scale probability matrix prior to correction. Default: True
-    random_state: int, optional
+    random_state: int
             Random seed used to use with harmony. Default: 555
+    **kwargs
+            Parameters to pass to harmonypy.run_harmony.
 
     References
     ----------
