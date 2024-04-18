@@ -85,6 +85,14 @@ class CistopicImputedFeatures:
             A :class:`CistopicImputedFeatures` containing the selected cells and/or features.
 
         """
+
+        # Create cisTopic logger
+        level = logging.INFO
+        log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+        handlers = [logging.StreamHandler(stream=sys.stdout)]
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
+        log = logging.getLogger("cisTopic")
+
         mtx = self.mtx
         cell_names = self.cell_names
         feature_names = self.feature_names
