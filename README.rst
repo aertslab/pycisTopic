@@ -15,7 +15,6 @@ To install pycisTopic, install SCENIC+ (which includes pycisTopic)::
 	conda activate scenicplus
 	git clone https://github.com/aertslab/scenicplus.git
 	cd scenicplus
-	git checkout development
 	pip install .
 
 Check version
