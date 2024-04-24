@@ -284,7 +284,7 @@ def get_tss_profile(
             values="position_from_tss",
             index="CB",
             columns="position_from_tss",
-            aggregate_function="count",
+            aggregate_function="len",
         )
         # Remove "no_CB" cell barcode (was only needed for the pivot).
         .filter(pl.col("CB") != "no_CB").with_columns(
