@@ -28,6 +28,7 @@ from scipy import sparse
 if TYPE_CHECKING:
     from pycisTopic.cistopic_class import CistopicObject
 
+
 class CistopicLDAModel:
     """
     cisTopic LDA model class

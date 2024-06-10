@@ -280,8 +280,7 @@ def _filter_intersection_output_columns(
     regions2_coord: bool,
     regions1_suffix: str,
     regions2_suffix: str,
-) -> pl.DataFrame:
-    ...
+) -> pl.DataFrame: ...
 
 
 @overload
@@ -293,8 +292,7 @@ def _filter_intersection_output_columns(
     regions2_coord: bool,
     regions1_suffix: str,
     regions2_suffix: str,
-) -> pl.LazyFrame:
-    ...
+) -> pl.LazyFrame: ...
 
 
 def _filter_intersection_output_columns(

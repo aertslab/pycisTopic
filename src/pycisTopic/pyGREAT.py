@@ -30,7 +30,7 @@ def pyGREAT(
     bg_choice: str = "wholeGenome",
     tmp_dir: str | None = None,
     n_cpu: int = 1,
-    **kwargs
+    **kwargs,
 ):
     """
     Running GREAT (McLean et al., 2010) on a dictionary of pyranges. For more details in GREAT parameters, please visit http://great.stanford.edu/public/html/.
@@ -248,7 +248,7 @@ def pyGREAT_oneset(
     random_label = hex(random.randint(0, 0xFFFFFF))[2:]
     bed_file = os.path.join(
         tmp_dir if tmp_dir else tempfile.gettempdir(),
-        f"{random_label}_great.bed"
+        f"{random_label}_great.bed",
     )
     region_set.df.to_csv(bed_file, sep="\t", index=False, header=False)
 
@@ -263,11 +263,11 @@ def pyGREAT_oneset(
         "twoDistance": two_distance,
         "oneDistance": one_distance,
         "includeCuratedRegDoms": include_curated_reg_doms,
-        "bgChoice": "file" if (bg_choice != 'wholeGenome') else 'wholeGenome',
+        "bgChoice": "file" if (bg_choice != "wholeGenome") else "wholeGenome",
         "fgChoice": "file",
     }
 
-    if bg_choice == 'wholeGenome':
+    if bg_choice == "wholeGenome":
         files = {"fgFile": open(bed_file, "r")}
     else:
         files = {"fgFile": open(bed_file, "r"), "bgFile": open(bg_choice, "r")}

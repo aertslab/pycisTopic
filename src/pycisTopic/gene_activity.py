@@ -149,9 +149,7 @@ def get_gene_activity(
         gene_act = gene_act.round()
         gene_act = sparse.csr_matrix(gene_act)
         keep_features_index = non_zero_rows(gene_act)
-        gene_act = gene_act[
-            keep_features_index,
-        ]
+        gene_act = gene_act[keep_features_index,]
         genes = subset_list(genes, keep_features_index)
     gene_act = CistopicImputedFeatures(
         gene_act, genes, imputed_acc_object.cell_names, project
@@ -538,9 +536,7 @@ def region_weights(
             gini_weight, columns=["Gini"], index=subset_imputed_acc_object.feature_names
         )
         gini_weight["Gini_weight"] = np.exp((1 - gini_weight["Gini"])) + np.exp(-1)
-        gini_weight = gini_weight.loc[
-            regions_per_gene.Name,
-        ]
+        gini_weight = gini_weight.loc[regions_per_gene.Name,]
         regions_per_gene.Gini_weight = gini_weight.loc[:, "Gini_weight"]
     else:
         regions_per_gene.Gini_weight = 1

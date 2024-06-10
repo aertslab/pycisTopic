@@ -73,7 +73,7 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
 
     region_df = (
         pl.DataFrame(
-            data = {"RegionIDs": region_names},
+            data={"RegionIDs": region_names},
         )
         .with_columns(
             pl.col("RegionIDs")
@@ -84,7 +84,8 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
             # Give sensible names to each splitted part.
             .struct.rename_fields(
                 ["Chromosome", "Start", "End"],
-            ).alias("RegionIDsFields")
+            )
+            .alias("RegionIDsFields")
         )
         # Unpack "RegionIDsFields" struct column and create Chromosome", "Start" and "End" columns.
         .unnest("RegionIDsFields")
@@ -201,6 +202,7 @@ def regions_overlap(target, query):
         + target_pr.End.astype(str)
     ).to_list()
     return selected_regions
+
 
 def prepare_tag_cells(cell_names, split_pattern="___"):
     if split_pattern == "-":
@@ -352,6 +354,7 @@ def get_tss_matrix(fragments, flank_window, tss_space_annotation):
     gc.collect()
 
     return TSS_matrix
+
 
 def read_fragments_from_file(
     fragments_bed_filename, use_polars: bool = True

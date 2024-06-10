@@ -156,9 +156,8 @@ def get_tss_profile(
             }
         )
         if use_genomic_ranges
-        else
         # Use pyranges to calculate the intersection.
-        pl.from_pandas(
+        else pl.from_pandas(
             (
                 # Create PyRanges object from filtered fragments Polars DataFrame.
                 create_pyranges_from_polars_df(filtered_fragments_df_pl).join(
@@ -287,11 +286,10 @@ def get_tss_profile(
             aggregate_function="len",
         )
         # Remove "no_CB" cell barcode (was only needed for the pivot).
-        .filter(pl.col("CB") != "no_CB").with_columns(
+        .filter(pl.col("CB") != "no_CB")
+        .with_columns(
             # Fill in 0, for non-observed values in the pivot table.
-            pl.col(pl.UInt32)
-            .cast(pl.Int32)
-            .fill_null(0),
+            pl.col(pl.UInt32).cast(pl.Int32).fill_null(0),
         )
     )
 
@@ -313,7 +311,8 @@ def get_tss_profile(
             header_name="position_from_tss",
             # Add old "CB" column as column names.
             column_names=tss_matrix_tmp.get_column("CB"),
-        ).with_columns(
+        )
+        .with_columns(
             # Convert "position_from_tss" column from pl.Utf8 to pl.Int32.
             pl.col("position_from_tss").cast(pl.Int32)
         )

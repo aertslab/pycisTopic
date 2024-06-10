@@ -24,6 +24,7 @@ from scipy.stats import gaussian_kde
 # string cache.
 pl.enable_string_cache()
 
+
 def get_barcodes_passing_qc_for_sample(
     sample_id: str,
     pycistopic_qc_output_dir: str | Path,
@@ -40,7 +41,7 @@ def get_barcodes_passing_qc_for_sample(
     sample_id
         Sample ID.
     pycistopic_qc_output_dir
-        Directory with output from pycistopic qc.
+        Directory with output from ``pycistopic qc``.
     unique_fragments_threshold
         Threshold for number of unique fragments in peaks.
         If not defined, and use_automatic_thresholds is False,
@@ -48,10 +49,10 @@ def get_barcodes_passing_qc_for_sample(
     tss_enrichment_threshold
         Threshold for TSS enrichment score.
         If not defined, and use_automatic_thresholds is False,
-        the threshold will be set to 0.
+        the threshold will be set to 0.0.
     frip_threshold
         Threshold for fraction of reads in peaks (FRiP).
-        If not defined the threshold will be set to 0.
+        If not defined the threshold will be set to 0.0.
     use_automatic_thresholds
         Use automatic thresholds for unique fragments in peaks and TSS enrichment score
         as calculated by Otsu's method. If False, the thresholds will be set to 0 if not
@@ -69,80 +70,118 @@ def get_barcodes_passing_qc_for_sample(
         If the file with fragments statistics per cell barcode does not exist.
 
     """
-    # Check wether files exist
-    if not os.path.exists(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet")):
-        raise FileNotFoundError(f"File {os.path.join(pycistopic_qc_output_dir, f'{sample_id}.fragments_stats_per_cb.parquet')} does not exist")
+    # Check whether files exist.
+    if not os.path.exists(
+        os.path.join(
+            pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet"
+        )
+    ):
+        raise FileNotFoundError(
+            f"File {os.path.join(pycistopic_qc_output_dir, f'{sample_id}.fragments_stats_per_cb.parquet')} does not exist."
+        )
 
     first_print = True
 
     if use_automatic_thresholds:
-        # Check wether files exist
-        if not os.path.exists(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.otsu_thresholds.tsv")):
-            Warning(f"File {os.path.join(pycistopic_qc_output_dir, f'{sample_id}.otsu_thresholds.tsv')} does not exist")
+        # Check whether files exist.
+        if not os.path.exists(
+            os.path.join(pycistopic_qc_output_dir, f"{sample_id}.otsu_thresholds.tsv")
+        ):
+            Warning(
+                f"File {os.path.join(pycistopic_qc_output_dir, f'{sample_id}.otsu_thresholds.tsv')} does not exist."
+            )
         else:
-            # Read automatic thresholds
-            otsu_unique_fragments_threshold, otsu_tss_enrichment_threshold = pl.read_csv(
-                os.path.join(pycistopic_qc_output_dir, f"{sample_id}.otsu_thresholds.tsv"),
-                separator = "\t"
-            ).select(["unique_fragments_in_peaks_count_otsu_threshold", "tss_enrichment_otsu_threshold"]).to_numpy()[0]
+            # Read automatic thresholds.
+            otsu_unique_fragments_threshold, otsu_tss_enrichment_threshold = (
+                pl.read_csv(
+                    os.path.join(
+                        pycistopic_qc_output_dir, f"{sample_id}.otsu_thresholds.tsv"
+                    ),
+                    separator="\t",
+                )
+                .select(
+                    [
+                        "unique_fragments_in_peaks_count_otsu_threshold",
+                        "tss_enrichment_otsu_threshold",
+                    ]
+                )
+                .to_numpy()[0]
+            )
             if unique_fragments_threshold is None:
                 if first_print:
                     print(f"{sample_id}:")
                     first_print = False
-                print(f"\tUsing automatic threshold for unique fragments: {otsu_unique_fragments_threshold}")
+                print(
+                    f"\tUsing automatic threshold for unique fragments: {otsu_unique_fragments_threshold}"
+                )
                 unique_fragments_threshold = otsu_unique_fragments_threshold
             else:
                 if first_print:
                     print(f"{sample_id}:")
                     first_print = False
-                print(f"\tUsing user-defined threshold for unique fragments: {unique_fragments_threshold}")
+                print(
+                    f"\tUsing user-defined threshold for unique fragments: {unique_fragments_threshold}"
+                )
             if tss_enrichment_threshold is None:
                 if first_print:
                     print(f"{sample_id}:")
                     first_print = False
-                print(f"\tUsing automatic threshold for TSS enrichment: {otsu_tss_enrichment_threshold}")
+                print(
+                    f"\tUsing automatic threshold for TSS enrichment: {otsu_tss_enrichment_threshold}"
+                )
                 tss_enrichment_threshold = otsu_tss_enrichment_threshold
             else:
                 if first_print:
                     print(f"{sample_id}:")
                     first_print = False
-                print(f"\tUsing user-defined threshold for TSS enrichment: {tss_enrichment_threshold}")
+                print(
+                    f"\tUsing user-defined threshold for TSS enrichment: {tss_enrichment_threshold}"
+                )
 
-    # Set thresholds to 0 if not defined
+    # Set thresholds to 0 if not defined.
     if unique_fragments_threshold is None:
         if first_print:
             print(f"{sample_id}:")
             first_print = False
-        print("\tNo threshold for unique fragments defined, setting to 0")
+        print("\tNo threshold for unique fragments defined, setting to 0.")
         unique_fragments_threshold = 0
 
     if tss_enrichment_threshold is None:
         if first_print:
             print(f"{sample_id}:")
             first_print = False
-        print("\tNo threshold for TSS enrichment defined, setting to 0")
-        tss_enrichment_threshold = 0
+        print("\tNo threshold for TSS enrichment defined, setting to 0.0.")
+        tss_enrichment_threshold = 0.0
 
     if frip_threshold is None:
         if first_print:
             print(f"{sample_id}:")
             first_print = False
-        print("\tNo threshold for FRiP defined, setting to 0")
-        frip_threshold = 0
+        print("\tNo threshold for FRiP defined, setting to 0.0.")
+        frip_threshold = 0.0
 
-    # Get barcodes passing filters
-    barcodes_passing_filters = pl.scan_parquet(
-        os.path.join(pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet")
-    ).filter(
-        ( pl.col("unique_fragments_in_peaks_count") > unique_fragments_threshold ) & \
-        ( pl.col("tss_enrichment") > tss_enrichment_threshold ) & \
-        ( pl.col("fraction_of_fragments_in_peaks") > frip_threshold )
-    ).select("CB").collect().to_numpy().squeeze()
+    # Get barcodes passing filters.
+    barcodes_passing_filters = (
+        pl.scan_parquet(
+            os.path.join(
+                pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet"
+            )
+        )
+        .filter(
+            (pl.col("unique_fragments_in_peaks_count") > unique_fragments_threshold)
+            & (pl.col("tss_enrichment") > tss_enrichment_threshold)
+            & (pl.col("fraction_of_fragments_in_peaks") > frip_threshold)
+        )
+        .select("CB")
+        .collect()
+        .to_numpy()
+        .squeeze()
+    )
 
     return barcodes_passing_filters, {
         "unique_fragments_threshold": unique_fragments_threshold,
         "tss_enrichment_threshold": tss_enrichment_threshold,
-        "frip_threshold": frip_threshold
+        "frip_threshold": frip_threshold,
     }
 
 

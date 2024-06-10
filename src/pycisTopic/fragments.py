@@ -497,9 +497,8 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     bed_with_idx_df_pl = (
         bed_df_pl
         # Add index column and cast it from UInt32 to Int64
-        .with_row_index("__index_level_0__").with_columns(
-            pl.col("__index_level_0__").cast(pl.Int64)
-        )
+        .with_row_index("__index_level_0__")
+        .with_columns(pl.col("__index_level_0__").cast(pl.Int64))
         # Put index column as last column.
         .select(pl.col(pa_schema_fixed_categoricals.names))
     )
@@ -629,9 +628,7 @@ def get_fragments_per_cb(
     fragments_stats_per_cb_df_pl = (
         fragments_df_pl.lazy()
         .rename({"Name": "CB"})
-        .with_columns(
-                (pl.col("End") - pl.col("Start")).alias("fragment_length")
-        )
+        .with_columns((pl.col("End") - pl.col("Start")).alias("fragment_length"))
         .with_columns(
             pl.col("fragment_length").lt(147).alias("nucleosome_free"),
             pl.col("fragment_length").is_between(147, 294).alias("mononucleosome"),
@@ -641,7 +638,9 @@ def get_fragments_per_cb(
             [
                 pl.col("Score").sum().alias("total_fragments_count"),
                 pl.len().alias("unique_fragments_count"),
-                (pl.col("mononucleosome").sum() / pl.col("nucleosome_free").sum()).alias("nucleosome_signal")
+                (
+                    pl.col("mononucleosome").sum() / pl.col("nucleosome_free").sum()
+                ).alias("nucleosome_signal"),
             ]
         )
         .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
@@ -656,9 +655,10 @@ def get_fragments_per_cb(
             (pl.col("duplication_count") / pl.col("total_fragments_count")).alias(
                 "duplication_ratio"
             )
-        ).select(
+        )
+        .select(
             pl.selectors.all() - pl.selectors.by_name("nucleosome_signal"),
-            pl.selectors.by_name("nucleosome_signal")
+            pl.selectors.by_name("nucleosome_signal"),
         )
         .collect()
     )
@@ -942,7 +942,10 @@ def get_insert_size_distribution(
     return insert_size_distribution_df_pl
 
 
-def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.DataFrame) -> pl.DataFrame:
+def get_fragments_in_peaks(
+    fragments_df_pl: pl.DataFrame,
+    regions_df_pl: pl.DataFrame,
+) -> pl.DataFrame:
     """
     Get number of total and unique fragments in peaks.
 

@@ -496,7 +496,7 @@ def export_region_accessibility_to_loom(
     out_fname: str,
     selected_regions: list[str] | None = None,
     selected_cells: list[str] | None = None,
-    cluster_annotation: list[str]  | None = None,
+    cluster_annotation: list[str] | None = None,
     cluster_markers: dict[str, dict[str, pd.DataFrame]] | None = None,
     tree_structure: tuple = (),
     title: str | None = None,
@@ -746,7 +746,6 @@ def export_minimal_loom_region(
     auc_thresholds=None,
     compress: bool = False,
 ):
-
     # Information on the general loom file format: http://linnarssonlab.org/loompy/format/index.html
     # Information on the SCope specific alterations: https://github.com/aertslab/SCope/wiki/Data-Format
 
