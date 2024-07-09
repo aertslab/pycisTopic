@@ -261,7 +261,7 @@ def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFra
         separator="\t",
         # Use 0-bytes as comment character so the header can start with "# Chromosome".
         comment_prefix="\0",
-        dtypes={
+        schema_overrides={
             # Convert Chromosome, Start and End column to the correct datatypes.
             "Chromosome": pl.Categorical,
             "# Chromosome": pl.Categorical,
@@ -646,7 +646,7 @@ def get_chrom_sizes_and_alias_mapping_from_ucsc(
             has_header=False,
             comment_prefix="#",
             new_columns=["ucsc", "length"],
-            dtypes=[pl.Utf8, pl.Int64],
+            schema=[pl.Utf8, pl.Int64],
         )
 
     else:

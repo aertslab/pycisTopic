@@ -88,7 +88,7 @@ def plot_insert_size_distribution(
 
 
 def plot_tss_enrichment(
-    tss_norm_matrix_sample_df,
+    tss_norm_matrix_sample_df: pl.DataFrame,
     ax: plt.Axes | None = None,
     **matplotlib_plot_kwargs,
 ) -> plt.Axes:

@@ -103,7 +103,7 @@ def read_fragments_to_pyranges(
             separator="\t",
             use_pyarrow=False,
             new_columns=bed_column_names[:column_count],
-            dtypes={
+            schema_overrides={
                 bed_column: dtype
                 for bed_column, dtype in {
                     "Chromosome": pl.Categorical,
@@ -263,7 +263,7 @@ def read_bed_to_polars_df(
             separator="\t",
             use_pyarrow=False,
             new_columns=bed_column_names[:column_count],
-            dtypes={
+            schema_overrides={
                 bed_column: dtype
                 for bed_column, dtype in {
                     "Chromosome": pl.Categorical,
@@ -409,7 +409,7 @@ def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series
         separator="\t",
         columns=[0],
         new_columns=["CB"],
-        dtypes={"CB": pl.Categorical},
+        schema={"CB": pl.Categorical},
     ).to_series()
 
     return cbs
