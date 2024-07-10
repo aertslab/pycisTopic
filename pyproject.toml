@@ -144,3 +144,7 @@ max-doc-length = 88
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
+
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/stubs"
+plugins = ["numpy.typing.mypy_plugin"]
