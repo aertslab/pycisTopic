@@ -403,14 +403,18 @@ def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series
     ... )
 
     """
-    cbs = pl.read_csv(
-        barcodes_tsv_filename,
-        has_header=False,
-        separator="\t",
-        columns=[0],
-        new_columns=["CB"],
-        schema={"CB": pl.Categorical},
-    ).to_series()
+    cbs = (
+        pl.read_csv(
+            barcodes_tsv_filename,
+            has_header=False,
+            separator="\t",
+            columns=[0],
+            new_columns=["CB"],
+            schema={"CB": pl.Categorical},
+        )
+        .filter(pl.col("CB").is_not_null())
+        .to_series()
+    )
 
     return cbs
 
