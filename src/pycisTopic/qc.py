@@ -20,6 +20,9 @@ from pycisTopic.topic_binarization import threshold_otsu
 from pycisTopic.tss_profile import get_tss_profile
 from scipy.stats import gaussian_kde
 
+if TYPE_CHECKING:
+    import numpy.typing as npt
+
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
 pl.enable_string_cache()
@@ -171,7 +174,11 @@ def get_barcodes_passing_qc_for_sample(
     }
 
 
-def compute_kde(training_data: np.ndarray, test_data: np.ndarray, no_threads: int = 8):
+def compute_kde(
+    training_data: npt.ArrayLike,
+    test_data: npt.ArrayLike,
+    no_threads: int = 8,
+) -> npt.NDArray[np.float64]:
     """
     Compute kernel-density estimate (KDE) using Gaussian kernels.
 
@@ -196,6 +203,27 @@ def compute_kde(training_data: np.ndarray, test_data: np.ndarray, no_threads: in
     test_data.
 
     """
+    training_data = np.asarray(training_data, dtype=np.float64)
+    test_data = np.asarray(test_data, dtype=np.float64)
+
+    # Avoid very rare cases where second column of training_data has the same
+    # value everywhere. This can happen in some cases for duplication ratio as
+    # it can be 0.0% when fragment counts for each fragment are 1.
+    #
+    # This will result in the following error:
+    #     LinAlgError: The data appears to lie in a lower-dimensional subspace of
+    #     the space in which it is expressed. This has resulted in a singular data
+    #     covariance matrix, which cannot be treated using the algorithms implemented
+    #     in `gaussian_kde`. Consider performing principle component analysis /
+    #     dimensionality reduction and using `gaussian_kde` with the transformed data.
+    if np.var(training_data[1]) == 0.0:
+        # Add small value to first element to avoid all of them to be equal.
+        if training_data[1][0] == 0.0:
+            training_data[1][0] = 0.000000000001
+        else:
+            # In even rarer case that the value is not 0.0, change the value proportionally.
+            training_data[1][0] = training_data[1][0] * 1.000000000001
+
     # Convert 2D numpy array test data to complex number array so numpy considers both
     # columns at the same time in further operations.
     test_data_all = np.empty(test_data.shape[1], dtype=np.complex128)
@@ -216,7 +244,9 @@ def compute_kde(training_data: np.ndarray, test_data: np.ndarray, no_threads: in
         axis=1,
     )
 
-    def compute_kde_part(test_data_unique_split_array):
+    def compute_kde_part(
+        test_data_unique_split_array: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
         """
         Compute kernel-density estimate (KDE) using Gaussian kernels for a subsection of the test_data.
 
