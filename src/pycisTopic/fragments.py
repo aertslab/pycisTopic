@@ -413,6 +413,7 @@ def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series
             schema={"CB": pl.Categorical},
         )
         .filter(pl.col("CB").is_not_null())
+        .unique(maintain_order=True)
         .to_series()
     )
 
