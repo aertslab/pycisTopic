@@ -551,7 +551,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
                 # Partition Polars DataFrame with BED entries per chromosome-strand
                 # (stranded).
                 bed_with_idx_df_pl.partition_by(
-                    by=["Chromosome", "Strand"], maintain_order=False, as_dict=True
+                    "Chromosome", "Strand", maintain_order=False, as_dict=True
                 ).items(),
                 key=itemgetter(0),
             )
@@ -565,7 +565,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
                 # Partition Polars DataFrame with BED entries per chromosome
                 # (unstranded).
                 bed_with_idx_df_pl.partition_by(
-                    by=["Chromosome"], maintain_order=False, as_dict=True
+                    "Chromosome", maintain_order=False, as_dict=True
                 ).items(),
                 key=itemgetter(0),
             )
@@ -635,7 +635,7 @@ def get_fragments_per_cb(
             pl.col("fragment_length").lt(147).alias("nucleosome_free"),
             pl.col("fragment_length").is_between(147, 294).alias("mononucleosome"),
         )
-        .group_by(by="CB", maintain_order=True)
+        .group_by("CB", maintain_order=True)
         .agg(
             [
                 pl.col("Score").sum().alias("total_fragments_count"),
@@ -646,7 +646,7 @@ def get_fragments_per_cb(
             ]
         )
         .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
-        .sort(by=fragments_count_column, descending=True)
+        .sort(fragments_count_column, descending=True)
         .with_row_index(name="barcode_rank", offset=1)
         .with_columns(
             (pl.col("total_fragments_count") - pl.col("unique_fragments_count")).alias(
@@ -770,7 +770,7 @@ def get_cbs_passing_filter(
     elif isinstance(keep_top_x_cbs, int):
         fragments_stats_per_cb_filtered_df_pl = (
             fragments_stats_per_cb_df_pl.lazy()
-            .sort(by=fragments_count_column, descending=True)
+            .sort(fragments_count_column, descending=True)
             .head(keep_top_x_cbs)
             .collect()
         )
@@ -932,7 +932,7 @@ def get_insert_size_distribution(
         )
         .group_by("insert_size")
         .agg([pl.len().alias("fragments_count")])
-        .sort(by="insert_size", descending=True)
+        .sort("insert_size", descending=True)
         .with_columns(
             (pl.col("fragments_count") / pl.col("fragments_count").sum()).alias(
                 "fragments_ratio"
@@ -1014,7 +1014,7 @@ def get_fragments_in_peaks(
             pl.col("Name").alias("CB"),
             pl.col("Score"),
         )
-        .group_by(by="CB", maintain_order=True)
+        .group_by("CB", maintain_order=True)
         .agg(
             [
                 pl.col("Score").sum().alias("total_fragments_in_peaks_count"),

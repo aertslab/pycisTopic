@@ -266,7 +266,8 @@ def _plot_fragment_stats(
 
     """
     fragments_stats_per_cb_df = fragments_stats_per_cb_df.sort(
-        by=c_var, descending=False
+        c_var,
+        descending=False,
     )
     ax.scatter(
         x=fragments_stats_per_cb_df.get_column(x_var).to_numpy(),
