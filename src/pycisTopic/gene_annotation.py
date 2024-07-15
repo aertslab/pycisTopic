@@ -726,7 +726,7 @@ def find_most_likely_chromosome_source_in_bed(
     chrom_source_stats_df_pl = chrom_sizes_and_alias_df_pl.select(
         [
             pl.col(column_name).is_in(chroms_from_bed).sum()
-            for column_name in chrom_sizes_and_alias_df_pl.columns
+            for column_name in chrom_sizes_and_alias_df_pl.collect_schema().names()
         ]
     )
 

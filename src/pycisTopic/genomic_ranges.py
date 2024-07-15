@@ -358,7 +358,7 @@ def _filter_intersection_output_columns(
     regions1_info_columns = [
         # Remove region1 suffix from column names.
         pl.col(column_name).alias(column_name[:-regions1_suffix_length])
-        for column_name in df.columns
+        for column_name in df.collect_schema().names()
         if (
             column_name.endswith(regions1_suffix)
             and column_name not in regions1_coord_columns
@@ -373,7 +373,7 @@ def _filter_intersection_output_columns(
         pl.col(column_name)
         if regions1_info
         else pl.col(column_name).alias(column_name[:-regions2_suffix_length])
-        for column_name in df.columns
+        for column_name in df.collect_schema().names()
         if (
             column_name.endswith(regions2_suffix)
             and column_name not in regions2_coord_columns

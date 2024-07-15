@@ -389,7 +389,7 @@ def get_tss_profile(
                     .max()
                 )
             ).alias(CB)
-            for CB in tss_smoothed_matrix_per_cb.columns[1:]
+            for CB in tss_smoothed_matrix_per_cb.collect_schema().names()[1:]
         ]
     )
 

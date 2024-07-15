@@ -358,10 +358,7 @@ def read_fragments_to_polars_df(
 
     # If no score is provided or score column is ".", generate a score column with the
     # number of fragments which have the same chromosome, start, end and CB.
-    if (
-        "Score" not in fragments_df_pl.columns
-        or fragments_df_pl.schema["Score"] == pl.Utf8
-    ):
+    if fragments_df_pl.collect_schema().get("Score") in (None, pl.Utf8):
         fragments_df_pl = fragments_df_pl.group_by(
             ["Chromosome", "Start", "End", "Name"]
         ).agg(pl.len().cast(pl.Int32()).alias("Score"))
