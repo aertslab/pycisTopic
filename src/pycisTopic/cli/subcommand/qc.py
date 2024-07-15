@@ -209,14 +209,14 @@ def qc(
     fragments_stats_per_cb_for_otsu_threshold_df_pl.write_csv(
         f"{output_prefix}.fragments_stats_per_cb_for_otsu_thresholds.tsv",
         separator="\t",
-        has_header=True,
+        include_header=True,
     )
 
     logger.info(f'Writing "{output_prefix}.cbs_for_otsu_thresholds.tsv".')
     fragments_stats_per_cb_for_otsu_threshold_df_pl.select(pl.col("CB")).write_csv(
         f"{output_prefix}.cbs_for_otsu_thresholds.tsv",
         separator="\t",
-        has_header=False,
+        include_header=False,
     )
 
     logger.info(f'Writing "{output_prefix}.otsu_thresholds.tsv".')

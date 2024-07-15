@@ -489,7 +489,7 @@ def get_chrom_sizes_and_alias_mapping_from_ncbi(
             chrom_sizes_and_alias_df_pl.rename({"ucsc": "# ucsc"}).write_csv(
                 file=chrom_sizes_and_alias_tsv_filename,
                 separator="\t",
-                has_header=True,
+                include_header=True,
             )
 
         return chrom_sizes_and_alias_df_pl
@@ -665,7 +665,7 @@ def get_chrom_sizes_and_alias_mapping_from_ucsc(
         chrom_sizes_and_alias_df_pl.rename({"ucsc": "# ucsc"}).write_csv(
             file=chrom_sizes_and_alias_tsv_filename,
             separator="\t",
-            has_header=True,
+            include_header=True,
         )
 
     return chrom_sizes_and_alias_df_pl
