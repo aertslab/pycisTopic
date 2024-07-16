@@ -987,10 +987,6 @@ def get_insert_size_distribution(
     ----------
     fragments_df_pl
         Polars DataFrame with fragments.
-    cbs
-        List/Polars Series with Cell barcodes.
-        See :func:`pycisTopic.fragments.get_cbs_passing_filter` for a way to get a
-        filtered list of cell barcodes (``selected_cbs`` variable).
 
     Returns
     -------
