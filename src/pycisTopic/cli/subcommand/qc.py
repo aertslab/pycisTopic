@@ -233,7 +233,7 @@ def qc(
     logger.info("pycisTopic QC finished.")
 
 
-def run_qc(args):
+def run_qc_run(args):
     qc(
         fragments_tsv_filename=args.fragments_tsv_filename,
         regions_bed_filename=args.regions_bed_filename,
@@ -257,9 +257,20 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         "qc",
         help="Run QC statistics on fragment file.",
     )
-    parser_qc.set_defaults(func=run_qc)
+    subparser_qc = parser_qc.add_subparsers(
+        title="QC",
+        dest="qc",
+        help="List of QC subcommands.",
+    )
+    subparser_qc.required = True
 
-    parser_qc.add_argument(
+    parser_qc_run = subparser_qc.add_parser(
+        "run",
+        help="Run QC statistics on fragment file.",
+    )
+    parser_qc_run.set_defaults(func=run_qc_run)
+
+    parser_qc_run.add_argument(
         "-f",
         "--fragments",
         dest="fragments_tsv_filename",
@@ -269,7 +280,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         help="Fragments TSV filename which contains scATAC fragments.",
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "-r",
         "--regions",
         dest="regions_bed_filename",
@@ -282,7 +293,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "-t",
         "--tss",
         dest="tss_annotation_bed_filename",
@@ -295,7 +306,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "-o",
         "--output",
         dest="output_prefix",
@@ -305,7 +316,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         help="Output prefix to use for QC statistics parquet output files.",
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "--threads",
         dest="threads",
         action="store",
@@ -319,7 +330,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         "Default: 8.",
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "-e",
         "--engine",
         dest="engine",
@@ -331,10 +342,10 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         help="Use Polars or pyarrow to read BED and fragment files. Default: pyarrow.",
     )
 
-    group_qc_tss = parser_qc.add_argument_group(
+    group_qc_run_tss = parser_qc_run.add_argument_group(
         "TSS profile", "TSS profile statistics calculation settings."
     )
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_flank_window",
         dest="tss_flank_window",
         action="store",
@@ -346,7 +357,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         "Default: 2000 (+/- 2000 bp).",
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_smoothing_rolling_window",
         dest="tss_smoothing_rolling_window",
         action="store",
@@ -356,7 +367,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         help="Rolling window used to smooth the cut sites signal. Default: 10.",
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_minimum_signal_window",
         dest="tss_minimum_signal_window",
         action="store",
@@ -373,7 +384,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_window",
         dest="tss_window",
         action="store",
@@ -387,7 +398,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_min_norm",
         dest="tss_min_norm",
         action="store",
@@ -402,7 +413,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--use-pyranges",
         dest="use_genomic_ranges",
         action="store_false",
@@ -413,7 +424,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "--min_fragments_per_cb",
         dest="min_fragments_per_cb",
         action="store",
@@ -427,7 +438,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "--dont-collapse_duplicates",
         dest="collapse_duplicates",
         action="store_false",

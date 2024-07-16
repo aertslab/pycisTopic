@@ -44,7 +44,7 @@ def get_barcodes_passing_qc_for_sample(
     sample_id
         Sample ID.
     pycistopic_qc_output_dir
-        Directory with output from ``pycistopic qc``.
+        Directory with output from ``pycistopic qc run``.
     unique_fragments_threshold
         Threshold for number of unique fragments in peaks.
         If not defined, and use_automatic_thresholds is False,

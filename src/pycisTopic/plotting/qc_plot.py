@@ -143,7 +143,7 @@ def plot_sample_stats(
     sample_id : str
         Sample ID.
     pycistopic_qc_output_dir : str | Path
-        Directory containing the output of the pycistopic qc command.
+        Directory containing the output of the ``pycistopic qc run`` command.
     save : str | Path, optional
         Path to save the plot, by default None.
     insert_size_distriubtion_xlim : tuple, optional
@@ -298,7 +298,7 @@ def plot_barcode_stats(
     sample_id : str
         Sample ID.
     pycistopic_qc_output_dir : str | Path
-        Directory containing the output of the pycistopic qc command.
+        Directory containing the output of the ``pycistopic qc run`` command.
     unique_fragments_threshold : int, optional
         Unique fragments threshold, by default None.
     tss_enrichment_threshold : float, optional
