@@ -313,6 +313,9 @@ def read_bed_to_polars_df(
 def read_fragments_to_polars_df(
     fragments_bed_filename: str,
     engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
+    sample_id: str | None = None,
+    cb_end_to_remove: str | None = "-1",
+    cb_sample_separator: str | None = "___",
 ) -> pl.DataFrame:
     """
     Read fragments BED file to a Polars DataFrame.
@@ -325,7 +328,15 @@ def read_fragments_to_polars_df(
     fragments_bed_filename
         Fragments BED filename.
     engine
-        Use Polars or pyarrow to read the fragments BED file (default: pyarrow).
+        Use Polars or pyarrow to read the fragments BED file (default: `pyarrow`).
+    sample_id
+        Optional sample ID to append after cell barcode after removing `cb_end_to_remove`
+        and appending `cb_sample_separator`.
+    cb_end_to_remove
+        Remove this string from the end of the cell barcode if `sample_id` is specified.
+    cb_sample_separator
+        Add this string to the cell barcode if `sample_id` is specified, after removing
+        `cb_end_to_remove` and before appending `sample_id`.
 
     Returns
     -------
@@ -349,12 +360,23 @@ def read_fragments_to_polars_df(
     ...     fragments_bed_filename="fragments.tsv",
     ... )
 
+    Read gzipped fragments BED file to a Polars DataFrame and add sample ID to cell
+    barcode names after removing `cb_end_to_remove` string from cell barcode and
+    appending `cb_sample_separator` to the cell barcode.
+
+    >>> fragments_df_pl = read_fragments_to_polars_df(
+    ...     fragments_bed_filename="fragments.tsv.gz",
+    ...     sample_id="sample1",
+    ...     cb_end_to_remove="-1",
+    ...     cb_sample_separator="___",
+    ... )
+
     """
     fragments_df_pl = read_bed_to_polars_df(
         bed_filename=fragments_bed_filename,
         engine=engine,
         min_column_count=4,
-    )
+    ).lazy()
 
     # If no score is provided or score column is ".", generate a score column with the
     # number of fragments which have the same chromosome, start, end and CB.
@@ -365,10 +387,40 @@ def read_fragments_to_polars_df(
     else:
         fragments_df_pl = fragments_df_pl.with_columns(pl.col("Score").cast(pl.Int32()))
 
+    # Modify cell barcode if sample ID is specified or an empty string.
+    if sample_id or sample_id == "":
+        separator_and_sample_id = (
+            f"{cb_sample_separator + sample_id}" if cb_sample_separator else sample_id
+        )
+
+        if not cb_end_to_remove:
+            # Append separator and sample ID to cell barcode.
+            fragments_df_pl = fragments_df_pl.with_columns(
+                (pl.col("Name").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
+                    pl.Categorical
+                )
+            )
+        else:
+            # Remove `cb_end_to_remove` from the end of the cell barcode before adding
+            # separator and sample ID to cell barcode.
+            fragments_df_pl = fragments_df_pl.with_columns(
+                pl.col("Name")
+                .cast(pl.Utf8)
+                .str.replace(cb_end_to_remove + "$", separator_and_sample_id)
+                .cast(pl.Categorical)
+            )
+
+    fragments_df_pl = fragments_df_pl.collect()
+
     return fragments_df_pl
 
 
-def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series:
+def read_barcodes_file_to_polars_series(
+    barcodes_tsv_filename: str,
+    sample_id: str | None = None,
+    cb_end_to_remove: str | None = "-1",
+    cb_sample_separator: str | None = "___",
+) -> pl.Series:
     """
     Read barcode TSV file to a Polars Series.
 
@@ -376,6 +428,14 @@ def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series
     ----------
     barcodes_tsv_filename
         TSV file with CBs.
+    sample_id
+        Optional sample ID to append after cell barcode after removing `cb_end_to_remove`
+        and appending `cb_sample_separator`.
+    cb_end_to_remove
+        Remove this string from the end of the cell barcode if `sample_id` is specified.
+    cb_sample_separator
+        Add this string to the cell barcode if `sample_id` is specified, after removing
+        `cb_end_to_remove` and before appending `sample_id`.
 
     Returns
     -------
@@ -399,6 +459,17 @@ def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series
     ...     barcodes_tsv_filename="barcodes.tsv",
     ... )
 
+    Read gzipped barcodes TSV file to a Polars Series and add sample ID to cell
+    barcode names after removing `cb_end_to_remove` string from cell barcode and
+    appending `cb_sample_separator` to the cell barcode.
+
+    >>> cbs = read_barcodes_file_to_polars_series(
+    ...     barcodes_tsv_filename="barcodes.tsv",
+    ...     sample_id="sample1",
+    ...     cb_end_to_remove="-1",
+    ...     cb_sample_separator="___",
+    ... )
+
     """
     cbs = (
         pl.read_csv(
@@ -411,10 +482,32 @@ def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series
         )
         .filter(pl.col("CB").is_not_null())
         .unique(maintain_order=True)
-        .to_series()
     )
 
-    return cbs
+    # Modify cell barcode if sample ID is specified or an empty string.
+    if sample_id or sample_id == "":
+        separator_and_sample_id = (
+            f"{cb_sample_separator + sample_id}" if cb_sample_separator else sample_id
+        )
+
+        if not cb_end_to_remove:
+            # Append separator and sample ID to cell barcode.
+            cbs = cbs.with_columns(
+                (pl.col("CB").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
+                    pl.Categorical
+                )
+            )
+        else:
+            # Remove `cb_end_to_remove` from the end of the cell barcode before adding
+            # separator and sample ID to cell barcode.
+            cbs = cbs.with_columns(
+                pl.col("CB")
+                .cast(pl.Utf8)
+                .str.replace(cb_end_to_remove + "$", separator_and_sample_id)
+                .cast(pl.Categorical)
+            )
+
+    return cbs.to_series()
 
 
 def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:

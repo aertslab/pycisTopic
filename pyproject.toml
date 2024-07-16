@@ -36,6 +36,7 @@ dependencies = [
   "polars >= 1",
   "pyarrow >= 8.0.0",
   "pyranges < 0.0.128",
+  "numba",
   "ray",
   "scatac_fragment_tools >= 0.1.2",
   "scikit-learn",
