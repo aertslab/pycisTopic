@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 
@@ -27,6 +27,7 @@ def qc(
     min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
     no_threads: int = 8,
+    engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
 ) -> None:
     """
     Compute quality check statistics from fragments file.
@@ -85,6 +86,8 @@ def qc(
         probability density function (PDF) values for log10 unique fragments in peaks
         vs TSS enrichment, fractions of fragments in peaks and duplication ratio.
         Default: ``8``
+    engine
+        Use Polars or pyarrow to read BED and fragment files (default: `pyarrow`).
 
     Returns
     -------
@@ -127,12 +130,13 @@ def qc(
     regions_df_pl = read_bed_to_polars_df(
         bed_filename=regions_bed_filename,
         min_column_count=3,
+        engine=engine,
     )
 
     logger.info(f'Loading fragments TSV file from "{fragments_tsv_filename}".')
     fragments_df_pl = read_fragments_to_polars_df(
         fragments_tsv_filename,
-        engine="pyarrow",
+        engine=engine,
     )
 
     logger.info("Computing QC stats.")
@@ -244,6 +248,7 @@ def run_qc(args):
         min_fragments_per_cb=args.min_fragments_per_cb,
         collapse_duplicates=args.collapse_duplicates,
         no_threads=args.threads,
+        engine=args.engine,
     )
 
 
@@ -312,6 +317,18 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         "in peaks vs TSS enrichment, fractions of fragments in peaks and duplication "
         "ratio. "
         "Default: 8.",
+    )
+
+    parser_qc.add_argument(
+        "-e",
+        "--engine",
+        dest="engine",
+        action="store",
+        type=str,
+        choices=["polars", "pyarrow"],
+        required=False,
+        default="pyarrow",
+        help="Use Polars or pyarrow to read BED and fragment files. Default: pyarrow.",
     )
 
     group_qc_tss = parser_qc.add_argument_group(
