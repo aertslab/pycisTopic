@@ -73,8 +73,6 @@ def get_barcodes_passing_qc_for_sample(
         If the file with fragments statistics per cell barcode does not exist.
 
     """
-    print(f"{sample_id}:")
-
     if use_automatic_thresholds:
         otsu_thresholds_tsv_filename = os.path.join(
             pycistopic_qc_output_dir,
@@ -157,9 +155,9 @@ def get_barcodes_passing_qc_for_sample(
     barcodes_passing_filters = (
         pl.scan_parquet(fragments_stats_per_cb_filename)
         .filter(
-            (pl.col("unique_fragments_in_peaks_count") > unique_fragments_threshold)
-            & (pl.col("tss_enrichment") > tss_enrichment_threshold)
-            & (pl.col("fraction_of_fragments_in_peaks") > frip_threshold)
+            (pl.col("unique_fragments_in_peaks_count") >= unique_fragments_threshold)
+            & (pl.col("tss_enrichment") >= tss_enrichment_threshold)
+            & (pl.col("fraction_of_fragments_in_peaks") >= frip_threshold)
         )
         .select("CB")
         .collect()
