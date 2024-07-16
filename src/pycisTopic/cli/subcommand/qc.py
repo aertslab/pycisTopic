@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Literal
 
 import polars as pl
@@ -233,6 +234,44 @@ def qc(
     logger.info("pycisTopic QC finished.")
 
 
+def qc_filter_barcodes(
+    sample_id: str,
+    pycistopic_qc_output_dir: str | Path,
+    unique_fragments_threshold: int | None = None,
+    tss_enrichment_threshold: float | None = None,
+    frip_threshold: float | None = None,
+):
+    from pycisTopic.qc import get_barcodes_passing_qc_for_sample
+
+    selected_cbs_filename = os.path.join(
+        pycistopic_qc_output_dir,
+        f"{sample_id}.min_fragments_{unique_fragments_threshold}_min_tss_{tss_enrichment_threshold}_min_frip_{frip_threshold}.cbs.txt",
+    )
+
+    print(
+        f'Writing selected cell barcodes for "{sample_id}" based on QC statistics with:\n'
+        f"  - minimum unqiue fragments:\t{unique_fragments_threshold}\n"
+        f"  - minimum TSS threshold:\t{tss_enrichment_threshold}\n"
+        f"  - minimum FRiP threshold:\t{frip_threshold}\n"
+        f'to "{selected_cbs_filename}".'
+    )
+
+    barcodes_passing_filters, _ = get_barcodes_passing_qc_for_sample(
+        sample_id=sample_id,
+        pycistopic_qc_output_dir=pycistopic_qc_output_dir,
+        unique_fragments_threshold=unique_fragments_threshold,
+        tss_enrichment_threshold=tss_enrichment_threshold,
+        frip_threshold=frip_threshold,
+        use_automatic_thresholds=False,
+    )
+
+    pl.Series("CB", barcodes_passing_filters).to_frame().select(pl.col("CB")).write_csv(
+        selected_cbs_filename,
+        separator="\t",
+        include_header=False,
+    )
+
+
 def run_qc_run(args):
     qc(
         fragments_tsv_filename=args.fragments_tsv_filename,
@@ -249,6 +288,16 @@ def run_qc_run(args):
         collapse_duplicates=args.collapse_duplicates,
         no_threads=args.threads,
         engine=args.engine,
+    )
+
+
+def run_qc_filter_barcodes(args):
+    qc_filter_barcodes(
+        sample_id=args.sample_id,
+        pycistopic_qc_output_dir=args.pycistopic_qc_output_dir,
+        unique_fragments_threshold=args.unique_fragments_threshold,
+        tss_enrichment_threshold=args.tss_enrichment_threshold,
+        frip_threshold=args.frip_threshold,
     )
 
 
@@ -448,4 +497,63 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             the same cell barcode).
             Default: collapse duplicates.
             """,
+    )
+
+    parser_qc_filter_barcodes = subparser_qc.add_parser(
+        "filter",
+        help="Filter cell barcodes based on QC statistics.",
+    )
+    parser_qc_filter_barcodes.set_defaults(func=run_qc_filter_barcodes)
+
+    parser_qc_filter_barcodes.add_argument(
+        "-s",
+        "--sample",
+        dest="sample_id",
+        action="store",
+        type=str,
+        required=True,
+        help="Sample ID for which to get list of cell barcodes based on QC statistics.",
+    )
+
+    parser_qc_filter_barcodes.add_argument(
+        "-o",
+        "--output",
+        dest="pycistopic_qc_output_dir",
+        action="store",
+        type=str,
+        required=True,
+        help='Output directory from "pycistopic run qc" which contains QC statistics parquet output files.',
+    )
+
+    parser_qc_filter_barcodes.add_argument(
+        "-f",
+        "--fragments",
+        dest="unique_fragments_threshold",
+        action="store",
+        type=int,
+        required=False,
+        default=1000,
+        help="Threshold for number of unique fragments in peaks. Default: 1000.",
+    )
+
+    parser_qc_filter_barcodes.add_argument(
+        "-t",
+        "--tss",
+        dest="tss_enrichment_threshold",
+        action="store",
+        type=float,
+        required=False,
+        default=5.0,
+        help="Threshold for TSS enrichment score. Default: 5.0.",
+    )
+
+    parser_qc_filter_barcodes.add_argument(
+        "-p",
+        "--frip",
+        dest="frip_threshold",
+        action="store",
+        type=float,
+        required=False,
+        default=0.0,
+        help="Threshold for fraction of reads in peaks (FRiP). Default: 0.0.",
     )
