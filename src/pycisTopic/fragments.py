@@ -732,8 +732,8 @@ def get_fragments_per_cb(
         .group_by("CB", maintain_order=True)
         .agg(
             [
-                pl.col("Score").sum().alias("total_fragments_count"),
-                pl.len().alias("unique_fragments_count"),
+                pl.col("Score").sum().cast(pl.UInt32).alias("total_fragments_count"),
+                pl.len().cast(pl.UInt32).alias("unique_fragments_count"),
                 (
                     pl.col("mononucleosome").sum() / pl.col("nucleosome_free").sum()
                 ).alias("nucleosome_signal"),
@@ -741,7 +741,11 @@ def get_fragments_per_cb(
         )
         .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
         .sort(fragments_count_column, descending=True)
-        .with_row_index(name="barcode_rank", offset=1)
+        .with_row_index(
+            name="barcode_rank",
+            offset=1,
+        )
+        .with_columns(pl.col("barcode_rank").cast(pl.UInt32))
         .with_columns(
             (pl.col("total_fragments_count") - pl.col("unique_fragments_count")).alias(
                 "duplication_count"
@@ -1021,7 +1025,7 @@ def get_insert_size_distribution(
             (pl.col("End") - pl.col("Start")).abs().alias("insert_size"),
         )
         .group_by("insert_size")
-        .agg([pl.len().alias("fragments_count")])
+        .agg([pl.len().cast(pl.UInt32).alias("fragments_count")])
         .sort("insert_size", descending=True)
         .with_columns(
             (pl.col("fragments_count") / pl.col("fragments_count").sum()).alias(
@@ -1107,8 +1111,11 @@ def get_fragments_in_peaks(
         .group_by("CB", maintain_order=True)
         .agg(
             [
-                pl.col("Score").sum().alias("total_fragments_in_peaks_count"),
-                pl.len().alias("unique_fragments_in_peaks_count"),
+                pl.col("Score")
+                .sum()
+                .cast(pl.UInt32)
+                .alias("total_fragments_in_peaks_count"),
+                pl.len().cast(pl.UInt32).alias("unique_fragments_in_peaks_count"),
             ]
         )
     )

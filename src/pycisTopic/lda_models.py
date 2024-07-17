@@ -634,7 +634,7 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             )
             .lazy()
             .group_by(["topic", "region"])
-            .agg(pl.len().alias("occurrence"))
+            .agg(pl.len().cast(pl.UInt32).alias("occurrence"))
             .collect()
         )
 
