@@ -591,7 +591,8 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     # those index values or not).
     bed_with_idx_df_pl = (
         bed_df_pl
-        # Add index column and cast it from UInt32 to Int64
+        # Add index column and cast it from UInt32 (`polars`) or
+        # UInt64 (`polars-u64-idx`) to Int64.
         .with_row_index("__index_level_0__")
         .with_columns(pl.col("__index_level_0__").cast(pl.Int64))
         # Put index column as last column.

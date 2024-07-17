@@ -289,8 +289,9 @@ def get_tss_profile(
         # Remove "no_CB" cell barcode (was only needed for the pivot).
         .filter(pl.col("CB") != "no_CB")
         .with_columns(
-            # Fill in 0, for non-observed values in the pivot table.
-            pl.col(pl.UInt32).cast(pl.Int32).fill_null(0),
+            # Fill in 0, for non-observed values in the pivot table after casting
+            # column from UInt32 (`polars`) or UInt64 (`polars-u64-idx`) to Int32.
+            pl.col(pl.get_index_type()).cast(pl.Int32).fill_null(0),
         )
     )
 
