@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gzip
 from operator import itemgetter
-from typing import Literal, Sequence
+from typing import TYPE_CHECKING, Literal, Sequence
 
 import numpy as np
 import pandas as pd
@@ -10,8 +10,12 @@ import polars as pl
 import pyarrow as pa  # type: ignore[import]
 import pyarrow.csv  # type: ignore[import]
 import pyranges as pr  # type: ignore[import]
+import scipy as sp
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.utils import normalise_filepath
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
@@ -1121,3 +1125,207 @@ def get_fragments_in_peaks(
     )
 
     return fragments_in_peaks_df_pl
+
+
+def create_fragment_matrix_from_fragments(
+    fragments_bed_filename: str | Path,
+    regions_bed_filename: str | Path,
+    barcodes_tsv_filename: str | Path,
+    blacklist_bed_filename: str | Path | None = None,
+    sample_id: str | None = None,
+    cb_end_to_remove: str | None = "-1",
+    cb_sample_separator: str | None = "___",
+):
+    """
+    Create fragments matrix from a fragment file and BED file with regions.
+
+    Parameters
+    ----------
+    fragments_bed_filename
+        Fragments BED filename.
+    regions_bed_filename
+        Consensus peaks / SCREEN regions BED file for which to make the fragments matrix per cell barcode.
+    barcodes_tsv_filename
+        TSV file with selected cell barcodes after pycisTopic QC filtering.
+    blacklist_bed_filename
+        BED file with blacklisted regions (Amemiya et al., 2019). Default: None.
+    sample_id
+        Optional sample ID to append after cell barcode after removing `cb_end_to_remove`
+        and appending `cb_sample_separator`.
+    cb_end_to_remove
+        Remove this string from the end of the cell barcode if `sample_id` is specified.
+    cb_sample_separator
+        Add this string to the cell barcode if `sample_id` is specified, after removing
+        `cb_end_to_remove` and before appending `sample_id`.
+
+    Returns
+    -------
+    (
+        counts_fragments_matrix,
+        cbs,
+        region_ids,
+    )
+
+    References
+    ----------
+    Amemiya, H. M., Kundaje, A., & Boyle, A. P. (2019). The ENCODE blacklist: identification of problematic regions of the genome. Scientific reports, 9(1), 1-5.
+
+    """
+    # Create logger
+    # level = logging.INFO
+    # log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+    # handlers = [logging.StreamHandler(stream=sys.stdout)]
+    # logging.basicConfig(level=level, format=log_format, handlers=handlers)
+    # log = logging.getLogger("cisTopic")
+
+    # Read file with cell barcodes as a Polars Series and add sample ID to cell barcodes.
+    cbs = read_barcodes_file_to_polars_series(
+        barcodes_tsv_filename=barcodes_tsv_filename,
+        sample_id=sample_id,
+        cb_end_to_remove=cb_end_to_remove,
+        cb_sample_separator=cb_sample_separator,
+    )
+
+    # log.info("Reading data for " + project)
+    # Read fragments file to Polars Dataframe and add sample ID to cell barcodes.
+    fragments_df_pl = read_fragments_to_polars_df(
+        fragments_bed_filename=fragments_bed_filename,
+        engine="pyarrow",
+        sample_id=sample_id,
+        cb_end_to_remove=cb_end_to_remove,
+        cb_sample_separator=cb_sample_separator,
+    )
+
+    # Only keep fragments with the requested cell barcode.
+    fragments_cb_filtered_df_pl = filter_fragments_by_cb(
+        fragments_df_pl=fragments_df_pl,
+        cbs=cbs,
+    ).rename({"Name": "CB", "Score": "CB_count"})
+
+    del fragments_df_pl
+
+    # Read regions BED file as a Polars Dataframe.
+    regions_df_pl = (
+        read_bed_to_polars_df(
+            bed_filename=regions_bed_filename,
+            engine="polars",
+            min_column_count=3,
+        )
+        .with_columns(
+            (
+                pl.col("Chromosome")
+                + ":"
+                + pl.col("Start").cast(pl.Utf8)
+                + "-"
+                + pl.col("End").cast(pl.Utf8)
+            )
+            .cast(pl.Categorical)
+            .alias("RegionID")
+        )
+        .select(
+            pl.col("Chromosome"),
+            pl.col("Start"),
+            pl.col("End"),
+            pl.col("RegionID"),
+        )
+    )
+
+    if blacklist_bed_filename:
+        # Read BED file with blacklisted regions .
+        blacklist_df_pl = read_bed_to_polars_df(
+            bed_filename=blacklist_bed_filename,
+            engine="polars",
+            min_column_count=3,
+        ).select(
+            pl.col("Chromosome"),
+            pl.col("Start"),
+            pl.col("End"),
+        )
+
+        # Filter out regions that overlap with blacklisted regions.
+        regions_df_pl = (
+            regions_df_pl.lazy()
+            .join(
+                # Get all regionIDs that overlap with blacklisted regions.
+                gr_overlap(
+                    regions1_df_pl=regions_df_pl,
+                    regions2_df_pl=blacklist_df_pl,
+                    how="first",
+                )
+                .lazy()
+                .select(
+                    pl.col("RegionID"),
+                ),
+                on="RegionID",
+                how="anti",
+            )
+            .select(
+                pl.col("Chromosome"),
+                pl.col("Start"),
+                pl.col("End"),
+                pl.col("RegionID"),
+            )
+            .collect()
+        )
+
+    # Get accessibility (binary and counts) for each region ID and cell barcode.
+    region_cb_df_pl = (
+        gr_intersection(
+            regions1_df_pl=regions_df_pl,
+            regions2_df_pl=fragments_cb_filtered_df_pl,
+            # how: Literal["all", "containment", "first", "last"] | str | None = None,
+            how="all",
+            regions1_info=True,
+            regions2_info=True,
+            regions1_coord=False,
+            regions2_coord=False,
+            regions1_suffix="@1",
+            regions2_suffix="@2",
+        )
+        .rename({"CB@2": "CB"})
+        .lazy()
+        .group_by(["RegionID", "CB"])
+        .agg(
+            # Get accessibility in binary form.
+            pl.lit(1).cast(pl.Int8).alias("accessible_binary"),
+            # Get accessibility in count form.
+            pl.len().cast(pl.UInt32).alias("accessible_count"),
+        )
+        .join(
+            regions_df_pl.lazy()
+            .select(pl.col("RegionID"))
+            .with_row_index("region_idx"),
+            on="RegionID",
+            how="left",
+        )
+        .join(
+            cbs.to_frame().lazy().with_row_index("CB_idx"),
+            on="CB",
+            how="left",
+        )
+        .collect()
+    )
+
+    # Construct binary accessibility matrix as a sparse matrix
+    # (regions as rows and cells as columns).
+    counts_fragments_matrix = sp.sparse.csr_matrix(
+        (
+            # All data points are 1:
+            #   - same as: region_cb_df_pl.get_column("accessible_binary").to_numpy()
+            #   - for count matrix: region_cb_df_pl.get_column("accessible_count").to_numpy()
+            # np.ones(region_cb_df_pl.shape[0], dtype=np.int8),
+            region_cb_df_pl.get_column("accessible_count").to_numpy(),
+            (
+                # Row indices:
+                region_cb_df_pl.get_column("region_idx").to_numpy(),
+                # Column indices:
+                region_cb_df_pl.get_column("CB_idx").to_numpy(),
+            ),
+        )
+    )
+
+    return (
+        counts_fragments_matrix,
+        cbs.to_list(),
+        regions_df_pl.get_column("RegionID").to_list(),
+    )
