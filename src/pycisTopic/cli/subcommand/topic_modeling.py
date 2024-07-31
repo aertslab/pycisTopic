@@ -141,7 +141,7 @@ def run_topic_modeling_mallet(args):
     with open(output_filename, "wb") as fh:
         pickle.dump(models, fh)
 
-def snapatac_to_corpus(args):
+def adata_to_corpus(args):
     import snapatac2 as snap
     from tqdm import tqdm
     input_filename = args.input
@@ -484,10 +484,10 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     )
 
     parser_topic_modeling_create_corpus = subparser_topic_modeling.add_parser(
-        "create_corpus_from_snapatac",
+        "create_corpus_from_adata",
         help='"Create corpus from snapatac anndata".',
     )
-    parser_topic_modeling_create_corpus.set_defaults(func=snapatac_to_corpus)
+    parser_topic_modeling_create_corpus.set_defaults(func=adata_to_corpus)
 
     parser_topic_modeling_create_corpus.add_argument(
         "-i",
