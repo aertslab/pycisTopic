@@ -156,7 +156,7 @@ def snapatac_to_corpus(args):
 
     chunk_iter = anndata.X.chunked(chunk_size)
     n_cells = anndata.X.shape[0]
-
+    
     print("Writing to file ...")
     with open(output_filename, "w") as outf:
         for chunk, cell_idx_offset, _ in tqdm(
@@ -167,11 +167,13 @@ def snapatac_to_corpus(args):
                     chunk.indptr, chunk.indptr[1:]
                 )
             ):
-                tokens = chunk.indices[indprev:indnow].astype(str)
+                tokens = chunk.indices[indprev:indnow]
                 doc_idx = cell_idx + cell_idx_offset
-                _ = outf.write(
-                    f'{doc_idx}\t0\t{" ".join(tokens)}\n'
-                )
+                _ = outf.write(f"{doc_idx}\t0\t")
+                for token in tokens:
+                    _ = outf.write(token)
+                    _ = outf.write(" ")
+                _ = outf.write("\n")
     
     print("Done!")
     anndata.close()
