@@ -171,8 +171,7 @@ def snapatac_to_corpus(args):
                 doc_idx = cell_idx + cell_idx_offset
                 _ = outf.write(f"{doc_idx}\t0\t")
                 for token in tokens:
-                    _ = outf.write(token)
-                    _ = outf.write(" ")
+                    _ = outf.write(str(token) + " ")
                 _ = outf.write("\n")
     
     print("Done!")
