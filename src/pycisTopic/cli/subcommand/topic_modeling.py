@@ -486,9 +486,9 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         "create_corpus_from_snapatac",
         help='"Create corpus from snapatac anndata".',
     )
-    parser_topic_modeling_mallet.set_defaults(func=snapatac_to_corpus)
+    parser_topic_modeling_create_corpus.set_defaults(func=snapatac_to_corpus)
 
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_create_corpus.add_argument(
         "-i",
         "--input",
         dest="input",
@@ -497,7 +497,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Input snapatac anndata.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_create_corpus.add_argument(
         "-o",
         "--output",
         dest="output",
@@ -506,7 +506,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Output text file.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_create_corpus.add_argument(
         "-c",
         "--chunk_size",
         dest="chunk_size",
