@@ -167,7 +167,7 @@ def snapatac_to_corpus(args):
                     chunk.indptr, chunk.indptr[1:]
                 )
             ):
-                tokens = chunk.indices[indprev:indnow]
+                tokens = chunk.indices[indprev:indnow].astype(str)
                 doc_idx = cell_idx + cell_idx_offset
                 _ = outf.write(
                     f'{doc_idx}\t0\t{" ".join(tokens)}\n'
