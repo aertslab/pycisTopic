@@ -141,6 +141,41 @@ def run_topic_modeling_mallet(args):
     with open(output_filename, "wb") as fh:
         pickle.dump(models, fh)
 
+def snapatac_to_corpus(args):
+    import snapatac2 as snap
+    from tqdm import tqdm
+    input_filename = args.input
+    output_filename = args.output
+    chunk_size = args.chunk_size
+
+    print("Loading data")
+    anndata: snap.AnnData = snap.read(
+        input_filename,
+        backed = "r"
+    )
+
+    chunk_iter = anndata.X.chunked(chunk_size)
+    n_cells = anndata.X.shape[0]
+
+    print("Writing to file ...")
+    with open(output_filename, "w") as outf:
+        for chunk, cell_idx_offset, _ in tqdm(
+            chunk_iter, total = n_cells // chunk_size
+        ):
+            for cell_idx, (indprev, indnow) in enumerate(
+                zip(
+                    chunk.indptr, chunk.indptr[1:]
+                )
+            ):
+                tokens = chunk.indices[indprev:indnow]
+                doc_idx = cell_idx + cell_idx_offset
+                _ = outf.write(
+                    f'{doc_idx}\t0\t{" ".join(tokens)}\n'
+                )
+    
+    print("Done!")
+    anndata.close()
+
 
 def str_to_bool(v: str) -> bool:
     """
@@ -445,4 +480,38 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=False,
         default="mallet",
         help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
+    )
+
+    parser_topic_modeling_create_corpus = subparser_topic_modeling.add_parser(
+        "create_corpus_from_snapatac",
+        help='"Create corpus from snapatac anndata".',
+    )
+    parser_topic_modeling_mallet.set_defaults(func=snapatac_to_corpus)
+
+    parser_topic_modeling_mallet.add_argument(
+        "-i",
+        "--input",
+        dest="input",
+        action="store",
+        type=str,
+        required=True,
+        help="Input snapatac anndata.",
+    )
+    parser_topic_modeling_mallet.add_argument(
+        "-o",
+        "--output",
+        dest="output",
+        action="store",
+        type=str,
+        required=True,
+        help="Output text file.",
+    )
+    parser_topic_modeling_mallet.add_argument(
+        "-c",
+        "--chunk_size",
+        dest="chunk_size",
+        type=int,
+        required=False,
+        default=100,
+        help="Chunk size for iterating over snapatac file (default 100).",
     )
