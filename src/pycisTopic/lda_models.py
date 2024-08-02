@@ -428,6 +428,72 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
 
     """
 
+    @staticmethod
+    def create_regions_topics_frequency_matrix(
+        mallet_region_topics_counts_filename: str,
+    ):
+        """
+        Create regions vs topics frequency matrix from Mallet region topics counts file.
+
+        mallet_region_topics_counts_filename
+            Mallet region topics counts file.
+        """
+        no_region_ids = -1
+        no_topics = -1
+        region_id_topic_counts = []
+
+        with open(mallet_region_topics_counts_filename, "r") as fh:
+            # Column 0: order in which region ID idx was seen in the input corpus file.
+            # Column 1: region ID idx
+            # Column 3-n: "topic:count" pairs
+            #
+            # Example:
+            # --------
+            #
+            # 0 12 3:94 11:84 1:84 18:75 17:36 0:31 13:25 4:23 6:22 12:16 9:10 10:6 15:3 7:2 8:1
+            # 1 28 8:368 15:267 3:267 17:255 0:245 10:227 16:216 19:201 7:92 18:85 1:58 14:52 9:31 6:17 13:6 2:3
+            # 2 33 8:431 16:418 10:354 3:257 17:211 12:146 7:145 9:115 4:108 13:106 18:66 1:60 15:45 6:45 19:33 5:19 14:12 0:1
+            # 3 35 7:284 18:230 15:199 10:191 16:164 0:114 4:112 19:107 12:104 13:68 3:49 9:35 1:28 11:25 5:20 17:17 6:11 14:2 8:1
+            # 4 57 8:192 3:90 19:88 1:69 18:67 2:63 10:62 17:38 15:37 13:10 4:9 12:2 9:1
+            for line in fh:
+                columns = line.rstrip().split()
+                # Get region ID index from second column.
+                region_id_idx = int(columns[1])
+                # Get topic index and counts from column 3 till the end by splitting: "topic:count" pairs.
+                topics_counts = [
+                    (int(topic), int(count))
+                    for topic, count in [
+                        topic_counts.split(":", 1) for topic_counts in columns[2:]
+                    ]
+                ]
+                # Get topic indices.
+                topics_idx = np.array([topic for topic, count in topics_counts])
+                # Get counts.
+                counts = np.array([count for topic, count in topics_counts])
+                # Store region ID index, topics indices and counts till we know how many regions and topics we have.
+                region_id_topic_counts.append((region_id_idx, topics_idx, counts))
+
+                # Keep track of the highest seen region ID index and topic index (0-based).
+                no_region_ids = max(region_id_idx, no_region_ids)
+                no_topics = max(topics_idx.max(), no_topics)
+
+        # Add 1 to region IDs and topics counts to account for start at 0.
+        no_region_ids += 1
+        no_topics += 1
+
+        # Create regions topics counts matrix and populate it.
+        regions_topics_counts = np.zeros((no_topics, no_region_ids), dtype=np.float64)
+        for region_idx, topics_idx, counts in region_id_topic_counts:
+            regions_topics_counts[topics_idx, region_idx] = counts
+
+        # Create regions topics frequency matrix by dividing all count values for topic
+        # by total counts for that topic.
+        regions_topics_frequency = (
+            regions_topics_counts / regions_topics_counts.sum(axis=1)[:, None]
+        ).astype(np.float32)
+
+        return regions_topics_frequency
+
     def __init__(
         self,
         num_topics: int,
