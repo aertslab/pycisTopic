@@ -142,6 +142,32 @@ def run_topic_modeling_mallet(args):
         pickle.dump(models, fh)
 
 
+def run_convert_binary_matrix_to_mallet_corpus_file(args):
+    import scipy
+    from pycisTopic.lda_models import LDAMallet
+
+    binary_matrix_filename = args.binary_matrix_filename
+    mallet_corpus_filename = args.mallet_corpus_filename
+    mallet_path = args.mallet_path
+    memory_in_gb = f"{args.memory_in_gb}G"
+
+    print(
+        f'Read binary accessibility matrix from "{binary_matrix_filename}" Matrix Market file.'
+    )
+    binary_matrix = scipy.io.mmread(binary_matrix_filename)
+
+    os.environ["MALLET_MEMORY"] = memory_in_gb
+
+    print(
+        f'Convert binary accessibility matrix to Mallet serialized corpus file "{mallet_corpus_filename}".'
+    )
+    LDAMallet.convert_binary_matrix_to_mallet_corpus_file(
+        binary_matrix=binary_matrix,
+        mallet_corpus_filename=mallet_corpus_filename,
+        mallet_path=mallet_path,
+    )
+
+
 def str_to_bool(v: str) -> bool:
     """
     Convert string representation of a boolean value to a boolean.
@@ -438,6 +464,51 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help="Whether to reuse the corpus from Mallet. Default: False.",
     )
     parser_topic_modeling_mallet.add_argument(
+        "-b",
+        "--mallet_path",
+        dest="mallet_path",
+        type=str,
+        required=False,
+        default="mallet",
+        help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
+    )
+
+    parser_topic_modeling_create_mallet_corpus = subparser_topic_modeling.add_parser(
+        "create_mallet_corpus",
+        help='"Convert binary accessibility matrix to Mallet serialized corpus file.',
+    )
+    parser_topic_modeling_create_mallet_corpus.set_defaults(
+        func=run_convert_binary_matrix_to_mallet_corpus_file
+    )
+
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-i",
+        "--input",
+        dest="binary_matrix_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Binary accessibility matrix (region IDs vs cell barcodes) in Matrix Market format.",
+    )
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-o",
+        "--output",
+        dest="mallet_corpus_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Mallet serialized corpus filename.",
+    )
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-m",
+        "--memory",
+        dest="memory_in_gb",
+        type=int,
+        required=False,
+        default=10,
+        help='Amount of memory (in GB) Mallet is allowed to use. Default: "10"',
+    )
+    parser_topic_modeling_create_mallet_corpus.add_argument(
         "-b",
         "--mallet_path",
         dest="mallet_path",
