@@ -429,26 +429,33 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
     """
 
     @staticmethod
-    def create_regions_topics_frequency_matrix(
-        mallet_region_topics_counts_filename: str,
-    ):
+    def create_regions_topics_count_matrix(
+        mallet_region_topics_count_filename: str,
+    ) -> np.ndarray:
         """
-        Create regions vs topics frequency matrix from Mallet region topics counts file.
+        Create regions vs topics count matrix from Mallet region-topics count file.
 
+        Parameters
+        ----------
         mallet_region_topics_counts_filename
-            Mallet region topics counts file.
+            Mallet region-topics count file.
+
+        Returns
+        -------
+        Regions vs topics count matrix.
+
         """
         no_region_ids = -1
         no_topics = -1
         region_id_topic_counts = []
 
-        with open(mallet_region_topics_counts_filename, "r") as fh:
+        with open(mallet_region_topics_count_filename, "r") as fh:
             # Column 0: order in which region ID idx was seen in the input corpus file.
             # Column 1: region ID idx
             # Column 3-n: "topic:count" pairs
             #
-            # Example:
-            # --------
+            # Mallet region-topics count file example:
+            # ----------------------------------------
             #
             # 0 12 3:94 11:84 1:84 18:75 17:36 0:31 13:25 4:23 6:22 12:16 9:10 10:6 15:3 7:2 8:1
             # 1 28 8:368 15:267 3:267 17:255 0:245 10:227 16:216 19:201 7:92 18:85 1:58 14:52 9:31 6:17 13:6 2:3
@@ -481,18 +488,12 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         no_region_ids += 1
         no_topics += 1
 
-        # Create regions topics counts matrix and populate it.
-        regions_topics_counts = np.zeros((no_topics, no_region_ids), dtype=np.float64)
+        # Create regions topics count matrix and populate it.
+        regions_topics_counts = np.zeros((no_topics, no_region_ids), dtype=np.int32)
         for region_idx, topics_idx, counts in region_id_topic_counts:
             regions_topics_counts[topics_idx, region_idx] = counts
 
-        # Create regions topics frequency matrix by dividing all count values for topic
-        # by total counts for that topic.
-        regions_topics_frequency = (
-            regions_topics_counts / regions_topics_counts.sum(axis=1)[:, None]
-        ).astype(np.float32)
-
-        return regions_topics_frequency
+        return regions_topics_counts
 
     def __init__(
         self,
@@ -712,18 +713,24 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
 
         return word_topics
 
-    def get_topics(self):
+    def get_topics(self) -> np.ndarray:
         """
-        Get topics X words matrix.
+        Get the region-topic probability matrix learned during inference.
 
         Returns
         -------
-        np.ndarray
-            Topics X words matrix, shape `num_topics` x `vocabulary_size`.
+        The probability for each region in each topic, shape (no_regions, no_topics).
 
         """
-        topics = self.word_topics
-        return topics / topics.sum(axis=1)[:, None]
+        regions_topics_counts = np.asarray(self.word_topics, np.float64)
+
+        # Create regions topics frequency matrix by dividing all count values for topic
+        # by total counts for that topic.
+        regions_topics_frequency = (
+            regions_topics_counts / regions_topics_counts.sum(axis=1)[:, None]
+        ).astype(np.float32)
+
+        return regions_topics_frequency
 
     def fcorpustxt(self):
         """
