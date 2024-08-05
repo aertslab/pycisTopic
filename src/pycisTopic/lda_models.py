@@ -19,11 +19,11 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import ray
+import scipy
 import tmtoolkit
 from gensim import matutils, utils
 from gensim.models import basemodel
 from pycisTopic.utils import loglikelihood, subset_list
-from scipy import sparse
 
 if TYPE_CHECKING:
     from pycisTopic.cistopic_class import CistopicObject
@@ -149,7 +149,7 @@ def run_cgs_models(
     Griffiths, T. L., & Steyvers, M. (2004). Finding scientific topics. Proceedings of the National academy of Sciences, 101(suppl 1), 5228-5235.
 
     """
-    binary_matrix = sparse.csr_matrix(cistopic_obj.binary_matrix.transpose())
+    binary_matrix = scipy.sparse.csr_matrix(cistopic_obj.binary_matrix.transpose())
     region_names = cistopic_obj.region_names
     cell_names = cistopic_obj.cell_names
     ray.init(num_cpus=n_cpu, **kwargs)
@@ -561,15 +561,23 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
 
             file_like.write(f'{doc_idx}\t0\t{" ".join(tokens)}\n')
 
-    def convert_input(self, corpus):
+    @staticmethod
+    def convert_binary_matrix_to_mallet_corpus_file(
+        binary_matrix: scipy.sparse.csr,
+        mallet_corpus_filename: str,
+        mallet_path: str = "mallet",
+    ) -> None:
         """
-        Convert corpus to Mallet format and save it to a temporary text file.
+        Convert binary matrix to Mallet serialized corpus file.
 
         Parameters
         ----------
-        corpus
-            iterable of iterable of (int, int)
-            Collection of texts in BoW format.
+        binary_matrix
+            Binary accessibility matrix (region IDs vs cell barcodes)
+        mallet_corpus_filename
+            Mallet serialized corpus filename
+        mallet_path
+            Path to Mallet binary.
 
         Returns
         -------
@@ -578,29 +586,58 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         """
         logger = logging.getLogger("LDAMalletWrapper")
 
-        logger.info(f"Serializing temporary corpus to {self.fcorpustxt()}")
+        # Convert binary accessibility matrix to compressed sparse column matrix format
+        # and eliminate zeros as we assume later that for each found index, the
+        # associated value is 1.
+        binary_matrix_csc = binary_matrix.tocsc()
+        binary_matrix_csc.eliminate_zeros()
 
-        with utils.open(self.fcorpustxt(), "wt") as fh:
-            self.corpus_to_mallet(corpus, fh)
+        mallet_corpus_txt_filename = f"{mallet_corpus_filename}.txt"
 
-        cmd = [
-            self.mallet_path,
+        logger.info(
+            f"Serializing binary matrix to Mallet text corpus to {mallet_corpus_txt_filename}"
+        )
+
+        with open(mallet_corpus_txt_filename, "w") as mallet_corpus_txt_fh:
+            # Iterate over each column (cell barcode index) of the sparse binary
+            # accessibility matrix in compressed sparse column matrix format and get
+            # all index positions (region IDs indices) for that cell barcode index.
+            for cell_barcode_idx, (indptr_start, indptr_end) in enumerate(
+                zip(binary_matrix_csc.indptr, binary_matrix_csc.indptr[1:])
+            ):
+                # Get all region ID indices (assume all have an associated value of 1)
+                # for the current cell barcode index.
+                region_ids_idx = binary_matrix_csc.indices[indptr_start:indptr_end]
+
+                # Write Mallet text corpus for the current cell barcode index:
+                #   - column 1: cell barcode index.
+                #   - column 2: document number (always 0).
+                #   - column 3: region IDs indices accessible in the current cell barcode.
+                mallet_corpus_txt_fh.write(
+                    f'{cell_barcode_idx}\t0\t{" ".join([str(x) for x in region_ids_idx])}\n'
+                )
+
+        mallet_import_file_cmd = [
+            mallet_path,
             "import-file",
             "--preserve-case",
             "--keep-sequence",
             "--token-regex",
             "\\S+",
             "--input",
-            self.fcorpustxt(),
+            mallet_corpus_txt_filename,
             "--output",
-            self.fcorpusmallet(),
+            mallet_corpus_filename,
         ]
 
         logger.info(
-            f"Converting temporary corpus to MALLET format with: {' '.join(cmd)}"
+            f"Converting Mallet text corpus to Mallet serialised corpus with: {' '.join(mallet_import_file_cmd)}"
         )
+
         try:
-            subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
+            subprocess.check_output(
+                args=mallet_import_file_cmd, shell=False, stderr=subprocess.STDOUT
+            )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(
                 f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
