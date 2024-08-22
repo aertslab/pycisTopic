@@ -598,6 +598,12 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             f"Serializing binary matrix to Mallet text corpus to {mallet_corpus_txt_filename}"
         )
 
+        if binary_matrix_csc.shape[0] == 0:
+            raise ValueError("Binary accessibility matrix does not contain any cell barcodes.")
+
+        if binary_matrix_csc.shape[1] == 0:
+            raise ValueError("Binary accessibility matrix does not contain any regions.")
+
         with open(mallet_corpus_txt_filename, "w") as mallet_corpus_txt_fh:
             # Iterate over each column (cell barcode index) of the sparse binary
             # accessibility matrix in compressed sparse column matrix format and get
