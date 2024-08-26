@@ -244,43 +244,17 @@ def run_cgs_model(
     lda_log.propagate = False
     warnings.filterwarnings("ignore")
 
-    # Set models
-    if alpha_by_topic and eta_by_topic:
-        model = lda.LDA(
-            n_topics=n_topics,
-            n_iter=n_iter,
-            random_state=random_state,
-            alpha=alpha / n_topics,
-            eta=eta / n_topics,
-            refresh=n_iter,
-        )
-    elif alpha_by_topic and eta_by_topic is False:
-        model = lda.LDA(
-            n_topics=n_topics,
-            n_iter=n_iter,
-            random_state=random_state,
-            alpha=alpha / n_topics,
-            eta=eta,
-            refresh=n_iter,
-        )
-    elif alpha_by_topic is False and eta_by_topic is True:
-        model = lda.LDA(
-            n_topics=n_topics,
-            n_iter=n_iter,
-            random_state=random_state,
-            alpha=alpha,
-            eta=eta / n_topics,
-            refresh=n_iter,
-        )
-    else:
-        model = lda.LDA(
-            n_topics=n_topics,
-            n_iter=n_iter,
-            random_state=random_state,
-            alpha=alpha,
-            eta=eta,
-            refresh=n_iter,
-        )
+    lda_alpha = alpha / n_topics if alpha_by_topic else alpha
+    lda_eta = eta / n_topics if eta_by_topic else eta
+
+    model = lda.LDA(
+        n_topics=n_topics,
+        n_iter=n_iter,
+        random_state=random_state,
+        alpha=lda_alpha,
+        eta=lda_eta,
+        refresh=n_iter,
+    )
 
     # Running model
     log.info(f"Running model with {n_topics} topics")
@@ -303,7 +277,7 @@ def run_cgs_model(
         normalize=True,
         return_mean=False,
     )
-    ll = loglikelihood(model.nzw_, model.ndz_, alpha, eta)
+    ll = loglikelihood(model.nzw_, model.ndz_, lda_alpha, lda_eta)
 
     # Organize data
     if len(mimno_2011) <= top_topics_coh:
@@ -1053,6 +1027,8 @@ def run_cgs_model_mallet(
     doc_topic = (
         pd.read_csv(model.fdoctopics(), header=None, sep="\t").iloc[:, 2:].to_numpy()
     )
+    ll_alpha = alpha / n_topics if alpha_by_topic else alpha
+    ll_eta = eta / n_topics if eta_by_topic else eta
 
     # Model evaluation
     cell_cov = np.asarray(binary_matrix.sum(axis=0)).astype(float)
@@ -1070,7 +1046,7 @@ def run_cgs_model_mallet(
     )
     topic_word_assig = model.word_topics
     doc_topic_assig = (doc_topic.T * (cell_cov)).T
-    ll = loglikelihood(topic_word_assig, doc_topic_assig, alpha, eta)
+    ll = loglikelihood(topic_word_assig, doc_topic_assig, ll_alpha, ll_eta)
 
     # Organize data
     if len(mimno_2011) <= top_topics_coh:
