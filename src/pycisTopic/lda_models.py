@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import pickle
@@ -772,6 +773,25 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         ).astype(np.float32)
 
         return region_topic_probabilities
+
+    @staticmethod
+    def read_parameters_json_filename(parameters_json_filename: str) -> dict:
+        """
+        Read parameters from JSON file which gets written by `LDAMallet.run_mallet_topic_modeling`.
+
+        Parameters
+        ----------
+        parameters_json_filename
+            Parameters JSON filename created by `LDAMallet.run_mallet_topic_modeling`.
+
+        Returns
+        -------
+        Dictionary with Mallet LDA parameters and settings.
+
+        """
+        with open(parameters_json_filename, "r") as fh:
+            mallet_train_topics_parameters = json.load(fh)
+        return mallet_train_topics_parameters
 
     @staticmethod
     def run_mallet_topic_modeling(
