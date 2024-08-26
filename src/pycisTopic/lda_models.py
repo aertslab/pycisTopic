@@ -632,6 +632,89 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             os.remove(mallet_corpus_txt_filename)
 
     @staticmethod
+    def convert_cell_topic_probabilities_txt_to_parquet(
+        mallet_cell_topic_probabilities_txt_filename: str,
+        mallet_cell_topic_probabilities_parquet_filename: str,
+    ) -> None:
+        """
+        Convert cell-topic probabilities from Mallet output to Parquet file.
+
+        Parameters
+        ----------
+        mallet_cell_topic_probabilities_txt_filename
+            Mallet cell-topic probabilities text file.
+        mallet_cell_topic_probabilities_parquet_filename
+            Parquet output file with cell-topic probabilities.
+
+        Returns
+        -------
+        None
+
+        """
+        # Read cell-topic probabilities Mallet output file and extract for each cell
+        # barcode the probability for the cell barcode to belong to a certain topic.
+        #
+        # Column 0: order in which cell barcode idx was seen in the input corpus file.
+        # Column 1: cell barcode idx
+        # Column 3-n: "topic probability" for each topic
+        #
+        # Mallet cell-topic probabilities file example:
+        # ---------------------------------------------
+        #
+        # 0	0	0.06355276993175679	0.1908026307651073	0.06691338680081645	0.007391295383790694	0.07775807681999052	0.08091252087499742	0.08262375523163516	9.793208667505102E-4	0.007721171886275076	0.01605055357400573	0.014071294559099437	0.025307712924973712	0.020524503638950167	0.061903387419334883	0.07344906500628827	0.02866832979403336	0.03520400799950518	0.07608807702616333	0.047656845968290625	0.022421293528235367
+        # 1	1	0.10109016579604815	0.0016579604814898933	0.033499886441062915	0.003792868498750852	0.06665909607086078	0.19216443334090394	0.023143311378605497	0.0011128775834658188	0.08719055189643425	0.00401998637292755	0.0030206677265500795	0.03617987735634794	0.02473313649784238	0.255984555984556	0.004383374971610266	0.037179196002725415	0.023143311378605497	0.06202589143765614	0.009379968203497615	0.02963888258005905
+        # 2	2	0.08937104175357427	0.03120615116234973	0.11623971329970799	0.03952083886381736	0.034562364898175886	0.08415658538435283	0.03002104744207213	0.040440479350752775	0.02172532140012894	0.025119458455003983	0.01332530623080132	0.06196196291099397	0.07174617922560582	0.03189825173499185	0.05144772270469111	0.00540881337934696	0.08696291099397019	0.07489381470666313	0.04997819409154689	0.04001384201145284
+        # 3	3	0.05694870514375401	0.003620603552828708	0.07264393236783906	0.11541342655347078	0.005546835984875508	0.025451237782692444	0.010790468716558465	0.377309695369908	0.03540343868160091	0.007580081329813798	0.023453663408717986	0.02869729614040094	0.08166868802168795	0.01703288863522865	0.006153242491260612	0.0172112434900478	0.06311978312049654	0.02124206320896055	0.012895056003424414	0.017817649996432903
+        # 4	4	0.08079825190344497	0.002168049438355697	0.06058588548601864	0.002919184676841135	0.07448188739799926	0.12989518249172044	0.15225852709208235	0.008962409095564889	0.02753593499265936	0.001519341732391	0.011386527365222438	0.012376660179589606	0.015108061046809382	0.1424596264809314	0.015449486155211854	0.027740790057700842	0.068370377957595	0.1540339376557752	0.002168049438355697	0.00978182935573082
+        cell_topic_probabilities_ldf = pl.scan_csv(
+            mallet_cell_topic_probabilities_txt_filename,
+            separator="\t",
+            has_header=False,
+            with_column_names=lambda cols: [
+                f"topic_{idx - 1}" if idx > 1 else f"cell_idx{idx}"
+                for idx, col in enumerate(cols)
+            ],
+        )
+        # Get cell-topic probabilities as numpy matrix.
+        cell_topic_probabilities = (
+            cell_topic_probabilities_ldf.select(
+                pl.col("^topic_[0-9]+$").cast(pl.Float32)
+            )
+            .collect()
+            .to_numpy()
+        )
+
+        # Write cell-topic probabilities matrix to one column of a Parquet file.
+        pl.Series(
+            "cell_topic_probabilities", cell_topic_probabilities
+        ).to_frame().write_parquet(
+            f"{mallet_cell_topic_probabilities_parquet_filename}"
+        )
+
+    @staticmethod
+    def read_cell_topic_probabilities_parquet_file(
+        mallet_cell_topic_probabilities_parquet_filename: str,
+    ) -> np.ndarray:
+        """
+        Read cell-topic probabilities Parquet file to cell-topic probabilities matrix.
+
+        Parameters
+        ----------
+        mallet_cell_topic_probabilities_parquet_filename
+             Mallet cell-topic probabilities Parquet filename.
+
+        Returns
+        -------
+        Cell-topic probabilities matrix.
+
+        """
+        return (
+            pl.read_parquet(mallet_cell_topic_probabilities_parquet_filename)
+            .get_column("cell_topic_probabilities")
+            .to_numpy()
+        )
+
+    @staticmethod
     def run_mallet_topic_modeling(
         mallet_corpus_filename: str,
         output_prefix: str,
