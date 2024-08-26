@@ -573,10 +573,14 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         )
 
         if binary_matrix_csc.shape[0] == 0:
-            raise ValueError("Binary accessibility matrix does not contain any cell barcodes.")
+            raise ValueError(
+                "Binary accessibility matrix does not contain any cell barcodes."
+            )
 
         if binary_matrix_csc.shape[1] == 0:
-            raise ValueError("Binary accessibility matrix does not contain any regions.")
+            raise ValueError(
+                "Binary accessibility matrix does not contain any regions."
+            )
 
         with open(mallet_corpus_txt_filename, "w") as mallet_corpus_txt_fh:
             # Iterate over each column (cell barcode index) of the sparse binary
@@ -622,6 +626,10 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
             raise RuntimeError(
                 f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
             )
+
+        # Remove Mallet text corpus as only Mallet serialised corpus file is needed.
+        if os.path.exists(mallet_corpus_txt_filename):
+            os.remove(mallet_corpus_txt_filename)
 
     def train(self, corpus, reuse_corpus):
         """
