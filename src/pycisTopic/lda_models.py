@@ -830,6 +830,53 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         return os.path.join(self.tmp_dir, f"{self.random_label}_topickeys.txt")
 
 
+class LDAMalletFilenames:
+    """Class to generate output filenames when running functions of LDAMallet."""
+
+    def __init__(self, output_prefix: str, n_topics: int):
+        """
+        Generate output filenames when running functions of LDAMallet.
+
+        Parameters
+        ----------
+        output_prefix
+            Output prefix.
+        n_topics
+            The number of topics used in the model.
+
+        """
+        self.output_prefix = output_prefix
+        self.n_topics = n_topics
+
+    @property
+    def parameters_json_filename(self):
+        return os.path.join(
+            f"{self.output_prefix}.{self.n_topics}_topics.parameters.json"
+        )
+
+    @property
+    def cell_topic_probabilities_txt_filename(self):
+        return os.path.join(
+            f"{self.output_prefix}.{self.n_topics}_topics.cell_topic_probabilities.txt"
+        )
+
+    @property
+    def cell_topic_probabilities_parquet_filename(self):
+        return os.path.join(
+            f"{self.output_prefix}.{self.n_topics}_topics.cell_topic_probabilities.parquet"
+        )
+
+    @property
+    def region_topic_counts_txt_filename(self):
+        return f"{self.output_prefix}.{self.n_topics}_topics.region_topic_counts.txt"
+
+    @property
+    def region_topic_counts_parquet_filename(self):
+        return (
+            f"{self.output_prefix}.{self.n_topics}_topics.region_topic_counts.parquet"
+        )
+
+
 def run_cgs_models_mallet(
     cistopic_obj: CistopicObject,
     n_topics: list[int],
