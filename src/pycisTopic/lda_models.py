@@ -631,61 +631,112 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         if os.path.exists(mallet_corpus_txt_filename):
             os.remove(mallet_corpus_txt_filename)
 
-    def train(self, corpus, reuse_corpus):
+    @staticmethod
+    def run_mallet_topic_modeling(
+        mallet_corpus_filename: str,
+        output_prefix: str,
+        n_topics: int,
+        alpha: float = 50,
+        alpha_by_topic: bool = True,
+        eta: float = 0.1,
+        eta_by_topic: bool = False,
+        n_cpu: int = 1,
+        optimize_interval: int = 0,
+        iterations: int = 150,
+        topic_threshold: float = 0.0,
+        random_seed: int = 555,
+        mallet_path: str = "mallet",
+    ):
         """
-        Train Mallet LDA.
+        Run Mallet LDA.
 
         Parameters
         ----------
-        corpus : iterable of iterable of (int, int)
-            Corpus in BoW format
-        reuse_corpus: bool, optional
-            Whether to reuse the mallet corpus in the tmp directory. Default: False
+        mallet_corpus_filename
+            Mallet corpus file.
+        output_prefix
+            Output prefix.
+        n_topics
+            The number of topics to use in the model.
+        alpha
+            Scalar value indicating the symmetric Dirichlet hyperparameter for topic
+            proportions. Default: 50.
+        alpha_by_topic
+            Boolean indicating whether the scalar given in alpha has to be divided by
+            the number of topics. Default: True.
+        eta
+            Scalar value indicating the symmetric Dirichlet hyperparameter for topic
+            multinomials. Default: 0.1.
+        eta_by_topic
+            Boolean indicating whether the scalar given in beta has to be divided by
+            the number of topics. Default: False
+        n_cpu
+            Number of threads that will be used for training. Default: 1.
+        optimize_interval
+            Optimize hyperparameters every `optimize_interval` iterations (sometimes
+            leads to Java exception, 0 to switch off hyperparameter optimization).
+            Default: 0.
+        iterations
+            Number of training iterations. Default: 150.
+        topic_threshold
+            Threshold of the probability above which we consider a topic. Default: 0.0.
+        random_seed
+            Random seed to ensure consistent results, if 0 - use system clock.
+            Default: 555.
+        mallet_path
+            Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet). Default: "mallet".
 
         """
         logger = logging.getLogger("LDAMalletWrapper")
-        if os.path.isfile(self.fcorpusmallet()) is False or reuse_corpus is False:
-            self.convert_input(corpus)
-        else:
-            logger.info("MALLET corpus already exists, training model")
+
+        # Mallet divides alpha value by default by the number of topics, so in case
+        # alpha_by_topic=False, input alpha needs to be multiplied by n_topics.
+        mallet_alpha = alpha if alpha_by_topic else alpha * n_topics
+
+        mallet_beta = eta / n_topics if eta_by_topic else eta
+
+        lda_mallet_filenames = LDAMalletFilenames(
+            output_prefix=output_prefix, n_topics=n_topics
+        )
+
+        if not os.path.exists(mallet_corpus_filename):
+            raise FileNotFoundError(
+                f'Mallet corpus file "{mallet_corpus_filename}" does not exist.'
+            )
 
         cmd = [
-            self.mallet_path,
+            mallet_path,
             "train-topics",
             "--input",
-            self.fcorpusmallet(),
+            mallet_corpus_filename,
             "--num-topics",
-            str(self.num_topics),
+            str(n_topics),
             "--alpha",
-            str(self.alpha),
+            str(mallet_alpha),
             "--beta",
-            str(self.eta),
+            str(mallet_beta),
             "--optimize-interval",
-            str(self.optimize_interval),
+            str(optimize_interval),
             "--num-threads",
-            str(self.n_cpu),
-            "--output-state",
-            self.fstate(),
-            "--output-doc-topics",
-            self.fdoctopics(),
-            "--output-topic-keys",
-            self.ftopickeys(),
+            str(n_cpu),
             "--num-iterations",
-            str(self.iterations),
-            "--inferencer-filename",
-            self.finferencer(),
+            str(iterations),
+            "--word-topic-counts-file",
+            lda_mallet_filenames.region_topic_counts_txt_filename,
+            "--output-doc-topics",
+            lda_mallet_filenames.cell_topic_probabilities_txt_filename,
             "--doc-topics-threshold",
-            str(self.topic_threshold),
+            str(topic_threshold),
             "--random-seed",
-            str(self.random_seed),
+            str(random_seed),
         ]
 
-        start = time.time()
+        start_time = time.time()
         logger.info(f"Training MALLET LDA with: {' '.join(cmd)}")
         try:
             subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(
+            raise RuntimeError(  # noqa: B904
                 f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
             )
         self.word_topics = self.load_word_topics()
