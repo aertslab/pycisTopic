@@ -79,26 +79,19 @@ def run_topic_modeling_lda(args):
 
 
 def run_topic_modeling_mallet(args):
-    from pycisTopic.lda_models import run_cgs_models_mallet
+    from pycisTopic.lda_models import LDAMallet
 
-    input_filename = args.input
-    output_filename = args.output
-    topics = args.topics
+    mallet_corpus_filename = args.mallet_corpus_filename
+    output_prefix = args.output_prefix
+    n_topics_list = [args.topics] if isinstance(args.topics, int) else args.topics
     alpha = args.alpha
     alpha_by_topic = args.alpha_by_topic
     eta = args.eta
     eta_by_topic = args.eta_by_topic
     n_iter = args.iterations
     n_cpu = args.parallel
-    save_path = (
-        (output_filename[:-4] if output_filename.endswith(".pkl") else output_filename)
-        if args.keep_intermediate_topic_models
-        else None
-    )
     random_state = args.seed
     memory_in_gb = f"{args.memory_in_gb}G"
-    temp_dir = args.temp_dir
-    reuse_corpus = args.reuse_corpus
     mallet_path = args.mallet_path
 
     if args.verbose:
@@ -108,9 +101,9 @@ def run_topic_modeling_mallet(args):
         logging.basicConfig(level=level, format=log_format, handlers=handlers)
 
     print("Run topic modeling with Mallet with the following settings:")
-    print(f"  - Input cisTopic object filename:             {input_filename}")
-    print(f"  - Topic modeling output filename:             {output_filename}")
-    print(f"  - Number of topics to run topic modeling for: {topics}")
+    print(f"  - Mallet corpus filename:                     {mallet_corpus_filename}")
+    print(f"  - Output prefix:                              {output_prefix}")
+    print(f"  - Number of topics to run topic modeling for: {n_topics_list}")
     print(f"  - Alpha:                                      {alpha}")
     print(f"  - Divide alpha by the number of topics:       {alpha_by_topic}")
     print(f"  - Eta:                                        {eta}")
@@ -118,42 +111,35 @@ def run_topic_modeling_mallet(args):
     print(f"  - Number of iterations:                       {n_iter}")
     print(f"  - Number threads Mallet is allowed to use:    {n_cpu}")
     print(f"  - Seed:                                       {random_state}")
-    print(f"  - Save intermediate topic models in dir:      {save_path}")
-    print(f"  - TMP dir:                                    {temp_dir}")
-    print(f"  - Reuse Mallet corpus:                        {reuse_corpus}")
     print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}")
     print(f"  - Mallet binary:                              {mallet_path}")
 
-    print(f'\nLoading cisTopic object from "{input_filename}"...\n')
-    with open(input_filename, "rb") as fh:
-        cistopic_obj = pickle.load(fh)
-
-    # Run models
-    print("Running models")
-    print("--------------")
-
     os.environ["MALLET_MEMORY"] = memory_in_gb
 
-    models = run_cgs_models_mallet(
-        cistopic_obj,
-        n_topics=topics,
-        n_cpu=parallel,
-        n_iter=iterations,
-        random_state=random_state,
-        alpha=alpha,
-        alpha_by_topic=alpha_by_topic,
-        eta=eta,
-        eta_by_topic=eta_by_topic,
-        save_path=save_path,
-        top_topics_coh=5,
-        tmp_path=temp_dir,
-        reuse_corpus=reuse_corpus,
-        mallet_path=mallet_path,
-    )
+    for n_topics in n_topics_list:
+        # Run models
+        print(f"\nRunning Mallet topic modeling for {n_topics} topics.")
+        print(f"----------------------------------{'-' * len(str(n_topics))}--------")
 
-    print(f'\nWriting topic modeling output to "{output_filename}"...')
-    with open(output_filename, "wb") as fh:
-        pickle.dump(models, fh)
+        LDAMallet.run_mallet_topic_modeling(
+            mallet_corpus_filename=mallet_corpus_filename,
+            output_prefix=output_prefix,
+            n_topics=n_topics,
+            alpha=alpha,
+            alpha_by_topic=alpha_by_topic,
+            eta=eta,
+            eta_by_topic=eta_by_topic,
+            n_cpu=n_cpu,
+            optimize_interval=0,
+            iterations=n_iter,
+            topic_threshold=0.0,
+            random_seed=random_state,
+            mallet_path=mallet_path,
+        )
+
+        print(
+            f'\nWriting Mallet topic modeling output files to "{output_prefix}.{n_topics}_topics.*"...'
+        )
 
 
 def run_convert_binary_matrix_to_mallet_corpus_file(args):
@@ -364,20 +350,20 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet.add_argument(
         "-i",
         "--input",
-        dest="input",
+        dest="mallet_corpus_filename",
         action="store",
         type=str,
         required=True,
-        help="cisTopic object pickle input filename.",
+        help="Mallet corpus filename.",
     )
     parser_topic_modeling_mallet.add_argument(
         "-o",
         "--output",
-        dest="output",
+        dest="output_prefix",
         action="store",
         type=str,
         required=True,
-        help="Topic model list pickle output filename.",
+        help="Topic model output prefix.",
     )
     parser_topic_modeling_mallet.add_argument(
         "-t",
@@ -444,18 +430,6 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help="Whether the eta value should by divided by the number of topics. Default: False.",
     )
     parser_topic_modeling_mallet.add_argument(
-        "-k",
-        "--keep",
-        dest="keep_intermediate_topic_models",
-        type=str_to_bool,
-        choices=(True, False),
-        required=False,
-        default=False,
-        help="Whether intermediate topic models should be kept. "
-        "Useful to enable if running with a lot of topic numbers, to not lose finished topic model runs. "
-        "Default: False.",
-    )
-    parser_topic_modeling_mallet.add_argument(
         "-s",
         "--seed",
         dest="seed",
@@ -465,15 +439,6 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help="Seed for ensuring reproducibility. Default: 555.",
     )
     parser_topic_modeling_mallet.add_argument(
-        "-T",
-        "--temp_dir",
-        dest="temp_dir",
-        type=str,
-        required=False,
-        default=None,
-        help=f'TMP directory to use instead of the default ("{tempfile.gettempdir()}").',
-    )
-    parser_topic_modeling_mallet.add_argument(
         "-m",
         "--memory",
         dest="memory_in_gb",
@@ -481,15 +446,6 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=False,
         default=100,
         help='Amount of memory (in GB) Mallet is allowed to use. Default: "100"',
-    )
-    parser_topic_modeling_mallet.add_argument(
-        "-r",
-        "--reuse_corpus",
-        dest="reuse_corpus",
-        type=str_to_bool,
-        required=False,
-        default=False,
-        help="Whether to reuse the corpus from Mallet. Default: False.",
     )
     parser_topic_modeling_mallet.add_argument(
         "-b",
