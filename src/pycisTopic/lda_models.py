@@ -394,7 +394,7 @@ class LDAMallet:
         None.
 
         """
-        logger = logging.getLogger("LDAMalletWrapper")
+        logger = logging.getLogger("LDAMallet")
 
         # Convert binary accessibility matrix to compressed sparse column matrix format
         # and eliminate zeros as we assume later that for each found index, the
@@ -405,7 +405,7 @@ class LDAMallet:
         mallet_corpus_txt_filename = f"{mallet_corpus_filename}.txt"
 
         logger.info(
-            f"Serializing binary matrix to Mallet text corpus to {mallet_corpus_txt_filename}"
+            f'Serializing binary matrix to Mallet text corpus to "{mallet_corpus_txt_filename}".'
         )
 
         if binary_matrix_csc.shape[0] == 0:
@@ -751,7 +751,7 @@ class LDAMallet:
             Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet). Default: "mallet".
 
         """
-        logger = logging.getLogger("LDAMalletWrapper")
+        logger = logging.getLogger("LDAMallet")
 
         # Mallet divides alpha value by default by the number of topics, so in case
         # alpha_by_topic=False, input alpha needs to be multiplied by n_topics.
@@ -796,7 +796,7 @@ class LDAMallet:
         ]
 
         start_time = time.time()
-        logger.info(f"Training Mallet LDA with: {' '.join(cmd)}")
+        logger.info(f"Train topics with Mallet LDA: {' '.join(cmd)}")
         try:
             subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
@@ -805,12 +805,18 @@ class LDAMallet:
             )
 
         # Convert cell-topic probabilities text version to parquet.
+        logger.info(
+            f'Write cell-topic probabilities to "{lda_mallet_filenames.cell_topic_probabilities_parquet_filename}".'
+        )
         LDAMallet.convert_cell_topic_probabilities_txt_to_parquet(
             mallet_cell_topic_probabilities_txt_filename=lda_mallet_filenames.cell_topic_probabilities_txt_filename,
             mallet_cell_topic_probabilities_parquet_filename=lda_mallet_filenames.cell_topic_probabilities_parquet_filename,
         )
 
         # Convert region-topic counts text version to parquet.
+        logger.info(
+            f'Write region-topic counts to "{lda_mallet_filenames.region_topic_counts_parquet_filename}".'
+        )
         LDAMallet.convert_region_topic_counts_txt_to_parquet(
             mallet_region_topic_counts_txt_filename=lda_mallet_filenames.region_topic_counts_txt_filename,
             mallet_region_topic_counts_parquet_filename=lda_mallet_filenames.region_topic_counts_parquet_filename,
@@ -819,6 +825,9 @@ class LDAMallet:
         total_time = time.time() - start_time
 
         # Write JSON file with all used parameters.
+        logger.info(
+            f'Write JSON parameters file to "{lda_mallet_filenames.parameters_json_filename}".'
+        )
         with open(lda_mallet_filenames.parameters_json_filename, "w") as fh:
             mallet_train_topics_parameters = {
                 "mallet_corpus_filename": mallet_corpus_filename,
