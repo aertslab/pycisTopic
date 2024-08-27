@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 import os
 import pickle
+import sys
 import tempfile
 from argparse import ArgumentTypeError
 from typing import TYPE_CHECKING
@@ -15,13 +17,13 @@ def run_topic_modeling_lda(args):
 
     input_filename = args.input
     output_filename = args.output
-    topics = args.topics
+    n_topics = args.topics
     alpha = args.alpha
     alpha_by_topic = args.alpha_by_topic
     eta = args.eta
     eta_by_topic = args.eta_by_topic
-    iterations = args.iterations
-    parallel = args.parallel
+    n_iter = args.iterations
+    n_cpu = args.parallel
     save_path = (
         (output_filename[:-4] if output_filename.endswith(".pkl") else output_filename)
         if args.keep_intermediate_topic_models
@@ -30,16 +32,22 @@ def run_topic_modeling_lda(args):
     random_state = args.seed
     temp_dir = args.temp_dir
 
+    if args.verbose:
+        level = logging.INFO
+        log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+        handlers = [logging.StreamHandler(stream=sys.stdout)]
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
+
     print("Run topic modeling with lda with the following settings:")
     print(f"  - Input cisTopic object filename:             {input_filename}")
     print(f"  - Topic modeling output filename:             {output_filename}")
-    print(f"  - Number of topics to run topic modeling for: {topics}")
+    print(f"  - Number of topics to run topic modeling for: {n_topics}")
     print(f"  - Alpha:                                      {alpha}")
     print(f"  - Divide alpha by the number of topics:       {alpha_by_topic}")
     print(f"  - Eta:                                        {eta}")
     print(f"  - Divide eta by the number of topics:         {eta_by_topic}")
-    print(f"  - Number of iterations:                       {iterations}")
-    print(f"  - Number of topic models to run in parallel:  {parallel}")
+    print(f"  - Number of iterations:                       {n_iter}")
+    print(f"  - Number of topic models to run in parallel:  {n_cpu}")
     print(f"  - Seed:                                       {random_state}")
     print(f"  - Save intermediate topic models in dir:      {save_path}")
     print(f"  - TMP dir:                                    {temp_dir}")
@@ -53,9 +61,9 @@ def run_topic_modeling_lda(args):
     print("--------------")
     models = run_cgs_models(
         cistopic_obj,
-        n_topics=topics,
-        n_cpu=parallel,
-        n_iter=iterations,
+        n_topics=n_topics,
+        n_cpu=n_cpu,
+        n_iter=n_iter,
         random_state=random_state,
         alpha=alpha,
         alpha_by_topic=alpha_by_topic,
@@ -80,8 +88,8 @@ def run_topic_modeling_mallet(args):
     alpha_by_topic = args.alpha_by_topic
     eta = args.eta
     eta_by_topic = args.eta_by_topic
-    iterations = args.iterations
-    parallel = args.parallel
+    n_iter = args.iterations
+    n_cpu = args.parallel
     save_path = (
         (output_filename[:-4] if output_filename.endswith(".pkl") else output_filename)
         if args.keep_intermediate_topic_models
@@ -93,6 +101,12 @@ def run_topic_modeling_mallet(args):
     reuse_corpus = args.reuse_corpus
     mallet_path = args.mallet_path
 
+    if args.verbose:
+        level = logging.INFO
+        log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+        handlers = [logging.StreamHandler(stream=sys.stdout)]
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
+
     print("Run topic modeling with Mallet with the following settings:")
     print(f"  - Input cisTopic object filename:             {input_filename}")
     print(f"  - Topic modeling output filename:             {output_filename}")
@@ -101,8 +115,8 @@ def run_topic_modeling_mallet(args):
     print(f"  - Divide alpha by the number of topics:       {alpha_by_topic}")
     print(f"  - Eta:                                        {eta}")
     print(f"  - Divide eta by the number of topics:         {eta_by_topic}")
-    print(f"  - Number of iterations:                       {iterations}")
-    print(f"  - Number threads Mallet is allowed to use:    {parallel}")
+    print(f"  - Number of iterations:                       {n_iter}")
+    print(f"  - Number threads Mallet is allowed to use:    {n_cpu}")
     print(f"  - Seed:                                       {random_state}")
     print(f"  - Save intermediate topic models in dir:      {save_path}")
     print(f"  - TMP dir:                                    {temp_dir}")
@@ -150,6 +164,12 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
     mallet_corpus_filename = args.mallet_corpus_filename
     mallet_path = args.mallet_path
     memory_in_gb = f"{args.memory_in_gb}G"
+
+    if args.verbose:
+        level = logging.INFO
+        log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+        handlers = [logging.StreamHandler(stream=sys.stdout)]
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
 
     print(
         f'Read binary accessibility matrix from "{binary_matrix_filename}" Matrix Market file.'
@@ -255,8 +275,8 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         dest="iterations",
         type=int,
         required=False,
-        default=500,
-        help="Number of iterations. Default: 500.",
+        default=150,
+        help="Number of iterations. Default: 150.",
     )
     parser_topic_modeling_lda.add_argument(
         "-a",
@@ -326,6 +346,14 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=None,
         help=f'TMP directory to use instead of the default ("{tempfile.gettempdir()}").',
     )
+    parser_topic_modeling_lda.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        required=False,
+        help="Enable verbose mode.",
+    )
 
     parser_topic_modeling_mallet = subparser_topic_modeling.add_parser(
         "mallet",
@@ -375,7 +403,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=int,
         required=False,
         default=150,
-        help="Number of iterations. Default: 500.",
+        help="Number of iterations. Default: 150.",
     )
     parser_topic_modeling_mallet.add_argument(
         "-a",
@@ -472,6 +500,14 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default="mallet",
         help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
     )
+    parser_topic_modeling_mallet.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        required=False,
+        help="Enable verbose mode.",
+    )
 
     parser_topic_modeling_create_mallet_corpus = subparser_topic_modeling.add_parser(
         "create_mallet_corpus",
@@ -516,4 +552,12 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=False,
         default="mallet",
         help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
+    )
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        required=False,
+        help="Enable verbose mode.",
     )
