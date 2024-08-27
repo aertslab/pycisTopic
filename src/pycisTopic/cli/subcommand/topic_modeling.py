@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from argparse import ArgumentParser, _SubParsersAction
 
 
-def run_topic_modeling_lda(args):
+def run_topic_modeling_with_lda(args):
     from pycisTopic.lda_models import run_cgs_models
 
     input_filename = args.input
@@ -78,7 +78,7 @@ def run_topic_modeling_lda(args):
         pickle.dump(models, fh)
 
 
-def run_topic_modeling_mallet(args):
+def run_topic_modeling_with_mallet(args):
     from pycisTopic.lda_models import LDAMallet
 
     mallet_corpus_filename = args.mallet_corpus_filename
@@ -216,9 +216,9 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
 
     parser_topic_modeling_lda = subparser_topic_modeling.add_parser(
         "lda",
-        help='"Run LDA topic modeling with "lda" package.',
+        help='Run LDA topic modeling with "lda" package.',
     )
-    parser_topic_modeling_lda.set_defaults(func=run_topic_modeling_lda)
+    parser_topic_modeling_lda.set_defaults(func=run_topic_modeling_with_lda)
 
     parser_topic_modeling_lda.add_argument(
         "-i",
@@ -341,15 +341,26 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help="Enable verbose mode.",
     )
 
-    parser_topic_modeling_create_mallet_corpus = subparser_topic_modeling.add_parser(
-        "create_mallet_corpus",
-        help='"Convert binary accessibility matrix to Mallet serialized corpus file.',
+    parser_topic_modeling_mallet = subparser_topic_modeling.add_parser(
+        "mallet", help='Run LDA topic modeling with "Mallet".'
     )
-    parser_topic_modeling_create_mallet_corpus.set_defaults(
+
+    subparser_topic_modeling_mallet = parser_topic_modeling_mallet.add_subparsers(
+        title='Topic modeling with "Mallet"',
+        dest="mallet",
+        help='List of "Mallet" topic modeling subcommands.',
+    )
+    subparser_topic_modeling_mallet.required = True
+
+    parser_topic_modeling_mallet_create_corpus = subparser_topic_modeling_mallet.add_parser(
+        "create_corpus",
+        help="Convert binary accessibility matrix to Mallet serialized corpus file.",
+    )
+    parser_topic_modeling_mallet_create_corpus.set_defaults(
         func=run_convert_binary_matrix_to_mallet_corpus_file
     )
 
-    parser_topic_modeling_create_mallet_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus.add_argument(
         "-i",
         "--input",
         dest="binary_matrix_filename",
@@ -358,7 +369,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Binary accessibility matrix (region IDs vs cell barcodes) in Matrix Market format.",
     )
-    parser_topic_modeling_create_mallet_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus.add_argument(
         "-o",
         "--output",
         dest="mallet_corpus_filename",
@@ -367,7 +378,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Mallet serialized corpus filename.",
     )
-    parser_topic_modeling_create_mallet_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus.add_argument(
         "-m",
         "--memory",
         dest="memory_in_gb",
@@ -376,7 +387,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=10,
         help='Amount of memory (in GB) Mallet is allowed to use. Default: "10"',
     )
-    parser_topic_modeling_create_mallet_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus.add_argument(
         "-b",
         "--mallet_path",
         dest="mallet_path",
@@ -385,7 +396,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default="mallet",
         help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
     )
-    parser_topic_modeling_create_mallet_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus.add_argument(
         "-v",
         "--verbose",
         dest="verbose",
@@ -394,13 +405,13 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help="Enable verbose mode.",
     )
 
-    parser_topic_modeling_mallet = subparser_topic_modeling.add_parser(
-        "mallet",
-        help='"Run LDA topic modeling with "Mallet".',
+    parser_topic_modeling_mallet_run = subparser_topic_modeling_mallet.add_parser(
+        "run",
+        help='Run LDA topic modeling with "Mallet".',
     )
-    parser_topic_modeling_mallet.set_defaults(func=run_topic_modeling_mallet)
+    parser_topic_modeling_mallet_run.set_defaults(func=run_topic_modeling_with_mallet)
 
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-i",
         "--input",
         dest="mallet_corpus_filename",
@@ -409,7 +420,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Mallet corpus filename.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-o",
         "--output",
         dest="output_prefix",
@@ -418,7 +429,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Topic model output prefix.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-t",
         "--topics",
         dest="topics",
@@ -427,7 +438,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         nargs="+",
         help="Number(s) of topics to create during topic modeling.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-p",
         "--parallel",
         dest="parallel",
@@ -435,7 +446,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Number of threads Mallet is allowed to use.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-n",
         "--iterations",
         dest="iterations",
@@ -444,7 +455,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=150,
         help="Number of iterations. Default: 150.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-a",
         "--alpha",
         dest="alpha",
@@ -453,7 +464,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=50,
         help="Alpha value. Default: 50.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-A",
         "--alpha_by_topic",
         dest="alpha_by_topic",
@@ -463,7 +474,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=True,
         help="Whether the alpha value should by divided by the number of topics. Default: True.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-e",
         "--eta",
         dest="eta",
@@ -472,7 +483,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=0.1,
         help="Eta value. Default: 0.1.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-E",
         "--eta_by_topic",
         dest="eta_by_topic",
@@ -482,7 +493,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=False,
         help="Whether the eta value should by divided by the number of topics. Default: False.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-s",
         "--seed",
         dest="seed",
@@ -491,7 +502,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=555,
         help="Seed for ensuring reproducibility. Default: 555.",
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-m",
         "--memory",
         dest="memory_in_gb",
@@ -500,7 +511,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=100,
         help='Amount of memory (in GB) Mallet is allowed to use. Default: "100"',
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-b",
         "--mallet_path",
         dest="mallet_path",
@@ -509,7 +520,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default="mallet",
         help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
     )
-    parser_topic_modeling_mallet.add_argument(
+    parser_topic_modeling_mallet_run.add_argument(
         "-v",
         "--verbose",
         dest="verbose",
