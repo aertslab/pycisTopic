@@ -4,10 +4,8 @@ import json
 import logging
 import os
 import pickle
-import random
 import subprocess
 import sys
-import tempfile
 import time
 import warnings
 from itertools import chain
@@ -22,8 +20,6 @@ import polars as pl
 import ray
 import scipy
 import tmtoolkit
-from gensim import matutils, utils
-from gensim.models import basemodel
 from pycisTopic.utils import loglikelihood, subset_list
 
 if TYPE_CHECKING:
@@ -372,102 +368,8 @@ def run_cgs_model(
     return model
 
 
-class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
-    """
-    Wrapper class to run LDA models with Mallet. This class has been adapted from gensim (https://github.com/RaRe-Technologies/gensim/blob/27bbb7015dc6bbe02e00bb1853e7952ac13e7fe0/gensim/models/wrappers/ldamallet.py).
-
-    Parameters
-    ----------
-    num_topics: int
-        The number of topics to use in the model.
-    corpus: iterable of iterable of (int, int), optional
-        Collection of texts in BoW format. Default: None.
-    alpha: float, optional
-        Scalar value indicating the symmetric Dirichlet hyperparameter for topic proportions. Default: 50.
-    id2word : :class:`gensim.utils.FakeDict`, optional
-        Mapping between tokens ids and words from corpus, if not specified - will be inferred from `corpus`. Default: None.
-    n_cpu : int, optional
-        Number of threads that will be used for training. Default: 1.
-    tmp_dir : str, optional
-        tmp_dir for produced temporary files. Default: None.
-    optimize_interval : int, optional
-        Optimize hyperparameters every `optimize_interval` iterations (sometimes leads to Java exception 0 to switch off hyperparameter optimization). Default: 0.
-    iterations : int, optional
-        Number of training iterations. Default: 150.
-    topic_threshold : float, optional
-        Threshold of the probability above which we consider a topic. Default: 0.0.
-    random_seed: int, optional
-        Random seed to ensure consistent results, if 0 - use system clock. Default: 555.
-    mallet_path: str
-        Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet). Default: "mallet".
-
-    """
-
-    def __init__(
-        self,
-        num_topics: int,
-        corpus: list | None = None,
-        alpha: float = 50,
-        eta: float = 0.1,
-        id2word: utils.FakeDict = None,
-        n_cpu: int = 1,
-        tmp_dir: str = None,
-        optimize_interval: int = 0,
-        iterations: int = 150,
-        topic_threshold: float = 0.0,
-        random_seed: int = 555,
-        reuse_corpus: bool = False,
-        mallet_path: str = "mallet",
-    ):
-        logger = logging.getLogger("LDAMalletWrapper")
-        if id2word is None:
-            logger.warning(
-                "No id2word mapping provided; initializing from corpus, assuming identity"
-            )
-            self.num_terms = utils.get_max_id(corpus) + 1
-        else:
-            self.num_terms = id2word.num_terms
-
-        if self.num_terms == 0:
-            raise ValueError("Cannot compute LDA over an empty collection (no terms)")
-
-        self.num_topics = num_topics
-        self.topic_threshold = topic_threshold
-        self.alpha = alpha
-        self.eta = eta
-        self.tmp_dir = tmp_dir if tmp_dir else tempfile.gettempdir()
-        self.random_label = hex(random.randint(0, 0xFFFFFF))[2:]
-        self.n_cpu = n_cpu
-        self.optimize_interval = optimize_interval
-        self.iterations = iterations
-        self.random_seed = random_seed
-        self.mallet_path = mallet_path
-        if corpus is not None:
-            self.train(corpus, reuse_corpus)
-
-    def corpus_to_mallet(self, corpus, file_like):
-        """
-        Convert `corpus` to Mallet format and write it to `file_like` descriptor.
-
-        Parameters
-        ----------
-        corpus
-            iterable of iterable of (int, int)
-            Collection of texts in BoW format.
-        file_like
-             Writable file-like object in text mode.
-
-        Returns
-        -------
-        None.
-
-        """
-        # Iterate over each cell ("document").
-        for doc_idx, doc in enumerate(corpus):
-            # Get all accessible regions for the current cell.
-            tokens = chain.from_iterable([str(token_id)] for token_id, _cnt in doc)
-
-            file_like.write(f'{doc_idx}\t0\t{" ".join(tokens)}\n')
+class LDAMallet:
+    """Class for running LDA models with Mallet."""
 
     @staticmethod
     def convert_binary_matrix_to_mallet_corpus_file(
@@ -935,144 +837,6 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
                 "mallet_cmd": cmd,
             }
             json.dump(mallet_train_topics_parameters, fh)
-
-    def load_word_topics(self):
-        """
-        Load words X topics matrix from :meth:`gensim.models.wrappers.LDAMallet.LDAMallet.fstate` file.
-
-        Returns
-        -------
-        np.ndarray
-            Matrix words X topics.
-
-        """
-        logger = logging.getLogger("LDAMalletWrapper")
-        logger.info("loading assigned topics from %s", self.fstate())
-        word_topics = np.zeros((self.num_topics, self.num_terms), dtype=np.float64)
-
-        with utils.open(self.fstate(), "rb") as fin:
-            _ = next(fin)  # header
-            self.alpha = np.fromiter(next(fin).split()[2:], dtype=float)
-            assert (
-                len(self.alpha) == self.num_topics
-            ), "Mismatch between MALLET vs. requested topics"
-
-        # Get occurrence of each found topic-region combination:
-        #   - Get region (type) and topic column from Mallet state file.
-        #   - Count occurrence of each topic-region combination.
-        topic_region_occurrence_df_pl = (
-            pl.read_csv(
-                self.fstate(),
-                separator=" ",
-                has_header=False,
-                skip_rows=3,
-                columns=[4, 5],
-                new_columns=["region", "topic"],
-            )
-            .lazy()
-            .group_by(["topic", "region"])
-            .agg(pl.len().cast(pl.UInt32).alias("occurrence"))
-            .collect()
-        )
-
-        # Fill in word topics matrix values.
-        word_topics[
-            topic_region_occurrence_df_pl.get_column("topic"),
-            topic_region_occurrence_df_pl.get_column("region"),
-        ] = topic_region_occurrence_df_pl.get_column("occurrence")
-
-        return word_topics
-
-    def get_topics(self) -> np.ndarray:
-        """
-        Get the region-topic probability matrix learned during inference.
-
-        Returns
-        -------
-        The probability for each region in each topic, shape (no_regions, no_topics).
-
-        """
-        regions_topics_counts = np.asarray(self.word_topics, np.float64)
-
-        # Create regions topics frequency matrix by dividing all count values for topic
-        # by total counts for that topic.
-        regions_topics_frequency = (
-            regions_topics_counts / regions_topics_counts.sum(axis=1)[:, None]
-        ).astype(np.float32)
-
-        return regions_topics_frequency
-
-    def fcorpustxt(self):
-        """
-        Get path to corpus text file.
-
-        Returns
-        -------
-        str
-            Path to corpus text file.
-
-        """
-        return os.path.join(self.tmp_dir, "corpus.txt")
-
-    def fcorpusmallet(self):
-        """
-        Get path to corpus.mallet file.
-
-        Returns
-        -------
-        str
-            Path to corpus.mallet file.
-
-        """
-        return os.path.join(self.tmp_dir, "corpus.mallet")
-
-    def fstate(self):
-        """
-        Get path to temporary file.
-
-        Returns
-        -------
-        str
-            Path to file.
-
-        """
-        return os.path.join(self.tmp_dir, f"{self.random_label}_state.mallet.gz")
-
-    def fdoctopics(self):
-        """
-        Get path to document topic text file.
-
-        Returns
-        -------
-        str
-            Path to document topic text file.
-
-        """
-        return os.path.join(self.tmp_dir, f"{self.random_label}_doctopics.txt")
-
-    def finferencer(self):
-        """
-        Get path to inferencer.mallet file.
-
-        Returns
-        -------
-        str
-            Path to inferencer.mallet file.
-
-        """
-        return os.path.join(self.tmp_dir, f"{self.random_label}_inferencer.mallet")
-
-    def ftopickeys(self):
-        """
-        Get path to topic keys text file.
-
-        Returns
-        -------
-        str
-            Path to topic keys text file.
-
-        """
-        return os.path.join(self.tmp_dir, f"{self.random_label}_topickeys.txt")
 
 
 class LDAMalletFilenames:
