@@ -894,15 +894,47 @@ class LDAMallet(utils.SaveLoad, basemodel.BaseTopicModel):
         ]
 
         start_time = time.time()
-        logger.info(f"Training MALLET LDA with: {' '.join(cmd)}")
+        logger.info(f"Training Mallet LDA with: {' '.join(cmd)}")
         try:
             subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(  # noqa: B904
                 f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
             )
-        self.word_topics = self.load_word_topics()
-        self.time = time.time() - start
+
+        # Convert cell-topic probabilities text version to parquet.
+        LDAMallet.convert_cell_topic_probabilities_txt_to_parquet(
+            mallet_cell_topic_probabilities_txt_filename=lda_mallet_filenames.cell_topic_probabilities_txt_filename,
+            mallet_cell_topic_probabilities_parquet_filename=lda_mallet_filenames.cell_topic_probabilities_parquet_filename,
+        )
+
+        # Convert region-topic counts text version to parquet.
+        LDAMallet.convert_region_topic_counts_txt_to_parquet(
+            mallet_region_topic_counts_txt_filename=lda_mallet_filenames.region_topic_counts_txt_filename,
+            mallet_region_topic_counts_parquet_filename=lda_mallet_filenames.region_topic_counts_parquet_filename,
+        )
+
+        total_time = time.time() - start_time
+
+        # Write JSON file with all used parameters.
+        with open(lda_mallet_filenames.parameters_json_filename, "w") as fh:
+            mallet_train_topics_parameters = {
+                "mallet_corpus_filename": mallet_corpus_filename,
+                "output_prefix": output_prefix,
+                "n_topics": n_topics,
+                "alpha": alpha,
+                "alpha_by_topic": alpha_by_topic,
+                "eta": eta,
+                "eta_by_topic": eta_by_topic,
+                "n_cpu": n_cpu,
+                "optimize_interval": optimize_interval,
+                "iterations": iterations,
+                "random_seed": random_seed,
+                "mallet_path": mallet_path,
+                "time": total_time,
+                "mallet_cmd": cmd,
+            }
+            json.dump(mallet_train_topics_parameters, fh)
 
     def load_word_topics(self):
         """
