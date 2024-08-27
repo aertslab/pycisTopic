@@ -341,6 +341,59 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help="Enable verbose mode.",
     )
 
+    parser_topic_modeling_create_mallet_corpus = subparser_topic_modeling.add_parser(
+        "create_mallet_corpus",
+        help='"Convert binary accessibility matrix to Mallet serialized corpus file.',
+    )
+    parser_topic_modeling_create_mallet_corpus.set_defaults(
+        func=run_convert_binary_matrix_to_mallet_corpus_file
+    )
+
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-i",
+        "--input",
+        dest="binary_matrix_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Binary accessibility matrix (region IDs vs cell barcodes) in Matrix Market format.",
+    )
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-o",
+        "--output",
+        dest="mallet_corpus_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Mallet serialized corpus filename.",
+    )
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-m",
+        "--memory",
+        dest="memory_in_gb",
+        type=int,
+        required=False,
+        default=10,
+        help='Amount of memory (in GB) Mallet is allowed to use. Default: "10"',
+    )
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-b",
+        "--mallet_path",
+        dest="mallet_path",
+        type=str,
+        required=False,
+        default="mallet",
+        help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
+    )
+    parser_topic_modeling_create_mallet_corpus.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        required=False,
+        help="Enable verbose mode.",
+    )
+
     parser_topic_modeling_mallet = subparser_topic_modeling.add_parser(
         "mallet",
         help='"Run LDA topic modeling with "Mallet".',
@@ -457,59 +510,6 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
     )
     parser_topic_modeling_mallet.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        action="store_true",
-        required=False,
-        help="Enable verbose mode.",
-    )
-
-    parser_topic_modeling_create_mallet_corpus = subparser_topic_modeling.add_parser(
-        "create_mallet_corpus",
-        help='"Convert binary accessibility matrix to Mallet serialized corpus file.',
-    )
-    parser_topic_modeling_create_mallet_corpus.set_defaults(
-        func=run_convert_binary_matrix_to_mallet_corpus_file
-    )
-
-    parser_topic_modeling_create_mallet_corpus.add_argument(
-        "-i",
-        "--input",
-        dest="binary_matrix_filename",
-        action="store",
-        type=str,
-        required=True,
-        help="Binary accessibility matrix (region IDs vs cell barcodes) in Matrix Market format.",
-    )
-    parser_topic_modeling_create_mallet_corpus.add_argument(
-        "-o",
-        "--output",
-        dest="mallet_corpus_filename",
-        action="store",
-        type=str,
-        required=True,
-        help="Mallet serialized corpus filename.",
-    )
-    parser_topic_modeling_create_mallet_corpus.add_argument(
-        "-m",
-        "--memory",
-        dest="memory_in_gb",
-        type=int,
-        required=False,
-        default=10,
-        help='Amount of memory (in GB) Mallet is allowed to use. Default: "10"',
-    )
-    parser_topic_modeling_create_mallet_corpus.add_argument(
-        "-b",
-        "--mallet_path",
-        dest="mallet_path",
-        type=str,
-        required=False,
-        default="mallet",
-        help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
-    )
-    parser_topic_modeling_create_mallet_corpus.add_argument(
         "-v",
         "--verbose",
         dest="verbose",
