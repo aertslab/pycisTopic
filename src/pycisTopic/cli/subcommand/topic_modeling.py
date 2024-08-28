@@ -146,7 +146,7 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
     import scipy
     from pycisTopic.lda_models import LDAMallet
 
-    binary_matrix_filename = args.binary_matrix_filename
+    binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     mallet_corpus_filename = args.mallet_corpus_filename
     mallet_path = args.mallet_path
     memory_in_gb = f"{args.memory_in_gb}G"
@@ -158,9 +158,9 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
         logging.basicConfig(level=level, format=log_format, handlers=handlers)
 
     print(
-        f'Read binary accessibility matrix from "{binary_matrix_filename}" Matrix Market file.'
+        f'Read binary accessibility matrix from "{binary_accessibility_matrix_filename}" Matrix Market file.'
     )
-    binary_matrix = scipy.io.mmread(binary_matrix_filename)
+    binary_accessibility_matrix = scipy.io.mmread(binary_accessibility_matrix_filename)
 
     os.environ["MALLET_MEMORY"] = memory_in_gb
 
@@ -168,7 +168,7 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
         f'Convert binary accessibility matrix to Mallet serialized corpus file "{mallet_corpus_filename}".'
     )
     LDAMallet.convert_binary_matrix_to_mallet_corpus_file(
-        binary_matrix=binary_matrix,
+        binary_accessibility_matrix=binary_accessibility_matrix,
         mallet_corpus_filename=mallet_corpus_filename,
         mallet_path=mallet_path,
     )
@@ -179,16 +179,16 @@ def run_mallet_calculate_model_evaluation_stats(args):
     from pycisTopic.fragments import read_barcodes_file_to_polars_series
     from pycisTopic.lda_models import LDAMallet, calculate_model_evaluation_stats
 
-    binary_matrix_filename = args.binary_matrix_filename
+    binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     cell_barcodes_filename = args.cell_barcodes_filename
     region_ids_filename = args.region_ids_filename
     output_prefix = args.output_prefix
     n_topics_list = [args.topics] if isinstance(args.topics, int) else args.topics
 
     print(
-        f'Read binary accessibility matrix from "{binary_matrix_filename}" Matrix Market file.'
+        f'Read binary accessibility matrix from "{binary_accessibility_matrix_filename}" Matrix Market file.'
     )
-    binary_accessibility_matrix = scipy.io.mmread(binary_matrix_filename)
+    binary_accessibility_matrix = scipy.io.mmread(binary_accessibility_matrix_filename)
 
     print(f'Read cell barcodes filename "{cell_barcodes_filename}".')
     cell_barcodes = read_barcodes_file_to_polars_series(
@@ -409,7 +409,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet_create_corpus.add_argument(
         "-i",
         "--input",
-        dest="binary_matrix_filename",
+        dest="binary_accessibility_matrix_filename",
         action="store",
         type=str,
         required=True,
@@ -588,7 +588,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet_calculate_stats.add_argument(
         "-i",
         "--input",
-        dest="binary_matrix_filename",
+        dest="binary_accessibility_matrix_filename",
         action="store",
         type=str,
         required=True,

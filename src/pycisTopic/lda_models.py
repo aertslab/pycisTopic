@@ -146,14 +146,16 @@ def run_cgs_models(
     Griffiths, T. L., & Steyvers, M. (2004). Finding scientific topics. Proceedings of the National academy of Sciences, 101(suppl 1), 5228-5235.
 
     """
-    binary_matrix = scipy.sparse.csr_matrix(cistopic_obj.binary_matrix.transpose())
+    binary_accessibility_matrix = scipy.sparse.csr_matrix(
+        cistopic_obj.binary_matrix.transpose()
+    )
     region_names = cistopic_obj.region_names
     cell_names = cistopic_obj.cell_names
     ray.init(num_cpus=n_cpu, **kwargs)
     model_list = ray.get(
         [
             run_cgs_model.remote(
-                binary_matrix,
+                binary_accessibility_matrix,
                 n_topics=n_topic,
                 cell_names=cell_names,
                 region_names=region_names,
@@ -175,7 +177,7 @@ def run_cgs_models(
 
 @ray.remote
 def run_cgs_model(
-    binary_matrix: sparse.csr_matrix,
+    binary_accessibility_matrix: sparse.csr_matrix,
     n_topics: int,
     cell_names: list[str],
     region_names: list[str],
@@ -193,7 +195,7 @@ def run_cgs_model(
 
     Parameters
     ----------
-    binary_matrix: sparse.csr_matrix
+    binary_accessibility_matrix: sparse.csr_matrix
         Binary sparse matrix containing cells as columns, regions as rows, and 1 if a regions is considered accessible on a cell (otherwise, 0).
     n_topics: int
         Number of topics to use in the model.
@@ -256,19 +258,19 @@ def run_cgs_model(
     # Running model
     log.info(f"Running model with {n_topics} topics")
     start_time = time.time()
-    model.fit(binary_matrix)
+    model.fit(binary_accessibility_matrix)
     end_time = time.time() - start_time
 
     # Model evaluation
     arun_2010 = tmtoolkit.topicmod.evaluate.metric_arun_2010(
         model.topic_word_,
         model.doc_topic_,
-        np.asarray(binary_matrix.sum(axis=1)).astype(float),
+        np.asarray(binary_accessibility_matrix.sum(axis=1)).astype(float),
     )
     cao_juan_2009 = tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(model.topic_word_)
     mimno_2011 = tmtoolkit.topicmod.evaluate.metric_coherence_mimno_2011(
         model.topic_word_,
-        dtm=binary_matrix,
+        dtm=binary_accessibility_matrix,
         top_n=20,
         eps=1e-12,
         normalize=True,
@@ -307,7 +309,7 @@ def run_cgs_model(
             list(
                 chain.from_iterable(
                     tmtoolkit.topicmod.model_stats.marginal_topic_distrib(
-                        model.doc_topic_, binary_matrix.sum(axis=1)
+                        model.doc_topic_, binary_accessibility_matrix.sum(axis=1)
                     ).tolist()
                 )
             ),
@@ -373,7 +375,7 @@ class LDAMallet:
 
     @staticmethod
     def convert_binary_matrix_to_mallet_corpus_file(
-        binary_matrix: scipy.sparse.csr,
+        binary_accessibility_matrix: scipy.sparse.csr,
         mallet_corpus_filename: str,
         mallet_path: str = "mallet",
     ) -> None:
@@ -382,7 +384,7 @@ class LDAMallet:
 
         Parameters
         ----------
-        binary_matrix
+        binary_accessibility_matrix
             Binary accessibility matrix (region IDs vs cell barcodes)
         mallet_corpus_filename
             Mallet serialized corpus filename
@@ -399,21 +401,21 @@ class LDAMallet:
         # Convert binary accessibility matrix to compressed sparse column matrix format
         # and eliminate zeros as we assume later that for each found index, the
         # associated value is 1.
-        binary_matrix_csc = binary_matrix.tocsc()
-        binary_matrix_csc.eliminate_zeros()
+        binary_accessibility_matrix_csc = binary_accessibility_matrix.tocsc()
+        binary_accessibility_matrix_csc.eliminate_zeros()
 
         mallet_corpus_txt_filename = f"{mallet_corpus_filename}.txt"
 
         logger.info(
-            f'Serializing binary matrix to Mallet text corpus to "{mallet_corpus_txt_filename}".'
+            f'Serializing binary accessibility matrix to Mallet text corpus to "{mallet_corpus_txt_filename}".'
         )
 
-        if binary_matrix_csc.shape[0] == 0:
+        if binary_accessibility_matrix_csc.shape[0] == 0:
             raise ValueError(
                 "Binary accessibility matrix does not contain any cell barcodes."
             )
 
-        if binary_matrix_csc.shape[1] == 0:
+        if binary_accessibility_matrix_csc.shape[1] == 0:
             raise ValueError(
                 "Binary accessibility matrix does not contain any regions."
             )
@@ -423,11 +425,16 @@ class LDAMallet:
             # accessibility matrix in compressed sparse column matrix format and get
             # all index positions (region IDs indices) for that cell barcode index.
             for cell_barcode_idx, (indptr_start, indptr_end) in enumerate(
-                zip(binary_matrix_csc.indptr, binary_matrix_csc.indptr[1:])
+                zip(
+                    binary_accessibility_matrix_csc.indptr,
+                    binary_accessibility_matrix_csc.indptr[1:],
+                )
             ):
                 # Get all region ID indices (assume all have an associated value of 1)
                 # for the current cell barcode index.
-                region_ids_idx = binary_matrix_csc.indices[indptr_start:indptr_end]
+                region_ids_idx = binary_accessibility_matrix_csc.indices[
+                    indptr_start:indptr_end
+                ]
 
                 # Write Mallet text corpus for the current cell barcode index:
                 #   - column 1: cell barcode index.
