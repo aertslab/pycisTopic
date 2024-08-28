@@ -197,9 +197,9 @@ def run_cgs_model(
         Binary sparse matrix containing cells as columns, regions as rows, and 1 if a regions is considered accessible on a cell (otherwise, 0).
     n_topics: int
         Number of topics to use in the model.
-    cell_names: list of str
+    cell_barcodes: list of str
         List containing cell names as ordered in the binary matrix columns.
-    region_names: list of str
+    region_ids: list of str
         List containing region names as ordered in the binary matrix rows.
     n_iter: int, optional
         Number of iterations for which the Gibbs sampler will be run. Default: 150.
@@ -894,170 +894,45 @@ class LDAMalletFilenames:
             f"{self.output_prefix}.{self.n_topics}_topics.region_topic_counts.parquet"
         )
 
+    @property
+    def model_pickle_filename(self):
+        return f"{self.output_prefix}.{self.n_topics}_topics.model.pkl"
 
-def run_cgs_models_mallet(
-    cistopic_obj: CistopicObject,
-    n_topics: list[int],
-    n_cpu: int = 1,
-    n_iter: int = 150,
-    random_state: int = 555,
-    alpha: float = 50.0,
-    alpha_by_topic: bool = True,
-    eta: float = 0.1,
-    eta_by_topic: bool = False,
+
+def calculate_model_evaluation_stats(
+    binary_accessibility_matrix: scipy.sparse.csr_matrix,
+    cell_barcodes: list[str],
+    region_ids: list[str],
+    output_prefix: str,
+    n_topics: int,
     top_topics_coh: int = 5,
-    tmp_path: str = None,
-    save_path: str = None,
-    reuse_corpus: bool = False,
-    mallet_path: str = "mallet",
-):
+) -> None:
     """
-    Run Latent Dirichlet Allocation per model as implemented in Mallet (McCallum, 2002).
+    Calculate model evaluation statistics after running Mallet (McCallum, 2002) topic modeling.
 
     Parameters
     ----------
-    cistopic_obj: CistopicObject
-        A :class:`CistopicObject`. Note that cells/regions have to be filtered before running any LDA model.
-    n_topics: list of int
-        A list containing the number of topics to use in each model.
-    n_cpu: int, optional
-        Number of cpus to use for modelling. In this function parallelization is done per model, that is, one model will run entirely in a unique cpu. We recommend to set the number of cpus as the number of models that will be inferred, so all models start at the same time.
-    n_iter: int, optional
-        Number of iterations for which the Gibbs sampler will be run. Default: 150.
-    random_state: int, optional
-        Random seed to initialize the models. Default: 555.
-    alpha: float, optional
-        Scalar value indicating the symmetric Dirichlet hyperparameter for topic proportions. Default: 50.
-    alpha_by_topic: bool, optional
-        Boolean indicating whether the scalar given in alpha has to be divided by the number of topics. Default: True
-    eta: float, optional
-        Scalar value indicating the symmetric Dirichlet hyperparameter for topic multinomials. Default: 0.1.
-    eta_by_topic: bool, optional
-        Boolean indicating whether the scalar given in beta has to be divided by the number of topics. Default: False
-    top_topics_coh: int, optional
-        Number of topics to use to calculate the model coherence. For each model, the coherence will be calculated as the average of the top coherence values. Default: 5.
-    tmp_path: str, optional
-        Path to a temporary folder for Mallet. Default: None.
-    save_path: str, optional
-        Path to save models as independent files as they are completed. This is recommended for large data sets. Default: None.
-    reuse_corpus: bool, optional
-        Whether to reuse the mallet corpus in the tmp directory. Default: False
-    mallet_path: str
-        Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".
-
-    Return
-    ------
-    list of :class:`CistopicLDAModel`
-        A list with cisTopic LDA models.
-
-    References
-    ----------
-    McCallum, A. K. (2002). Mallet: A machine learning for language toolkit. http://mallet.cs.umass.edu.
-
-    """
-    # Create cisTopic logger
-    level = logging.INFO
-    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger("cisTopic")
-
-    binary_matrix = cistopic_obj.binary_matrix
-    region_names = cistopic_obj.region_names
-    cell_names = cistopic_obj.cell_names
-
-    log.info("Formatting input to corpus")
-    corpus = matutils.Sparse2Corpus(binary_matrix)
-    id2word = utils.FakeDict(len(region_names))
-
-    model_list = [
-        run_cgs_model_mallet(
-            binary_matrix=binary_matrix,
-            corpus=corpus,
-            id2word=id2word,
-            n_topics=n_topic,
-            cell_names=cell_names,
-            region_names=region_names,
-            n_cpu=n_cpu,
-            n_iter=n_iter,
-            random_state=random_state,
-            alpha=alpha,
-            alpha_by_topic=alpha_by_topic,
-            eta=eta,
-            eta_by_topic=eta_by_topic,
-            top_topics_coh=top_topics_coh,
-            tmp_path=tmp_path,
-            save_path=save_path,
-            reuse_corpus=reuse_corpus,
-            mallet_path=mallet_path,
-        )
-        for n_topic in n_topics
-    ]
-    return model_list
-
-
-def run_cgs_model_mallet(
-    binary_matrix: sparse.csr_matrix,
-    corpus: list,
-    id2word: utils.FakeDict,
-    n_topics: list[int],
-    cell_names: list[str],
-    region_names: list[str],
-    n_cpu: int = 1,
-    n_iter: int = 500,
-    random_state: int = 555,
-    alpha: float = 50,
-    alpha_by_topic: bool = True,
-    eta: float = 0.1,
-    eta_by_topic: bool = False,
-    top_topics_coh: int = 5,
-    tmp_path: str = None,
-    save_path: str = None,
-    reuse_corpus: bool = False,
-    mallet_path: str = "mallet",
-):
-    """
-    Run Latent Dirichlet Allocation in a model as implemented in Mallet (McCallum, 2002).
-
-    Parameters
-    ----------
-    binary_matrix: sparse.csr_matrix
-        Binary sparse matrix containing cells as columns, regions as rows, and 1 if a regions is considered accessible on a cell (otherwise, 0).
-    n_topics: list of int
-        A list containing the number of topics to use in each model.
-    cell_names: list of str
+    binary_accessibility_matrix
+        Binary accessibility sparse matrix with cells as columns, regions as rows,
+         and 1 as value if a region is considered accessible in a cell (otherwise, 0).
+    cell_barcodes
         List containing cell names as ordered in the binary matrix columns.
-    region_names: list of str
+    region_ids
         List containing region names as ordered in the binary matrix rows.
-    n_cpu: int, optional
-        Number of cpus to use for modelling. In this function parallelization is done per model, that is, one model will run entirely in a unique cpu. We recommend to set the number of cpus as the number of models that will be inferred, so all models start at the same time.
-    n_iter: int, optional
-        Number of iterations for which the Gibbs sampler will be run. Default: 150.
-    random_state: int, optional
-        Random seed to initialize the models. Default: 555.
-    alpha: float, optional
-        Scalar value indicating the symmetric Dirichlet hyperparameter for topic proportions. Default: 50.
-    alpha_by_topic: bool, optional
-        Boolean indicating whether the scalar given in alpha has to be divided by the number of topics. Default: True
-    eta: float, optional
-        Scalar value indicating the symmetric Dirichlet hyperparameter for topic multinomials. Default: 0.1.
-    eta_by_topic: bool, optional
-        Boolean indicating whether the scalar given in beta has to be divided by the number of topics. Default: False
-    top_topics_coh: int, optional
-        Number of topics to use to calculate the model coherence. For each model, the coherence will be calculated as the average of the top coherence values. Default: 5.
-    tmp_path: str, optional
-        Path to a temporary folder for Mallet. Default: None.
-    save_path: str, optional
-        Path to save models as independent files as they are completed. This is recommended for large data sets. Default: None.
-    reuse_corpus: bool, optional
-        Whether to reuse the mallet corpus in the tmp directory. Default: False
-    mallet_path: str
-        Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".
+    output_prefix
+        Output prefix used for running topic modeling with Mallet.
+    n_topics
+        Number of topics used in the topic model created by Mallet.
+        In combination with output_prefix, this allows to load the correct region
+        topic counts and cell topic probabilties parquet files.
+    top_topics_coh
+        Number of topics to use to calculate the model coherence. For each model,
+        the coherence will be calculated as the average of the top coherence values.
+        Default: 5.
 
     Return
     ------
-    CistopicLDAModel
-        A cisTopic LDA model.
+    None
 
     References
     ----------
@@ -1070,56 +945,63 @@ def run_cgs_model_mallet(
     handlers = [logging.StreamHandler(stream=sys.stdout)]
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger("cisTopic")
-
-    # Set models
-    if not alpha_by_topic:
-        alpha = alpha * n_topics
-    if eta_by_topic:
-        eta = eta / n_topics
-
-    # Running model
-    start = time.time()
-    log.info(f"Running model with {n_topics} topics")
-    model = LDAMallet(
-        corpus=corpus,
-        id2word=id2word,
-        num_topics=n_topics,
-        iterations=n_iter,
-        alpha=alpha,
-        eta=eta,
-        n_cpu=n_cpu,
-        tmp_dir=tmp_path,
-        random_seed=random_state,
-        reuse_corpus=reuse_corpus,
-        mallet_path=mallet_path,
-    )
-    end_time = time.time() - start
 
     # Get distributions
-    topic_word = model.get_topics()
-    doc_topic = (
-        pd.read_csv(model.fdoctopics(), header=None, sep="\t").iloc[:, 2:].to_numpy()
+    lda_mallet_filenames = LDAMalletFilenames(
+        output_prefix=output_prefix, n_topics=n_topics
     )
+    topic_word_distrib = LDAMallet.read_region_topic_counts_parquet_file_to_region_topic_probabilities(
+        mallet_region_topic_counts_parquet_filename=lda_mallet_filenames.region_topic_counts_parquet_filename
+    )
+    doc_topic_distrib = LDAMallet.read_cell_topic_probabilities_parquet_file(
+        mallet_cell_topic_probabilities_parquet_filename=lda_mallet_filenames.cell_topic_probabilities_parquet_filename
+    )
+    topic_word_counts = LDAMallet.read_region_topic_counts_parquet_file(
+        mallet_region_topic_counts_parquet_filename=lda_mallet_filenames.region_topic_counts_parquet_filename
+    )
+
+    # Read used Mallet LDA parameters from JSON file.
+    mallet_train_topics_parameters = LDAMallet.read_parameters_json_filename(
+        lda_mallet_filenames.parameters_json_filename
+    )
+
+    if mallet_train_topics_parameters["n_topics"] != n_topics:
+        raise ValueError(
+            f"Number of topics does not match: {n_topics} vs {mallet_train_topics_parameters['n_topics']}."
+        )
+
+    alpha = mallet_train_topics_parameters["alpha"]
+    alpha_by_topic = mallet_train_topics_parameters["alpha_by_topic"]
+    eta = mallet_train_topics_parameters["eta"]
+    eta_by_topic = mallet_train_topics_parameters["eta_by_topic"]
+    n_iter = mallet_train_topics_parameters["iterations"]
+    random_state = mallet_train_topics_parameters["random_seed"]
+    mallet_time = mallet_train_topics_parameters["time"]
+
     ll_alpha = alpha / n_topics if alpha_by_topic else alpha
     ll_eta = eta / n_topics if eta_by_topic else eta
 
     # Model evaluation
-    cell_cov = np.asarray(binary_matrix.sum(axis=0)).astype(float)
+    cell_cov = np.asarray(binary_accessibility_matrix.sum(axis=0)).astype(float)
     arun_2010 = tmtoolkit.topicmod.evaluate.metric_arun_2010(
-        topic_word, doc_topic, cell_cov
+        topic_word_distrib=topic_word_distrib,
+        doc_topic_distrib=doc_topic_distrib,
+        doc_lengths=cell_cov,
     )
-    cao_juan_2009 = tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(topic_word)
+    cao_juan_2009 = tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(
+        topic_word_distrib=topic_word_distrib
+    )
     mimno_2011 = tmtoolkit.topicmod.evaluate.metric_coherence_mimno_2011(
-        topic_word,
-        dtm=binary_matrix.transpose(),
+        topic_word_distrib=topic_word_distrib,
+        dtm=binary_accessibility_matrix.transpose(),
         top_n=20,
         eps=1e-12,
         normalize=True,
         return_mean=False,
     )
-    topic_word_assig = model.word_topics
-    doc_topic_assig = (doc_topic.T * (cell_cov)).T
-    ll = loglikelihood(topic_word_assig, doc_topic_assig, ll_alpha, ll_eta)
+
+    doc_topic_counts = (doc_topic_distrib.T * (cell_cov)).T
+    ll = loglikelihood(topic_word_counts, doc_topic_counts, ll_alpha, ll_eta)
 
     # Organize data
     if len(mimno_2011) <= top_topics_coh:
@@ -1149,25 +1031,27 @@ def run_cgs_model_mallet(
     marg_topic = pd.DataFrame(
         [
             range(1, n_topics + 1),
-            tmtoolkit.topicmod.model_stats.marginal_topic_distrib(doc_topic, cell_cov),
+            tmtoolkit.topicmod.model_stats.marginal_topic_distrib(
+                doc_topic_distrib=doc_topic_distrib, doc_lengths=cell_cov
+            ),
         ],
         index=["Topic", "Marg_Topic"],
     ).transpose()
     topic_ass = pd.DataFrame.from_records(
         [
             range(1, n_topics + 1),
-            list(chain.from_iterable(model.word_topics.sum(axis=1)[:, None])),
+            list(chain.from_iterable(topic_word_counts.sum(axis=1)[:, None])),
         ],
         index=["Topic", "Assignments"],
     ).transpose()
     cell_topic = pd.DataFrame.from_records(
-        doc_topic,
-        index=cell_names,
+        doc_topic_distrib,
+        index=cell_barcodes,
         columns=["Topic" + str(i) for i in range(1, n_topics + 1)],
     ).transpose()
     topic_region = pd.DataFrame.from_records(
-        topic_word,
-        columns=region_names,
+        topic_word_distrib,
+        columns=region_ids,
         index=["Topic" + str(i) for i in range(1, n_topics + 1)],
     ).transpose()
     parameters = pd.DataFrame(
@@ -1180,8 +1064,7 @@ def run_cgs_model_mallet(
             alpha_by_topic,
             eta,
             top_topics_coh,
-            end_time,
-            model.time,
+            mallet_time,
         ],
         index=[
             "package",
@@ -1192,7 +1075,6 @@ def run_cgs_model_mallet(
             "alpha_by_topic",
             "eta",
             "top_topics_coh",
-            "full_time",
             "model_time",
         ],
         columns=["Parameter"],
@@ -1201,14 +1083,12 @@ def run_cgs_model_mallet(
     model = CistopicLDAModel(
         metrics, coherence, marg_topic, topic_ass, cell_topic, topic_region, parameters
     )
-    log.info(f"Model with {n_topics} topics done!")
-    if isinstance(save_path, str):
-        log.info(f"Saving model with {n_topics} topics at {save_path}")
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
-        with open(os.path.join(save_path, f"Topic{n_topics}.pkl"), "wb") as f:
-            pickle.dump(model, f)
-    return model
+
+    log.info(
+        f"Saving model with {n_topics} topics at {lda_mallet_filenames.model_pickle_filename}"
+    )
+    with open(lda_mallet_filenames.model_pickle_filename, "wb") as fh:
+        pickle.dump(model, fh)
 
 
 def evaluate_models(
