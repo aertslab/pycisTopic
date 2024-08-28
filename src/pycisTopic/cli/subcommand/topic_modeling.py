@@ -174,6 +174,52 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
     )
 
 
+def run_mallet_calculate_model_evaluation_stats(args):
+    import scipy
+    from pycisTopic.fragments import read_barcodes_file_to_polars_series
+    from pycisTopic.lda_models import LDAMallet, calculate_model_evaluation_stats
+
+    binary_matrix_filename = args.binary_matrix_filename
+    cell_barcodes_filename = args.cell_barcodes_filename
+    region_ids_filename = args.region_ids_filename
+    output_prefix = args.output_prefix
+    n_topics_list = [args.topics] if isinstance(args.topics, int) else args.topics
+
+    print(
+        f'Read binary accessibility matrix from "{binary_matrix_filename}" Matrix Market file.'
+    )
+    binary_accessibility_matrix = scipy.io.mmread(binary_matrix_filename)
+
+    print(f'Read cell barcodes filename "{cell_barcodes_filename}".')
+    cell_barcodes = read_barcodes_file_to_polars_series(
+        barcodes_tsv_filename=cell_barcodes_filename,
+        sample_id=None,
+        cb_end_to_remove=None,
+        cb_sample_separator=None,
+    ).to_list()
+
+    print(f'Read region IDs filename "{region_ids_filename}".')
+    region_ids = read_barcodes_file_to_polars_series(
+        barcodes_tsv_filename=region_ids_filename,
+        sample_id=None,
+        cb_end_to_remove=None,
+        cb_sample_separator=None,
+    ).to_list()
+
+    for n_topics in n_topics_list:
+        print(
+            f'Calculate model evaluation statistics for {n_topics} topics from "{output_prefix}.{n_topics}_topics.*"...'
+        )
+        calculate_model_evaluation_stats(
+            binary_accessibility_matrix=binary_accessibility_matrix,
+            cell_barcodes=cell_barcodes,
+            region_ids=region_ids,
+            output_prefix=output_prefix,
+            n_topics=n_topics,
+            top_topics_coh=5,
+        )
+
+
 def str_to_bool(v: str) -> bool:
     """
     Convert string representation of a boolean value to a boolean.
@@ -521,6 +567,70 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
     )
     parser_topic_modeling_mallet_run.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        required=False,
+        help="Enable verbose mode.",
+    )
+
+    parser_topic_modeling_mallet_calculate_stats = (
+        subparser_topic_modeling_mallet.add_parser(
+            "stats",
+            help="Calculate model evaluation statistics.",
+        )
+    )
+    parser_topic_modeling_mallet_calculate_stats.set_defaults(
+        func=run_mallet_calculate_model_evaluation_stats
+    )
+
+    parser_topic_modeling_mallet_calculate_stats.add_argument(
+        "-i",
+        "--input",
+        dest="binary_matrix_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Binary accessibility matrix (region IDs vs cell barcodes) in Matrix Market format.",
+    )
+    parser_topic_modeling_mallet_calculate_stats.add_argument(
+        "-c",
+        "--cb",
+        dest="cell_barcodes_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Filename with cell barcodes.",
+    )
+    parser_topic_modeling_mallet_calculate_stats.add_argument(
+        "-r",
+        "--regions",
+        dest="region_ids_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Filename with region IDs.",
+    )
+    parser_topic_modeling_mallet_calculate_stats.add_argument(
+        "-o",
+        "--output",
+        dest="output_prefix",
+        action="store",
+        type=str,
+        required=True,
+        help="Topic model output prefix.",
+    )
+    parser_topic_modeling_mallet_calculate_stats.add_argument(
+        "-t",
+        "--topics",
+        dest="topics",
+        type=int,
+        required=True,
+        nargs="+",
+        help="Topic number(s) to create the model evaluation statistics for.",
+    )
+    parser_topic_modeling_mallet_calculate_stats.add_argument(
         "-v",
         "--verbose",
         dest="verbose",
