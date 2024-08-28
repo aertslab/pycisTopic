@@ -7,6 +7,7 @@ from ncls import NCLS
 
 if TYPE_CHECKING:
     import numpy as np
+    import numpy.typing as npt
 
 # Intersection/overlap code is based on:
 #   https://github.com/biocore-ntnu/pyranges/blob/master/pyranges/methods/intersection.py
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
 def _get_start_end_and_indexes_for_chrom(
     regions_per_chrom_dfs_pl: dict[str, pl.DataFrame],
     chrom: str,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64], npt.NDArray[np.int64]]:
     """
     Get start, end and index positions from per chromosome Polars dataframe.
 
@@ -55,7 +56,7 @@ def _intersect_per_chrom(
     regions2_per_chrom_dfs_pl: dict[str, pl.DataFrame],
     chrom: str,
     how: Literal["all", "containment", "first", "last"] | str | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[pl.Series, pl.Series]:
     """
     Get intersection between two region sets per chromosome.
 
@@ -144,10 +145,10 @@ def _intersect_per_chrom(
         regions2_indexes = pl.Series("idx", regions2_indexes, dtype=pl.get_index_type())
 
         regions1_all_indexes = pl.arange(
-            0, indexes1_length, dtype=pl.get_index_type()(), eager=True
+            0, indexes1_length, dtype=pl.get_index_type(), eager=True
         ).alias("idx")
         regions2_all_indexes = pl.arange(
-            0, indexes2_length, dtype=pl.get_index_type()(), eager=True
+            0, indexes2_length, dtype=pl.get_index_type(), eager=True
         ).alias("idx")
 
         regions1_missing_indexes = (
@@ -170,12 +171,20 @@ def _intersect_per_chrom(
             .to_series()
         )
 
-        regions1_none_indexes = pl.repeat(
-            None, regions2_missing_indexes.len(), name="idx", eager=True
-        ).cast(pl.get_index_type())
-        regions2_none_indexes = pl.repeat(
-            None, regions1_missing_indexes.len(), name="idx", eager=True
-        ).cast(pl.get_index_type())
+        regions1_none_indexes = pl.select(
+            pl.repeat(
+                None,
+                n=regions2_missing_indexes.len(),
+                dtype=pl.get_index_type(),
+            ).alias("idx")
+        ).to_series()
+        regions2_none_indexes = pl.select(
+            pl.repeat(
+                None,
+                n=regions1_missing_indexes.len(),
+                dtype=pl.get_index_type(),
+            ).alias("idx")
+        ).to_series()
 
         if how == "outer":
             regions1_indexes = pl.concat(
@@ -214,7 +223,7 @@ def _overlap_per_chrom(
     regions2_per_chrom_dfs_pl: dict[str, pl.DataFrame],
     chrom: str,
     how: Literal["all", "containment", "first"] | str | None = "first",
-) -> np.ndarray:
+) -> npt.NDArray[np.int64]:
     """
     Get overlap between two region sets per chromosome.
 
@@ -280,8 +289,7 @@ def _filter_intersection_output_columns(
     regions2_coord: bool,
     regions1_suffix: str,
     regions2_suffix: str,
-) -> pl.DataFrame:
-    ...
+) -> pl.DataFrame: ...
 
 
 @overload
@@ -293,8 +301,7 @@ def _filter_intersection_output_columns(
     regions2_coord: bool,
     regions1_suffix: str,
     regions2_suffix: str,
-) -> pl.LazyFrame:
-    ...
+) -> pl.LazyFrame: ...
 
 
 def _filter_intersection_output_columns(
@@ -351,7 +358,7 @@ def _filter_intersection_output_columns(
     regions1_info_columns = [
         # Remove region1 suffix from column names.
         pl.col(column_name).alias(column_name[:-regions1_suffix_length])
-        for column_name in df.columns
+        for column_name in df.collect_schema().names()
         if (
             column_name.endswith(regions1_suffix)
             and column_name not in regions1_coord_columns
@@ -366,7 +373,7 @@ def _filter_intersection_output_columns(
         pl.col(column_name)
         if regions1_info
         else pl.col(column_name).alias(column_name[:-regions2_suffix_length])
-        for column_name in df.columns
+        for column_name in df.collect_schema().names()
         if (
             column_name.endswith(regions2_suffix)
             and column_name not in regions2_coord_columns
@@ -579,13 +586,23 @@ def intersection(
 
     """
     # TODO: chrom, stranded partitioning
-    regions1_per_chrom_dfs_pl = regions1_df_pl.partition_by(
-        ["Chromosome"], as_dict=True, maintain_order=True
-    )
+    regions1_per_chrom_dfs_pl = {
+        str(chrom): regions1_chrom_df_pl
+        for (chrom,), regions1_chrom_df_pl in regions1_df_pl.partition_by(
+            ["Chromosome"],
+            as_dict=True,
+            maintain_order=True,
+        ).items()
+    }
 
-    regions2_per_chrom_dfs_pl = regions2_df_pl.partition_by(
-        ["Chromosome"], as_dict=True, maintain_order=True
-    )
+    regions2_per_chrom_dfs_pl = {
+        str(chrom): regions2_chrom_df_pl
+        for (chrom,), regions2_chrom_df_pl in regions2_df_pl.partition_by(
+            ["Chromosome"],
+            as_dict=True,
+            maintain_order=True,
+        ).items()
+    }
 
     intersection_chrom_dfs_pl = {}
 
@@ -725,7 +742,8 @@ def intersection(
 
     # Combine per chromosome dataframes to a full one.
     intersection_df_pl = pl.concat(
-        list(intersection_chrom_dfs_pl.values()), rechunk=False
+        list(intersection_chrom_dfs_pl.values()),
+        rechunk=False,
     )
 
     return intersection_df_pl
@@ -866,13 +884,23 @@ def overlap(
 
     """
     # TODO: chrom, stranded partitioning
-    regions1_per_chrom_dfs_pl = regions1_df_pl.partition_by(
-        ["Chromosome"], as_dict=True, maintain_order=True
-    )
+    regions1_per_chrom_dfs_pl = {
+        str(chrom): regions1_chrom_df_pl
+        for (chrom,), regions1_chrom_df_pl in regions1_df_pl.partition_by(
+            ["Chromosome"],
+            as_dict=True,
+            maintain_order=True,
+        ).items()
+    }
 
-    regions2_per_chrom_dfs_pl = regions2_df_pl.partition_by(
-        ["Chromosome"], as_dict=True, maintain_order=True
-    )
+    regions2_per_chrom_dfs_pl = {
+        str(chrom): regions2_chrom_df_pl
+        for (chrom,), regions2_chrom_df_pl in regions2_df_pl.partition_by(
+            ["Chromosome"],
+            as_dict=True,
+            maintain_order=True,
+        ).items()
+    }
 
     overlap_chrom_dfs_pl = {}
 
@@ -913,6 +941,9 @@ def overlap(
         return regions1_df_pl.head(0)
 
     # Combine per chromosome dataframes to a full one.
-    overlap_df_pl = pl.concat(list(overlap_chrom_dfs_pl.values()), rechunk=False)
+    overlap_df_pl = pl.concat(
+        list(overlap_chrom_dfs_pl.values()),
+        rechunk=False,
+    )
 
     return overlap_df_pl

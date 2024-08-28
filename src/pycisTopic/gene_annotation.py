@@ -261,7 +261,7 @@ def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFra
         separator="\t",
         # Use 0-bytes as comment character so the header can start with "# Chromosome".
         comment_prefix="\0",
-        dtypes={
+        schema_overrides={
             # Convert Chromosome, Start and End column to the correct datatypes.
             "Chromosome": pl.Categorical,
             "# Chromosome": pl.Categorical,
@@ -489,7 +489,7 @@ def get_chrom_sizes_and_alias_mapping_from_ncbi(
             chrom_sizes_and_alias_df_pl.rename({"ucsc": "# ucsc"}).write_csv(
                 file=chrom_sizes_and_alias_tsv_filename,
                 separator="\t",
-                has_header=True,
+                include_header=True,
             )
 
         return chrom_sizes_and_alias_df_pl
@@ -646,7 +646,7 @@ def get_chrom_sizes_and_alias_mapping_from_ucsc(
             has_header=False,
             comment_prefix="#",
             new_columns=["ucsc", "length"],
-            dtypes=[pl.Utf8, pl.Int64],
+            schema=[pl.Utf8, pl.Int64],
         )
 
     else:
@@ -665,7 +665,7 @@ def get_chrom_sizes_and_alias_mapping_from_ucsc(
         chrom_sizes_and_alias_df_pl.rename({"ucsc": "# ucsc"}).write_csv(
             file=chrom_sizes_and_alias_tsv_filename,
             separator="\t",
-            has_header=True,
+            include_header=True,
         )
 
     return chrom_sizes_and_alias_df_pl
@@ -726,7 +726,7 @@ def find_most_likely_chromosome_source_in_bed(
     chrom_source_stats_df_pl = chrom_sizes_and_alias_df_pl.select(
         [
             pl.col(column_name).is_in(chroms_from_bed).sum()
-            for column_name in chrom_sizes_and_alias_df_pl.columns
+            for column_name in chrom_sizes_and_alias_df_pl.collect_schema().names()
         ]
     )
 

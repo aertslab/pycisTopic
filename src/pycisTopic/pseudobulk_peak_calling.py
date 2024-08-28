@@ -24,21 +24,23 @@ from .utils import *
 
 
 def _generate_bigwig(
-        path_to_fragments: str,
-        chromsizes: dict[str, int],
-        normalize_bigwig: bool,
-        bw_filename: str,
-        log: logging.Logger):
+    path_to_fragments: str,
+    chromsizes: dict[str, int],
+    normalize_bigwig: bool,
+    bw_filename: str,
+    log: logging.Logger,
+):
     fragments_df = read_fragments_to_polars_df(path_to_fragments)
     fragments_to_bw(
-        fragments_df = fragments_df,
-        chrom_sizes = chromsizes,
-        bw_filename = bw_filename,
-        normalize = normalize_bigwig,
-        scaling_factor = 1,
-        cut_sites = False
+        fragments_df=fragments_df,
+        chrom_sizes=chromsizes,
+        bw_filename=bw_filename,
+        normalize=normalize_bigwig,
+        scaling_factor=1,
+        cut_sites=False,
     )
     log.info(f"{bw_filename} done!")
+
 
 def export_pseudobulk(
     input_data: Union[CistopicObject, pd.DataFrame],
@@ -51,7 +53,7 @@ def export_pseudobulk(
     n_cpu: int = 1,
     normalize_bigwig: bool = True,
     split_pattern: str = "___",
-    temp_dir: str = "/tmp"
+    temp_dir: str = "/tmp",
 ) -> tuple[dict[str, str], dict[str, str]]:
     """
     Create pseudobulks as bed and bigwig from single cell fragments file given a barcode annotation.
@@ -124,15 +126,19 @@ def export_pseudobulk(
 
     # Check wether we have a path to fragments for each sample
     if not all([sample_id in path_to_fragments.keys() for sample_id in sample_ids]):
-        raise ValueError("Please, provide a path to fragments for each sample in your cell metadata!")
+        raise ValueError(
+            "Please, provide a path to fragments for each sample in your cell metadata!"
+        )
     # Check for NaNs in variable column
     if cell_data[variable].isna().any():
         log.warning(
-            f"NaNs detected in {variable} column. These will be converted to 'nan' string.")
+            f"NaNs detected in {variable} column. These will be converted to 'nan' string."
+        )
     # Check for numerical values in variable column
     if not all([isinstance(x, str) for x in cell_data[variable].dropna()]):
         log.warning(
-            f"Non-string values detected in {variable} column. These will be converted to strings.")
+            f"Non-string values detected in {variable} column. These will be converted to strings."
+        )
     # Convert variable column to string
     cell_data[variable] = cell_data[variable].astype(str)
     # make output folders, if they don't exists
@@ -147,10 +153,11 @@ def export_pseudobulk(
     sample_to_cell_type_to_barcodes = {}
     for sample in sample_ids:
         _sample_cell_data = cell_data.loc[cell_data[sample_id_col] == sample]
-        _cell_type_to_cell_barcodes = _sample_cell_data \
-            .groupby(variable, group_keys=False)["barcode"] \
-            .apply(list) \
+        _cell_type_to_cell_barcodes = (
+            _sample_cell_data.groupby(variable, group_keys=False)["barcode"]
+            .apply(list)
             .to_dict()
+        )
         sample_to_cell_type_to_barcodes[sample] = _cell_type_to_cell_barcodes
     if isinstance(chromsizes, pr.PyRanges):
         chromsizes_dict = chromsizes.df.set_index("Chromosome").to_dict()["End"]
@@ -160,21 +167,22 @@ def export_pseudobulk(
 
     log.info("Splitting fragments by cell type.")
     split_fragment_files_by_cell_type(
-        sample_to_fragment_file = path_to_fragments,
-        path_to_temp_folder = temp_dir,
-        path_to_output_folder = bed_path,
-        sample_to_cell_type_to_cell_barcodes = sample_to_cell_type_to_barcodes,
-        chromsizes = chromsizes_dict,
-        n_cpu = n_cpu,
-        verbose = False,
-        clear_temp_folder = True
+        sample_to_fragment_file=path_to_fragments,
+        path_to_temp_folder=temp_dir,
+        path_to_output_folder=bed_path,
+        sample_to_cell_type_to_cell_barcodes=sample_to_cell_type_to_barcodes,
+        chromsizes=chromsizes_dict,
+        n_cpu=n_cpu,
+        verbose=False,
+        clear_temp_folder=True,
     )
 
     bed_paths = {}
     for cell_type in cell_data[variable].unique():
         _bed_fname = os.path.join(
             bed_path,
-            f"{_santize_string_for_filename(cell_type)}.fragments.tsv.gz")
+            f"{_santize_string_for_filename(cell_type)}.fragments.tsv.gz",
+        )
         if os.path.exists(_bed_fname):
             bed_paths[cell_type] = _bed_fname
         else:
@@ -182,13 +190,15 @@ def export_pseudobulk(
 
     log.info("generating bigwig files")
     joblib.Parallel(n_jobs=n_cpu)(
-        joblib.delayed(_generate_bigwig)
-        (
-            path_to_fragments = bed_paths[cell_type],
-            chromsizes = chromsizes_dict,
-            normalize_bigwig = normalize_bigwig,
-            bw_filename = os.path.join(bigwig_path, f"{_santize_string_for_filename(cell_type)}.bw"),
-            log = log
+        joblib.delayed(_generate_bigwig)(
+            path_to_fragments=bed_paths[cell_type],
+            chromsizes=chromsizes_dict,
+            normalize_bigwig=normalize_bigwig,
+            bw_filename=os.path.join(
+                bigwig_path,
+                f"{_santize_string_for_filename(cell_type)}.bw",
+            ),
+            log=log,
         )
         for cell_type in bed_paths.keys()
     )
@@ -196,13 +206,15 @@ def export_pseudobulk(
     for cell_type in cell_data[variable].unique():
         _bw_fname = os.path.join(
             bigwig_path,
-            f"{_santize_string_for_filename(cell_type)}.bw")
+            f"{_santize_string_for_filename(cell_type)}.bw",
+        )
         if os.path.exists(_bw_fname):
             bw_paths[cell_type] = _bw_fname
         else:
             log.warning(f"Missing bigwig for {cell_type}!")
 
     return bw_paths, bed_paths
+
 
 def peak_calling(
     macs_path: str,
@@ -217,7 +229,7 @@ def peak_calling(
     q_value: float = 0.05,
     nolambda: bool = True,
     skip_empty_peaks: bool = False,
-    **kwargs
+    **kwargs,
 ):
     """
     Performs pseudobulk peak calling with MACS2. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -275,40 +287,40 @@ def peak_calling(
                         keep_dup,
                         q_value,
                         nolambda,
-                        skip_empty_peaks
-
+                        skip_empty_peaks,
                     )
                     for name in list(bed_paths.keys())
                 ]
             )
         except Exception as e:
             ray.shutdown()
-            raise(e)
+            raise (e)
         ray.shutdown()
     else:
-        narrow_peaks = [macs_call_peak(
-                    macs_path,
-                    bed_paths[name],
-                    name,
-                    outdir,
-                    genome_size,
-                    input_format,
-                    shift,
-                    ext_size,
-                    keep_dup,
-                    q_value,
-                    nolambda,
-                    skip_empty_peaks
-
-                )
-                for name in list(bed_paths.keys())
-            ]
+        narrow_peaks = [
+            macs_call_peak(
+                macs_path,
+                bed_paths[name],
+                name,
+                outdir,
+                genome_size,
+                input_format,
+                shift,
+                ext_size,
+                keep_dup,
+                q_value,
+                nolambda,
+                skip_empty_peaks,
+            )
+            for name in list(bed_paths.keys())
+        ]
     narrow_peaks_dict = {
         list(bed_paths.keys())[i]: narrow_peaks[i].narrow_peak
         for i in range(len(narrow_peaks))
         if len(narrow_peaks[i].narrow_peak) > 0
     }
     return narrow_peaks_dict
+
 
 def macs_call_peak(
     macs_path: str,
@@ -322,7 +334,7 @@ def macs_call_peak(
     keep_dup: str = "all",
     q_value: int = 0.05,
     nolambda: bool = True,
-    skip_empty_peaks: bool = False
+    skip_empty_peaks: bool = False,
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -379,10 +391,11 @@ def macs_call_peak(
         keep_dup=keep_dup,
         q_value=q_value,
         nolambda=nolambda,
-        skip_empty_peaks=skip_empty_peaks
+        skip_empty_peaks=skip_empty_peaks,
     )
     log.info(f"{name} done!")
     return MACS_peak_calling
+
 
 @ray.remote
 def macs_call_peak_ray(
@@ -397,7 +410,7 @@ def macs_call_peak_ray(
     keep_dup: str = "all",
     q_value: int = 0.05,
     nolambda: bool = True,
-    skip_empty_peaks: bool = False
+    skip_empty_peaks: bool = False,
 ):
     """
     Performs pseudobulk peak calling with MACS2 in a group. It requires to have MACS2 installed (https://github.com/macs3-project/MACS).
@@ -454,8 +467,7 @@ def macs_call_peak_ray(
         keep_dup=keep_dup,
         q_value=q_value,
         nolambda=nolambda,
-        skip_empty_peaks=skip_empty_peaks
-
+        skip_empty_peaks=skip_empty_peaks,
     )
     log.info(name + " done!")
     return MACS_peak_calling
@@ -580,9 +592,11 @@ class MACSCallPeak:
                 file_is_empty = True
         if file_is_empty and skip_empty_peaks:
             print(f"{self.name} has no peaks, skipping")
-            return  pr.PyRanges()
+            return pr.PyRanges()
         elif file_is_empty and not skip_empty_peaks:
-            raise ValueError(f"{self.name} has no peaks, exiting. Set skip_empty_peaks to True to skip empty peaks.")
+            raise ValueError(
+                f"{self.name} has no peaks, exiting. Set skip_empty_peaks to True to skip empty peaks."
+            )
         narrow_peak = pd.read_csv(
             os.path.join(self.outdir, f"{self.name}_peaks.narrowPeak"),
             sep="\t",

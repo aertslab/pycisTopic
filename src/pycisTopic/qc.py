@@ -20,9 +20,13 @@ from pycisTopic.topic_binarization import threshold_otsu
 from pycisTopic.tss_profile import get_tss_profile
 from scipy.stats import gaussian_kde
 
+if TYPE_CHECKING:
+    import numpy.typing as npt
+
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
 pl.enable_string_cache()
+
 
 def get_barcodes_passing_qc_for_sample(
     sample_id: str,
@@ -31,7 +35,7 @@ def get_barcodes_passing_qc_for_sample(
     tss_enrichment_threshold: float | None = None,
     frip_threshold: float | None = None,
     use_automatic_thresholds: bool = True,
-) -> tuple[np.ndarray, dict[str, float]]:
+) -> tuple[list[str], dict[str, float]]:
     """
     Get barcodes passing quality control (QC) for a sample.
 
@@ -40,7 +44,7 @@ def get_barcodes_passing_qc_for_sample(
     sample_id
         Sample ID.
     pycistopic_qc_output_dir
-        Directory with output from pycistopic qc.
+        Directory with output from ``pycistopic qc run``.
     unique_fragments_threshold
         Threshold for number of unique fragments in peaks.
         If not defined, and use_automatic_thresholds is False,
@@ -48,10 +52,10 @@ def get_barcodes_passing_qc_for_sample(
     tss_enrichment_threshold
         Threshold for TSS enrichment score.
         If not defined, and use_automatic_thresholds is False,
-        the threshold will be set to 0.
+        the threshold will be set to 0.0.
     frip_threshold
         Threshold for fraction of reads in peaks (FRiP).
-        If not defined the threshold will be set to 0.
+        If not defined the threshold will be set to 0.0.
     use_automatic_thresholds
         Use automatic thresholds for unique fragments in peaks and TSS enrichment score
         as calculated by Otsu's method. If False, the thresholds will be set to 0 if not
@@ -60,7 +64,7 @@ def get_barcodes_passing_qc_for_sample(
     Returns
     -------
     Tuple with:
-        - Numpy array with cell barcodes passing QC.
+        - List with cell barcodes passing QC.
         - Dictionary with thresholds used for QC.
 
     Raises
@@ -69,84 +73,110 @@ def get_barcodes_passing_qc_for_sample(
         If the file with fragments statistics per cell barcode does not exist.
 
     """
-    # Check wether files exist
-    if not os.path.exists(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet")):
-        raise FileNotFoundError(f"File {os.path.join(pycistopic_qc_output_dir, f'{sample_id}.fragments_stats_per_cb.parquet')} does not exist")
-
-    first_print = True
-
     if use_automatic_thresholds:
-        # Check wether files exist
-        if not os.path.exists(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.otsu_thresholds.tsv")):
-            Warning(f"File {os.path.join(pycistopic_qc_output_dir, f'{sample_id}.otsu_thresholds.tsv')} does not exist")
+        otsu_thresholds_tsv_filename = os.path.join(
+            pycistopic_qc_output_dir,
+            f"{sample_id}.otsu_thresholds.tsv",
+        )
+
+        # Check whether files exist.
+        if not os.path.exists(otsu_thresholds_tsv_filename):
+            Warning(f'File "{otsu_thresholds_tsv_filename}" does not exist.')
         else:
-            # Read automatic thresholds
-            otsu_unique_fragments_threshold, otsu_tss_enrichment_threshold = pl.read_csv(
-                os.path.join(pycistopic_qc_output_dir, f"{sample_id}.otsu_thresholds.tsv"),
-                separator = "\t"
-            ).select(["unique_fragments_in_peaks_count_otsu_threshold", "tss_enrichment_otsu_threshold"]).to_numpy()[0]
+            # Read automatic thresholds.
+            (
+                otsu_unique_fragments_threshold,
+                otsu_tss_enrichment_threshold,
+            ) = pl.read_csv(
+                otsu_thresholds_tsv_filename,
+                separator="\t",
+                columns=[
+                    "unique_fragments_in_peaks_count_otsu_threshold",
+                    "tss_enrichment_otsu_threshold",
+                ],
+            ).row(0)
+
+            print(f"{sample_id}:")
+
             if unique_fragments_threshold is None:
-                if first_print:
-                    print(f"{sample_id}:")
-                    first_print = False
-                print(f"\tUsing automatic threshold for unique fragments: {otsu_unique_fragments_threshold}")
+                print(
+                    f"\tUsing automatic threshold for unique fragments: {otsu_unique_fragments_threshold}"
+                )
                 unique_fragments_threshold = otsu_unique_fragments_threshold
             else:
-                if first_print:
-                    print(f"{sample_id}:")
-                    first_print = False
-                print(f"\tUsing user-defined threshold for unique fragments: {unique_fragments_threshold}")
+                print(
+                    f"\tUsing user-defined threshold for unique fragments: {unique_fragments_threshold}"
+                )
+
             if tss_enrichment_threshold is None:
-                if first_print:
-                    print(f"{sample_id}:")
-                    first_print = False
-                print(f"\tUsing automatic threshold for TSS enrichment: {otsu_tss_enrichment_threshold}")
+                print(
+                    f"\tUsing automatic threshold for TSS enrichment: {otsu_tss_enrichment_threshold}"
+                )
                 tss_enrichment_threshold = otsu_tss_enrichment_threshold
             else:
-                if first_print:
-                    print(f"{sample_id}:")
-                    first_print = False
-                print(f"\tUsing user-defined threshold for TSS enrichment: {tss_enrichment_threshold}")
+                print(
+                    f"\tUsing user-defined threshold for TSS enrichment: {tss_enrichment_threshold}"
+                )
 
-    # Set thresholds to 0 if not defined
-    if unique_fragments_threshold is None:
-        if first_print:
+    if (
+        unique_fragments_threshold is None
+        or tss_enrichment_threshold is None
+        or frip_threshold is None
+    ):
+        if not use_automatic_thresholds:
             print(f"{sample_id}:")
-            first_print = False
-        print("\tNo threshold for unique fragments defined, setting to 0")
-        unique_fragments_threshold = 0
 
-    if tss_enrichment_threshold is None:
-        if first_print:
-            print(f"{sample_id}:")
-            first_print = False
-        print("\tNo threshold for TSS enrichment defined, setting to 0")
-        tss_enrichment_threshold = 0
+        # Set thresholds to 0 if not defined.
+        if unique_fragments_threshold is None:
+            print("\tNo threshold for unique fragments defined, setting to 0.")
+            unique_fragments_threshold = 0
 
-    if frip_threshold is None:
-        if first_print:
-            print(f"{sample_id}:")
-            first_print = False
-        print("\tNo threshold for FRiP defined, setting to 0")
-        frip_threshold = 0
+        if tss_enrichment_threshold is None:
+            print("\tNo threshold for TSS enrichment defined, setting to 0.0.")
+            tss_enrichment_threshold = 0.0
 
-    # Get barcodes passing filters
-    barcodes_passing_filters = pl.scan_parquet(
-        os.path.join(pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet")
-    ).filter(
-        ( pl.col("unique_fragments_in_peaks_count") > unique_fragments_threshold ) & \
-        ( pl.col("tss_enrichment") > tss_enrichment_threshold ) & \
-        ( pl.col("fraction_of_fragments_in_peaks") > frip_threshold )
-    ).select("CB").collect().to_numpy().squeeze()
+        if frip_threshold is None:
+            print("\tNo threshold for FRiP defined, setting to 0.0.")
+            frip_threshold = 0.0
+
+    # fragments_stats_per_cb_df_pl
+    fragments_stats_per_cb_filename = os.path.join(
+        pycistopic_qc_output_dir,
+        f"{sample_id}.fragments_stats_per_cb.parquet",
+    )
+
+    # Check whether files exist.
+    if not os.path.exists(fragments_stats_per_cb_filename):
+        raise FileNotFoundError(
+            f'File "{fragments_stats_per_cb_filename}" does not exist.'
+        )
+
+    # Get barcodes passing filters.
+    barcodes_passing_filters = (
+        pl.scan_parquet(fragments_stats_per_cb_filename)
+        .filter(
+            (pl.col("unique_fragments_in_peaks_count") >= unique_fragments_threshold)
+            & (pl.col("tss_enrichment") >= tss_enrichment_threshold)
+            & (pl.col("fraction_of_fragments_in_peaks") >= frip_threshold)
+        )
+        .select("CB")
+        .collect()
+        .to_series()
+        .to_list()
+    )
 
     return barcodes_passing_filters, {
         "unique_fragments_threshold": unique_fragments_threshold,
         "tss_enrichment_threshold": tss_enrichment_threshold,
-        "frip_threshold": frip_threshold
+        "frip_threshold": frip_threshold,
     }
 
 
-def compute_kde(training_data: np.ndarray, test_data: np.ndarray, no_threads: int = 8):
+def compute_kde(
+    training_data: npt.ArrayLike,
+    test_data: npt.ArrayLike,
+    no_threads: int = 8,
+) -> npt.NDArray[np.float64]:
     """
     Compute kernel-density estimate (KDE) using Gaussian kernels.
 
@@ -171,6 +201,27 @@ def compute_kde(training_data: np.ndarray, test_data: np.ndarray, no_threads: in
     test_data.
 
     """
+    training_data = np.asarray(training_data, dtype=np.float64)
+    test_data = np.asarray(test_data, dtype=np.float64)
+
+    # Avoid very rare cases where second column of training_data has the same
+    # value everywhere. This can happen in some cases for duplication ratio as
+    # it can be 0.0% when fragment counts for each fragment are 1.
+    #
+    # This will result in the following error:
+    #     LinAlgError: The data appears to lie in a lower-dimensional subspace of
+    #     the space in which it is expressed. This has resulted in a singular data
+    #     covariance matrix, which cannot be treated using the algorithms implemented
+    #     in `gaussian_kde`. Consider performing principle component analysis /
+    #     dimensionality reduction and using `gaussian_kde` with the transformed data.
+    if np.var(training_data[1]) == 0.0:
+        # Add small value to first element to avoid all of them to be equal.
+        if training_data[1][0] == 0.0:
+            training_data[1][0] = 0.000000000001
+        else:
+            # In even rarer case that the value is not 0.0, change the value proportionally.
+            training_data[1][0] = training_data[1][0] * 1.000000000001
+
     # Convert 2D numpy array test data to complex number array so numpy considers both
     # columns at the same time in further operations.
     test_data_all = np.empty(test_data.shape[1], dtype=np.complex128)
@@ -191,7 +242,9 @@ def compute_kde(training_data: np.ndarray, test_data: np.ndarray, no_threads: in
         axis=1,
     )
 
-    def compute_kde_part(test_data_unique_split_array):
+    def compute_kde_part(
+        test_data_unique_split_array: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
         """
         Compute kernel-density estimate (KDE) using Gaussian kernels for a subsection of the test_data.
 

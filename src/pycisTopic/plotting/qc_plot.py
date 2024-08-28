@@ -14,7 +14,7 @@ import polars as pl
 def plot_barcode_rank(
     fragments_stats_per_cb_df: pl.DataFrame,
     ax: plt.Axes | None = None,
-    **matplotlib_plot_kwargs
+    **matplotlib_plot_kwargs,
 ) -> plt.Axes:
     """
     Plot barcode rank vs number of fragments in a log-log scale.
@@ -46,6 +46,7 @@ def plot_barcode_rank(
     ax.set_xlabel("Barcode Rank", fontsize=10)
     ax.set_ylabel("Number of fragments", fontsize=10)
     return ax
+
 
 def plot_insert_size_distribution(
     fragments_insert_size_dist_df: pl.DataFrame,
@@ -85,10 +86,11 @@ def plot_insert_size_distribution(
     ax.set_xlim(*insert_size_distriubtion_xlim)
     return ax
 
+
 def plot_tss_enrichment(
-        tss_norm_matrix_sample_df,
-        ax: plt.Axes | None = None,
-        **matplotlib_plot_kwargs
+    tss_norm_matrix_sample_df: pl.DataFrame,
+    ax: plt.Axes | None = None,
+    **matplotlib_plot_kwargs,
 ) -> plt.Axes:
     """
     Plot TSS enrichment.
@@ -141,7 +143,7 @@ def plot_sample_stats(
     sample_id : str
         Sample ID.
     pycistopic_qc_output_dir : str | Path
-        Directory containing the output of the pycistopic qc command.
+        Directory containing the output of the ``pycistopic qc run`` command.
     save : str | Path, optional
         Path to save the plot, by default None.
     insert_size_distriubtion_xlim : tuple, optional
@@ -195,8 +197,11 @@ def plot_sample_stats(
     figsize = (6.4 * ncols, 4.8 * nrows)
 
     fig, axs = plt.subplots(
-        nrows=nrows, ncols=ncols, figsize=figsize,
-        layout = "constrained")
+        nrows=nrows,
+        ncols=ncols,
+        figsize=figsize,
+        layout="constrained",
+    )
 
     # Set centered sample title for 3 combined plots.
     fig.suptitle(sample_id if sample_alias is None else sample_alias)
@@ -204,20 +209,20 @@ def plot_sample_stats(
     # Plot barcode rank plot on the left.
     plot_barcode_rank(
         fragments_stats_per_cb_df,
-        ax = axs[0]
+        ax=axs[0],
     )
 
     # Plot insert size distribution plot in the center.
     plot_insert_size_distribution(
         fragments_insert_size_dist_df,
-        ax = axs[1],
-        insert_size_distriubtion_xlim = insert_size_distriubtion_xlim
+        ax=axs[1],
+        insert_size_distriubtion_xlim=insert_size_distriubtion_xlim,
     )
 
     # Plot TSS enrichment plot on the right.
     plot_tss_enrichment(
         tss_norm_matrix_sample_df,
-        ax = axs[2]
+        ax=axs[2],
     )
 
     if save:
@@ -227,13 +232,14 @@ def plot_sample_stats(
 
     return fig
 
+
 def _plot_fragment_stats(
     fragments_stats_per_cb_df: pl.DataFrame,
     ax: plt.Axes,
     x_var: str,
     y_var: str,
     c_var: str,
-    **matplotlib_plot_kwargs
+    **matplotlib_plot_kwargs,
 ) -> plt.Axes:
     """
     Helper function to plot fragment statistics.
@@ -260,15 +266,17 @@ def _plot_fragment_stats(
 
     """
     fragments_stats_per_cb_df = fragments_stats_per_cb_df.sort(
-        by = c_var, descending = False
+        c_var,
+        descending=False,
     )
     ax.scatter(
-        x = fragments_stats_per_cb_df.get_column(x_var).to_numpy(),
-        y = fragments_stats_per_cb_df.get_column(y_var).to_numpy(),
-        c = fragments_stats_per_cb_df.get_column(c_var).to_numpy(),
-        **matplotlib_plot_kwargs
+        x=fragments_stats_per_cb_df.get_column(x_var).to_numpy(),
+        y=fragments_stats_per_cb_df.get_column(y_var).to_numpy(),
+        c=fragments_stats_per_cb_df.get_column(c_var).to_numpy(),
+        **matplotlib_plot_kwargs,
     )
     return ax
+
 
 def plot_barcode_stats(
     sample_id: str,
@@ -290,7 +298,7 @@ def plot_barcode_stats(
     sample_id : str
         Sample ID.
     pycistopic_qc_output_dir : str | Path
-        Directory containing the output of the pycistopic qc command.
+        Directory containing the output of the ``pycistopic qc run`` command.
     unique_fragments_threshold : int, optional
         Unique fragments threshold, by default None.
     tss_enrichment_threshold : float, optional
@@ -321,82 +329,92 @@ def plot_barcode_stats(
 
     """
     # check if files exist
-    if not os.path.isfile(os.path.join(pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet")):
+    if not os.path.isfile(
+        os.path.join(
+            pycistopic_qc_output_dir,
+            f"{sample_id}.fragments_stats_per_cb.parquet",
+        )
+    ):
         raise FileNotFoundError(
-            f"Could not find {sample_id}.fragments_stats_per_cb.parquet in {pycistopic_qc_output_dir}")
+            f"Could not find {sample_id}.fragments_stats_per_cb.parquet in {pycistopic_qc_output_dir}"
+        )
 
     fragments_stats_per_cb_df = pl.read_parquet(
         os.path.join(
-            pycistopic_qc_output_dir, f"{sample_id}.fragments_stats_per_cb.parquet"
+            pycistopic_qc_output_dir,
+            f"{sample_id}.fragments_stats_per_cb.parquet",
         )
     )
 
-    if detailed_title and bc_passing_filters is  None:
+    if detailed_title and bc_passing_filters is None:
         Warning("bc_passing_filters is None, no detailed title will be shown")
 
     ncols = 3
     nrows = 1
     figsize = (4 * ncols, 4 * nrows)
     fig, axs = plt.subplots(
-        figsize = figsize, nrows = nrows, ncols = ncols,
-        sharex = True,
-        layout = "constrained")
+        figsize=figsize,
+        nrows=nrows,
+        ncols=ncols,
+        sharex=True,
+        layout="constrained",
+    )
 
     # Plot TSS enrichment vs unique number of fragments on the left.
     axs[0] = _plot_fragment_stats(
         fragments_stats_per_cb_df,
-        ax = axs[0],
-        x_var = "unique_fragments_in_peaks_count",
-        y_var = "tss_enrichment",
-        c_var = "pdf_values_for_tss_enrichment",
-        s = 10,
-        edgecolors = None,
-        marker = "+",
-        cmap = "viridis"
+        ax=axs[0],
+        x_var="unique_fragments_in_peaks_count",
+        y_var="tss_enrichment",
+        c_var="pdf_values_for_tss_enrichment",
+        s=10,
+        edgecolors=None,
+        marker="+",
+        cmap="viridis",
     )
     axs[0].set_ylabel("TSS enrichment")
 
     # Plot FRIP vs unique number of fragments in the center.
     axs[1] = _plot_fragment_stats(
         fragments_stats_per_cb_df,
-        ax = axs[1],
-        x_var = "unique_fragments_in_peaks_count",
-        y_var = "fraction_of_fragments_in_peaks",
-        c_var = "pdf_values_for_fraction_of_fragments_in_peaks",
-        s = 10,
-        edgecolors = None,
-        marker = "+",
-        cmap = "viridis"
+        ax=axs[1],
+        x_var="unique_fragments_in_peaks_count",
+        y_var="fraction_of_fragments_in_peaks",
+        c_var="pdf_values_for_fraction_of_fragments_in_peaks",
+        s=10,
+        edgecolors=None,
+        marker="+",
+        cmap="viridis",
     )
     axs[1].set_ylabel("Fraction of fragments in peaks")
 
     # Plot duplication ratio vs unique number of fragments on the right.
     axs[2] = _plot_fragment_stats(
         fragments_stats_per_cb_df,
-        ax = axs[2],
-        x_var = "unique_fragments_in_peaks_count",
-        y_var = "duplication_ratio",
-        c_var = "pdf_values_for_duplication_ratio",
-        s = 10,
-        edgecolors = None,
-        marker = "+",
-        cmap = "viridis"
+        ax=axs[2],
+        x_var="unique_fragments_in_peaks_count",
+        y_var="duplication_ratio",
+        c_var="pdf_values_for_duplication_ratio",
+        s=10,
+        edgecolors=None,
+        marker="+",
+        cmap="viridis",
     )
     axs[2].set_ylabel("Duplication ratio")
 
     # plot thresholds
     if unique_fragments_threshold is not None:
         for ax in axs:
-            ax.axvline(x = unique_fragments_threshold, color = "r", linestyle = "--")
+            ax.axvline(x=unique_fragments_threshold, color="r", linestyle="--")
 
     if tss_enrichment_threshold is not None:
-        axs[0].axhline(y = tss_enrichment_threshold, color = "r", linestyle = "--")
+        axs[0].axhline(y=tss_enrichment_threshold, color="r", linestyle="--")
 
     if frip_threshold is not None:
-        axs[1].axhline(y = frip_threshold, color = "r", linestyle = "--")
+        axs[1].axhline(y=frip_threshold, color="r", linestyle="--")
 
     if duplication_ratio_threshold is not None:
-        axs[2].axhline(y = duplication_ratio_threshold, color = "r", linestyle = "--")
+        axs[2].axhline(y=duplication_ratio_threshold, color="r", linestyle="--")
 
     # Set x-axis to log scale and plot x-axis label.
     for ax in axs:
@@ -422,10 +440,12 @@ def plot_barcode_stats(
         title += f"Median Unique Fragments: {median_no_fragments:.0f}\n"
         title += f"Median TSS Enrichment: {median_tss_enrichment:.2f}\n"
         title += f"Median FRIP: {fraction_of_fragments_in_peaks:.2f}\n"
-        if (unique_fragments_threshold is not None) \
-            or (tss_enrichment_threshold is not None) \
-            or (frip_threshold is not None) \
-            or (duplication_ratio_threshold is not None):
+        if (
+            (unique_fragments_threshold is not None)
+            or (tss_enrichment_threshold is not None)
+            or (frip_threshold is not None)
+            or (duplication_ratio_threshold is not None)
+        ):
             title += "Thresholds:\n"
         if unique_fragments_threshold is not None:
             title += f"    Unique fragments: {unique_fragments_threshold:.2f}\n"
@@ -438,7 +458,10 @@ def plot_barcode_stats(
     else:
         title = sample_id if sample_alias is None else sample_alias
 
-    fig.suptitle(title, horizontalalignment = "left")
+    fig.suptitle(
+        title,
+        horizontalalignment="left",
+    )
 
     if save:
         fig.savefig(save)

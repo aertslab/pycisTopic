@@ -31,13 +31,14 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
-  "numpy >= 1.20.3",
+  "numpy >= 1.20.3, < 2",
   "pandas == 1.5",
-  "polars >= 0.18.3",
+  "polars >= 1",
   "pyarrow >= 8.0.0",
   "pyranges < 0.0.128",
+  "numba",
   "ray",
-  "scatac_fragment_tools",
+  "scatac_fragment_tools >= 0.1.2",
   "scikit-learn",
   "lda",
   "matplotlib < 3.7",
@@ -144,3 +145,7 @@ max-doc-length = 88
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
+
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/stubs"
+plugins = ["numpy.typing.mypy_plugin"]

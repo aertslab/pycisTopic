@@ -16,6 +16,7 @@ from sklearn.preprocessing import StandardScaler
 if TYPE_CHECKING:
     from anndata import AnnData
 
+
 def label_transfer(
     ref_anndata: AnnData,
     query_anndata: AnnData,
@@ -29,7 +30,7 @@ def label_transfer(
     bbknn_components: int = 30,
     cca_components: int = 30,
     return_label_weights: bool = False,
-    **kwargs
+    **kwargs,
 ):
     """
 

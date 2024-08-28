@@ -183,24 +183,16 @@ class CistopicImputedFeatures:
             if sparse.issparse(mtx):
                 mtx_common = sparse.hstack(
                     [
-                        mtx[
-                            common_index_fm,
-                        ],
-                        mtx_to_add[
-                            common_index_fm_to_add,
-                        ],
+                        mtx[common_index_fm,],
+                        mtx_to_add[common_index_fm_to_add,],
                     ],
                     format="csr",
                 )
             else:
                 mtx_common = np.hstack(
                     [
-                        mtx[
-                            common_index_fm,
-                        ],
-                        mtx_to_add[
-                            common_index_fm_to_add,
-                        ],
+                        mtx[common_index_fm,],
+                        mtx_to_add[common_index_fm_to_add,],
                     ]
                 )
             if len(diff_features) > 0:
@@ -211,9 +203,7 @@ class CistopicImputedFeatures:
                 if sparse.issparse(mtx):
                     mtx_diff_1 = sparse.hstack(
                         [
-                            mtx[
-                                diff_index_fm_1,
-                            ],
+                            mtx[diff_index_fm_1,],
                             np.zeros((len(diff_features_1), mtx_to_add.shape[1])),
                         ],
                         format="csr",
@@ -221,9 +211,7 @@ class CistopicImputedFeatures:
                 else:
                     mtx_diff_1 = np.hstack(
                         [
-                            mtx[
-                                diff_index_fm_1,
-                            ],
+                            mtx[diff_index_fm_1,],
                             np.zeros((len(diff_features_1), mtx_to_add.shape[1])),
                         ]
                     )
@@ -238,9 +226,7 @@ class CistopicImputedFeatures:
                     mtx_diff_2 = sparse.hstack(
                         [
                             np.zeros((len(diff_features_2), mtx.shape[1])),
-                            mtx_to_add[
-                                diff_index_fm_2,
-                            ],
+                            mtx_to_add[diff_index_fm_2,],
                         ],
                         format="csr",
                     )
@@ -251,9 +237,7 @@ class CistopicImputedFeatures:
                     mtx_diff_2 = np.hstack(
                         [
                             np.zeros((len(diff_features_2), mtx.shape[1])),
-                            mtx_to_add[
-                                diff_index_fm_2,
-                            ],
+                            mtx_to_add[diff_index_fm_2,],
                         ]
                     )
                     mtx = np.vstack([mtx_common, mtx_diff_1, mtx_diff_2])
@@ -328,10 +312,10 @@ class CistopicImputedFeatures:
 
         # Rank all scores per motif/track and assign a random ranking in range for regions/genes with the same score.
         for col_idx in range(len(imputed_acc_ranking.cell_names)):
-            imputed_acc_ranking.mtx[
-                :, col_idx
-            ] = rank_scores_and_assign_random_ranking_in_range_for_ties(
-                mtx[:, col_idx].toarray().flatten()
+            imputed_acc_ranking.mtx[:, col_idx] = (
+                rank_scores_and_assign_random_ranking_in_range_for_ties(
+                    mtx[:, col_idx].toarray().flatten()
+                )
             )
 
         return imputed_acc_ranking
@@ -400,7 +384,7 @@ def impute_accessibility(
         cell_topic: np.ndarray,
         region_names: list,
         scale_factor: int,
-        chunk_size: int
+        chunk_size: int,
     ) -> tuple[np.ndarray, list]:
         """
         Calculate imputed accessibility in chunks of chunk_size.
@@ -451,7 +435,7 @@ def impute_accessibility(
                 f"{input_chunk_start}-{input_chunk_end}"
             )
             topic_region_chunk = topic_region[
-                input_chunk_start:input_chunk_start + chunk_size
+                input_chunk_start : input_chunk_start + chunk_size
             ]
             imputed_acc_chunk = topic_region_chunk @ cell_topic
 
@@ -481,9 +465,9 @@ def impute_accessibility(
 
             # Convert from float32 to int32 and fill in the values in the full
             # imputed accessibility matrix.
-            imputed_acc[
-                output_chunk_start:output_chunk_end, :
-            ] = imputed_acc_chunk[region_idx_to_keep_chunk]
+            imputed_acc[output_chunk_start:output_chunk_end, :] = imputed_acc_chunk[
+                region_idx_to_keep_chunk
+            ]
 
         # Only retain that part of the imputed accessibility matrix that was actually
         # filled in.
@@ -555,7 +539,7 @@ def normalize_scores(
                     if scipy.sparse.issparse(imputed_acc.mtx)
                     else imputed_acc.mtx
                 ),
-                scale_factor=scale_factor
+                scale_factor=scale_factor,
             ),
             imputed_acc.feature_names,
             imputed_acc.cell_names,
@@ -565,7 +549,7 @@ def normalize_scores(
         output = pd.DataFrame(
             calculate_normalized_scores(
                 imputed_acc=imputed_acc.to_numpy(),
-                scale_factor=scale_factor
+                scale_factor=scale_factor,
             ),
             index=imputed_acc.index,
             columns=imputed_acc.columns,
@@ -723,7 +707,7 @@ def find_diff_features(
     log2fc_thr: float = np.log2(1.5),
     split_pattern: str = "___",
     n_cpu: int = 1,
-    **kwargs
+    **kwargs,
 ):
     """
     Find differential imputed features.
@@ -895,7 +879,9 @@ def markers(
         dtype=np.int64,
     )
 
-    log.info(f"Subsetting data for {contrast_name} ({fg_cells_index.shape[0]} of {mat.shape[1]})")
+    log.info(
+        f"Subsetting data for {contrast_name} ({fg_cells_index.shape[0]} of {mat.shape[1]})"
+    )
 
     if sparse.issparse(mat):
         fg_mat = mat[:, fg_cells_index].toarray()
@@ -920,7 +906,7 @@ def markers(
                     fg_mat_ref,
                     bg_mat_ref,
                     start=start,
-                    end=min(start + chunk_size, fg_mat.shape[0])
+                    end=min(start + chunk_size, fg_mat.shape[0]),
                 )
                 for start in range(0, fg_mat.shape[0], chunk_size)
             ]
@@ -946,7 +932,7 @@ def markers(
         {
             "Log2FC": log2_fc,
             "Adjusted_pval": adj_pvalues,
-            "Contrast": [contrast_name] * adj_pvalues.shape[0]
+            "Contrast": [contrast_name] * adj_pvalues.shape[0],
         },
         index=features,
     )
@@ -954,9 +940,7 @@ def markers(
     markers_dataframe = markers_dataframe.loc[
         markers_dataframe["Adjusted_pval"] <= adjpval_thr
     ]
-    markers_dataframe = markers_dataframe.loc[
-        markers_dataframe["Log2FC"] >= log2fc_thr
-    ]
+    markers_dataframe = markers_dataframe.loc[markers_dataframe["Log2FC"] >= log2fc_thr]
     markers_dataframe = markers_dataframe.sort_values(
         ["Log2FC", "Adjusted_pval"],
         ascending=[False, True],
@@ -986,8 +970,7 @@ def get_wilcox_test_pvalues(fg_mat, bg_mat):
     wilcox_test_pvalues = [
         wilcox_test.pvalue
         for wilcox_test in [
-            ranksums(fg_mat[i], y=bg_mat[i])
-            for i in range(fg_mat.shape[0])
+            ranksums(fg_mat[i], y=bg_mat[i]) for i in range(fg_mat.shape[0])
         ]
     ]
 
@@ -1019,10 +1002,7 @@ def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
 
     wilcox_test_pvalues_part = [
         wilcox_test.pvalue
-        for wilcox_test in [
-            ranksums(fg_mat[i], y=bg_mat[i])
-            for i in range(start, end)
-        ]
+        for wilcox_test in [ranksums(fg_mat[i], y=bg_mat[i]) for i in range(start, end)]
     ]
 
     return wilcox_test_pvalues_part
@@ -1057,9 +1037,13 @@ def subset_array_second_axis(arr, col_indices):
 
     """
     if np.max(col_indices) >= arr.shape[1]:
-        raise IndexError(f"index {np.max(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
+        raise IndexError(
+            f"index {np.max(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}"
+        )
     if np.min(col_indices) < -arr.shape[1]:
-        raise IndexError(f"index {np.min(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}")
+        raise IndexError(
+            f"index {np.min(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}"
+        )
 
     # Create empty subset array of correct dimensions and dtype.
     subset_arr = np.empty(
@@ -1115,6 +1099,4 @@ def get_log2_fc(fg_mat, bg_mat):
     #    np.log2(
     #        (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
     #    )
-    return np.log2(
-        (mean_axis1(fg_mat) + 10**-12) / (mean_axis1(bg_mat) + 10**-12)
-    )
+    return np.log2((mean_axis1(fg_mat) + 10**-12) / (mean_axis1(bg_mat) + 10**-12))

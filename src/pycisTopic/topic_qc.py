@@ -19,7 +19,8 @@ from .cistopic_class import *
 
 
 def compute_topic_metrics(
-    cistopic_obj: CistopicObject, return_metrics: bool = True
+    cistopic_obj: CistopicObject,
+    return_metrics: bool = True,
 ):
     """
     Compute topic quality control metrics.
@@ -235,7 +236,7 @@ def topic_annotation(
     annot_var: str,
     binarized_cell_topic: dict[str, pd.DataFrame] | None = None,
     general_topic_thr: float = 0.2,
-    **kwargs
+    **kwargs,
 ):
     """
     Automatic annotation of topics.
@@ -268,6 +269,7 @@ def topic_annotation(
     annot = cistopic_obj.cell_data[annot_var]
     if binarized_cell_topic is None:
         from pycisTopic.topic_binarization import binarize_topics
+
         binarized_cell_topic = binarize_topics(cistopic_obj, target="cell", **kwargs)
 
     topic_annot_dict = {topic: [] for topic in cell_topic.index.tolist()}

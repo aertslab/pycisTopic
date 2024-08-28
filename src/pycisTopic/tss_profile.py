@@ -96,7 +96,8 @@ def get_tss_profile(
     # Extend TSS position with flanking window and only keep minimal necessary columns
     # needed to find the overlap with fragments.
     tss_annotation_with_flanking_window_df_pl = (
-        tss_annotation.select(
+        tss_annotation.clone()
+        .select(
             # Only keep needed columns for faster Genomics Ranges / PyRanges join.
             pl.col("Chromosome").cast(pl.Categorical),
             pl.col("Start"),
@@ -156,9 +157,8 @@ def get_tss_profile(
             }
         )
         if use_genomic_ranges
-        else
         # Use pyranges to calculate the intersection.
-        pl.from_pandas(
+        else pl.from_pandas(
             (
                 # Create PyRanges object from filtered fragments Polars DataFrame.
                 create_pyranges_from_polars_df(filtered_fragments_df_pl).join(
@@ -287,11 +287,11 @@ def get_tss_profile(
             aggregate_function="len",
         )
         # Remove "no_CB" cell barcode (was only needed for the pivot).
-        .filter(pl.col("CB") != "no_CB").with_columns(
-            # Fill in 0, for non-observed values in the pivot table.
-            pl.col(pl.UInt32)
-            .cast(pl.Int32)
-            .fill_null(0),
+        .filter(pl.col("CB") != "no_CB")
+        .with_columns(
+            # Fill in 0, for non-observed values in the pivot table after casting
+            # column from UInt32 (`polars`) or UInt64 (`polars-u64-idx`) to Int32.
+            pl.col(pl.get_index_type()).cast(pl.Int32).fill_null(0),
         )
     )
 
@@ -313,7 +313,8 @@ def get_tss_profile(
             header_name="position_from_tss",
             # Add old "CB" column as column names.
             column_names=tss_matrix_tmp.get_column("CB"),
-        ).with_columns(
+        )
+        .with_columns(
             # Convert "position_from_tss" column from pl.Utf8 to pl.Int32.
             pl.col("position_from_tss").cast(pl.Int32)
         )
@@ -336,37 +337,41 @@ def get_tss_profile(
     # Normalize smoothed TSS matrix.
     # Get normalized sample TSS enrichment per position from the per CB
     # smoothed TSS matrix.
-    tss_norm_matrix_sample = tss_smoothed_matrix_per_cb.select(
-        pl.col("position_from_tss"),
-        # Get total number of cut sites per position over all CBs.
-        pl.sum_horizontal(pl.all().exclude("position_from_tss")).alias(
-            "smoothed_per_pos_sum"
-        ),
-    ).select(
-        pl.col("position_from_tss"),
-        # Normalize total number of cut sites per position over all CBs.
-        (
-            pl.col("smoothed_per_pos_sum")
-            / (
-                # Calculate background value from start and end over
-                # minimum_signal_window length.
-                (
+    tss_norm_matrix_sample = (
+        tss_smoothed_matrix_per_cb.clone()
+        .select(
+            pl.col("position_from_tss"),
+            # Get total number of cut sites per position over all CBs.
+            pl.sum_horizontal(pl.all().exclude("position_from_tss")).alias(
+                "smoothed_per_pos_sum"
+            ),
+        )
+        .select(
+            pl.col("position_from_tss"),
+            # Normalize total number of cut sites per position over all CBs.
+            (
+                pl.col("smoothed_per_pos_sum")
+                / (
+                    # Calculate background value from start and end over
+                    # minimum_signal_window length.
                     (
-                        pl.col("smoothed_per_pos_sum")
-                        .head(minimum_signal_window)
-                        .mean()
-                        + pl.col("smoothed_per_pos_sum")
-                        .tail(minimum_signal_window)
-                        .mean()
+                        (
+                            pl.col("smoothed_per_pos_sum")
+                            .head(minimum_signal_window)
+                            .mean()
+                            + pl.col("smoothed_per_pos_sum")
+                            .tail(minimum_signal_window)
+                            .mean()
+                        )
+                        / 2
                     )
-                    / 2
+                    # Or use min_norm.
+                    .append(min_norm)
+                    # Take highest value.
+                    .max()
                 )
-                # Or use min_norm.
-                .append(min_norm)
-                # Take highest value.
-                .max()
-            )
-        ).alias("normalized_tss_enrichment"),
+            ).alias("normalized_tss_enrichment"),
+        )
     )
 
     # Get normalized TSS matrix per CB for each cut site position.
@@ -390,7 +395,7 @@ def get_tss_profile(
                     .max()
                 )
             ).alias(CB)
-            for CB in tss_smoothed_matrix_per_cb.columns[1:]
+            for CB in tss_smoothed_matrix_per_cb.collect_schema().names()[1:]
         ]
     )
 

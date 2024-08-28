@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import os
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 
@@ -27,6 +28,7 @@ def qc(
     min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
     no_threads: int = 8,
+    engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
 ) -> None:
     """
     Compute quality check statistics from fragments file.
@@ -85,6 +87,8 @@ def qc(
         probability density function (PDF) values for log10 unique fragments in peaks
         vs TSS enrichment, fractions of fragments in peaks and duplication ratio.
         Default: ``8``
+    engine
+        Use Polars or pyarrow to read BED and fragment files (default: `pyarrow`).
 
     Returns
     -------
@@ -127,12 +131,13 @@ def qc(
     regions_df_pl = read_bed_to_polars_df(
         bed_filename=regions_bed_filename,
         min_column_count=3,
+        engine=engine,
     )
 
     logger.info(f'Loading fragments TSV file from "{fragments_tsv_filename}".')
     fragments_df_pl = read_fragments_to_polars_df(
         fragments_tsv_filename,
-        engine="pyarrow",
+        engine=engine,
     )
 
     logger.info("Computing QC stats.")
@@ -209,14 +214,14 @@ def qc(
     fragments_stats_per_cb_for_otsu_threshold_df_pl.write_csv(
         f"{output_prefix}.fragments_stats_per_cb_for_otsu_thresholds.tsv",
         separator="\t",
-        has_header=True,
+        include_header=True,
     )
 
     logger.info(f'Writing "{output_prefix}.cbs_for_otsu_thresholds.tsv".')
     fragments_stats_per_cb_for_otsu_threshold_df_pl.select(pl.col("CB")).write_csv(
         f"{output_prefix}.cbs_for_otsu_thresholds.tsv",
         separator="\t",
-        has_header=False,
+        include_header=False,
     )
 
     logger.info(f'Writing "{output_prefix}.otsu_thresholds.tsv".')
@@ -229,7 +234,45 @@ def qc(
     logger.info("pycisTopic QC finished.")
 
 
-def run_qc(args):
+def qc_filter_barcodes(
+    sample_id: str,
+    pycistopic_qc_output_dir: str | Path,
+    unique_fragments_threshold: int | None = None,
+    tss_enrichment_threshold: float | None = None,
+    frip_threshold: float | None = None,
+):
+    from pycisTopic.qc import get_barcodes_passing_qc_for_sample
+
+    selected_cbs_filename = os.path.join(
+        pycistopic_qc_output_dir,
+        f"{sample_id}.min_fragments_{unique_fragments_threshold}_min_tss_{tss_enrichment_threshold}_min_frip_{frip_threshold}.cbs.txt",
+    )
+
+    print(
+        f'Writing selected cell barcodes for "{sample_id}" based on QC statistics with:\n'
+        f"  - minimum unqiue fragments:\t{unique_fragments_threshold}\n"
+        f"  - minimum TSS threshold:\t{tss_enrichment_threshold}\n"
+        f"  - minimum FRiP threshold:\t{frip_threshold}\n"
+        f'to "{selected_cbs_filename}".'
+    )
+
+    barcodes_passing_filters, _ = get_barcodes_passing_qc_for_sample(
+        sample_id=sample_id,
+        pycistopic_qc_output_dir=pycistopic_qc_output_dir,
+        unique_fragments_threshold=unique_fragments_threshold,
+        tss_enrichment_threshold=tss_enrichment_threshold,
+        frip_threshold=frip_threshold,
+        use_automatic_thresholds=False,
+    )
+
+    pl.Series("CB", barcodes_passing_filters).to_frame().select(pl.col("CB")).write_csv(
+        selected_cbs_filename,
+        separator="\t",
+        include_header=False,
+    )
+
+
+def run_qc_run(args):
     qc(
         fragments_tsv_filename=args.fragments_tsv_filename,
         regions_bed_filename=args.regions_bed_filename,
@@ -244,6 +287,17 @@ def run_qc(args):
         min_fragments_per_cb=args.min_fragments_per_cb,
         collapse_duplicates=args.collapse_duplicates,
         no_threads=args.threads,
+        engine=args.engine,
+    )
+
+
+def run_qc_filter_barcodes(args):
+    qc_filter_barcodes(
+        sample_id=args.sample_id,
+        pycistopic_qc_output_dir=args.pycistopic_qc_output_dir,
+        unique_fragments_threshold=args.unique_fragments_threshold,
+        tss_enrichment_threshold=args.tss_enrichment_threshold,
+        frip_threshold=args.frip_threshold,
     )
 
 
@@ -252,9 +306,20 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         "qc",
         help="Run QC statistics on fragment file.",
     )
-    parser_qc.set_defaults(func=run_qc)
+    subparser_qc = parser_qc.add_subparsers(
+        title="QC",
+        dest="qc",
+        help="List of QC subcommands.",
+    )
+    subparser_qc.required = True
 
-    parser_qc.add_argument(
+    parser_qc_run = subparser_qc.add_parser(
+        "run",
+        help="Run QC statistics on fragment file.",
+    )
+    parser_qc_run.set_defaults(func=run_qc_run)
+
+    parser_qc_run.add_argument(
         "-f",
         "--fragments",
         dest="fragments_tsv_filename",
@@ -264,7 +329,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         help="Fragments TSV filename which contains scATAC fragments.",
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "-r",
         "--regions",
         dest="regions_bed_filename",
@@ -277,7 +342,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "-t",
         "--tss",
         dest="tss_annotation_bed_filename",
@@ -290,7 +355,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "-o",
         "--output",
         dest="output_prefix",
@@ -300,7 +365,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         help="Output prefix to use for QC statistics parquet output files.",
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "--threads",
         dest="threads",
         action="store",
@@ -314,10 +379,22 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         "Default: 8.",
     )
 
-    group_qc_tss = parser_qc.add_argument_group(
+    parser_qc_run.add_argument(
+        "-e",
+        "--engine",
+        dest="engine",
+        action="store",
+        type=str,
+        choices=["polars", "pyarrow"],
+        required=False,
+        default="pyarrow",
+        help="Use Polars or pyarrow to read BED and fragment files. Default: pyarrow.",
+    )
+
+    group_qc_run_tss = parser_qc_run.add_argument_group(
         "TSS profile", "TSS profile statistics calculation settings."
     )
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_flank_window",
         dest="tss_flank_window",
         action="store",
@@ -329,7 +406,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         "Default: 2000 (+/- 2000 bp).",
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_smoothing_rolling_window",
         dest="tss_smoothing_rolling_window",
         action="store",
@@ -339,7 +416,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         help="Rolling window used to smooth the cut sites signal. Default: 10.",
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_minimum_signal_window",
         dest="tss_minimum_signal_window",
         action="store",
@@ -356,7 +433,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_window",
         dest="tss_window",
         action="store",
@@ -370,7 +447,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--tss_min_norm",
         dest="tss_min_norm",
         action="store",
@@ -385,7 +462,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    group_qc_tss.add_argument(
+    group_qc_run_tss.add_argument(
         "--use-pyranges",
         dest="use_genomic_ranges",
         action="store_false",
@@ -396,7 +473,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "--min_fragments_per_cb",
         dest="min_fragments_per_cb",
         action="store",
@@ -410,7 +487,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             """,
     )
 
-    parser_qc.add_argument(
+    parser_qc_run.add_argument(
         "--dont-collapse_duplicates",
         dest="collapse_duplicates",
         action="store_false",
@@ -420,4 +497,63 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
             the same cell barcode).
             Default: collapse duplicates.
             """,
+    )
+
+    parser_qc_filter_barcodes = subparser_qc.add_parser(
+        "filter",
+        help="Filter cell barcodes based on QC statistics.",
+    )
+    parser_qc_filter_barcodes.set_defaults(func=run_qc_filter_barcodes)
+
+    parser_qc_filter_barcodes.add_argument(
+        "-s",
+        "--sample",
+        dest="sample_id",
+        action="store",
+        type=str,
+        required=True,
+        help="Sample ID for which to get list of cell barcodes based on QC statistics.",
+    )
+
+    parser_qc_filter_barcodes.add_argument(
+        "-o",
+        "--output",
+        dest="pycistopic_qc_output_dir",
+        action="store",
+        type=str,
+        required=True,
+        help='Output directory from "pycistopic run qc" which contains QC statistics parquet output files.',
+    )
+
+    parser_qc_filter_barcodes.add_argument(
+        "-f",
+        "--fragments",
+        dest="unique_fragments_threshold",
+        action="store",
+        type=int,
+        required=False,
+        default=1000,
+        help="Threshold for number of unique fragments in peaks. Default: 1000.",
+    )
+
+    parser_qc_filter_barcodes.add_argument(
+        "-t",
+        "--tss",
+        dest="tss_enrichment_threshold",
+        action="store",
+        type=float,
+        required=False,
+        default=5.0,
+        help="Threshold for TSS enrichment score. Default: 5.0.",
+    )
+
+    parser_qc_filter_barcodes.add_argument(
+        "-p",
+        "--frip",
+        dest="frip_threshold",
+        action="store",
+        type=float,
+        required=False,
+        default=0.0,
+        help="Threshold for fraction of reads in peaks (FRiP). Default: 0.0.",
     )

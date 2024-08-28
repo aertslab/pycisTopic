@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gzip
 from operator import itemgetter
-from typing import Literal, Sequence
+from typing import TYPE_CHECKING, Literal, Sequence
 
 import numpy as np
 import pandas as pd
@@ -10,8 +10,12 @@ import polars as pl
 import pyarrow as pa  # type: ignore[import]
 import pyarrow.csv  # type: ignore[import]
 import pyranges as pr  # type: ignore[import]
+import scipy as sp
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.utils import normalise_filepath
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
@@ -103,7 +107,7 @@ def read_fragments_to_pyranges(
             separator="\t",
             use_pyarrow=False,
             new_columns=bed_column_names[:column_count],
-            dtypes={
+            schema_overrides={
                 bed_column: dtype
                 for bed_column, dtype in {
                     "Chromosome": pl.Categorical,
@@ -263,7 +267,7 @@ def read_bed_to_polars_df(
             separator="\t",
             use_pyarrow=False,
             new_columns=bed_column_names[:column_count],
-            dtypes={
+            schema_overrides={
                 bed_column: dtype
                 for bed_column, dtype in {
                     "Chromosome": pl.Categorical,
@@ -313,6 +317,9 @@ def read_bed_to_polars_df(
 def read_fragments_to_polars_df(
     fragments_bed_filename: str,
     engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
+    sample_id: str | None = None,
+    cb_end_to_remove: str | None = "-1",
+    cb_sample_separator: str | None = "___",
 ) -> pl.DataFrame:
     """
     Read fragments BED file to a Polars DataFrame.
@@ -325,7 +332,15 @@ def read_fragments_to_polars_df(
     fragments_bed_filename
         Fragments BED filename.
     engine
-        Use Polars or pyarrow to read the fragments BED file (default: pyarrow).
+        Use Polars or pyarrow to read the fragments BED file (default: `pyarrow`).
+    sample_id
+        Optional sample ID to append after cell barcode after removing `cb_end_to_remove`
+        and appending `cb_sample_separator`.
+    cb_end_to_remove
+        Remove this string from the end of the cell barcode if `sample_id` is specified.
+    cb_sample_separator
+        Add this string to the cell barcode if `sample_id` is specified, after removing
+        `cb_end_to_remove` and before appending `sample_id`.
 
     Returns
     -------
@@ -349,29 +364,67 @@ def read_fragments_to_polars_df(
     ...     fragments_bed_filename="fragments.tsv",
     ... )
 
+    Read gzipped fragments BED file to a Polars DataFrame and add sample ID to cell
+    barcode names after removing `cb_end_to_remove` string from cell barcode and
+    appending `cb_sample_separator` to the cell barcode.
+
+    >>> fragments_df_pl = read_fragments_to_polars_df(
+    ...     fragments_bed_filename="fragments.tsv.gz",
+    ...     sample_id="sample1",
+    ...     cb_end_to_remove="-1",
+    ...     cb_sample_separator="___",
+    ... )
+
     """
     fragments_df_pl = read_bed_to_polars_df(
         bed_filename=fragments_bed_filename,
         engine=engine,
         min_column_count=4,
-    )
+    ).lazy()
 
     # If no score is provided or score column is ".", generate a score column with the
     # number of fragments which have the same chromosome, start, end and CB.
-    if (
-        "Score" not in fragments_df_pl.columns
-        or fragments_df_pl.schema["Score"] == pl.Utf8
-    ):
+    if fragments_df_pl.collect_schema().get("Score") in (None, pl.Utf8):
         fragments_df_pl = fragments_df_pl.group_by(
             ["Chromosome", "Start", "End", "Name"]
         ).agg(pl.len().cast(pl.Int32()).alias("Score"))
     else:
         fragments_df_pl = fragments_df_pl.with_columns(pl.col("Score").cast(pl.Int32()))
 
+    # Modify cell barcode if sample ID is specified or an empty string.
+    if sample_id or sample_id == "":
+        separator_and_sample_id = (
+            f"{cb_sample_separator + sample_id}" if cb_sample_separator else sample_id
+        )
+
+        if not cb_end_to_remove:
+            # Append separator and sample ID to cell barcode.
+            fragments_df_pl = fragments_df_pl.with_columns(
+                (pl.col("Name").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
+                    pl.Categorical
+                )
+            )
+        else:
+            # Remove `cb_end_to_remove` from the end of the cell barcode before adding
+            # separator and sample ID to cell barcode.
+            fragments_df_pl = fragments_df_pl.with_columns(
+                pl.col("Name")
+                .cast(pl.Utf8)
+                .str.replace(cb_end_to_remove + "$", separator_and_sample_id)
+                .cast(pl.Categorical)
+            )
+
+    fragments_df_pl = fragments_df_pl.collect()
+
     return fragments_df_pl
 
 
-def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series:
+def read_barcodes_file_to_polars_series(
+    barcodes_tsv_filename: str,
+    sample_id: str | None = None,
+    cb_end_to_remove: str | None = "-1",
+    cb_sample_separator: str | None = "___",
+) -> pl.Series:
     """
     Read barcode TSV file to a Polars Series.
 
@@ -379,6 +432,14 @@ def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series
     ----------
     barcodes_tsv_filename
         TSV file with CBs.
+    sample_id
+        Optional sample ID to append after cell barcode after removing `cb_end_to_remove`
+        and appending `cb_sample_separator`.
+    cb_end_to_remove
+        Remove this string from the end of the cell barcode if `sample_id` is specified.
+    cb_sample_separator
+        Add this string to the cell barcode if `sample_id` is specified, after removing
+        `cb_end_to_remove` and before appending `sample_id`.
 
     Returns
     -------
@@ -402,17 +463,55 @@ def read_barcodes_file_to_polars_series(barcodes_tsv_filename: str) -> pl.Series
     ...     barcodes_tsv_filename="barcodes.tsv",
     ... )
 
-    """
-    cbs = pl.read_csv(
-        barcodes_tsv_filename,
-        has_header=False,
-        separator="\t",
-        columns=[0],
-        new_columns=["CB"],
-        dtypes={"CB": pl.Categorical},
-    ).to_series()
+    Read gzipped barcodes TSV file to a Polars Series and add sample ID to cell
+    barcode names after removing `cb_end_to_remove` string from cell barcode and
+    appending `cb_sample_separator` to the cell barcode.
 
-    return cbs
+    >>> cbs = read_barcodes_file_to_polars_series(
+    ...     barcodes_tsv_filename="barcodes.tsv",
+    ...     sample_id="sample1",
+    ...     cb_end_to_remove="-1",
+    ...     cb_sample_separator="___",
+    ... )
+
+    """
+    cbs = (
+        pl.read_csv(
+            barcodes_tsv_filename,
+            has_header=False,
+            separator="\t",
+            columns=[0],
+            new_columns=["CB"],
+            schema={"CB": pl.Categorical},
+        )
+        .filter(pl.col("CB").is_not_null())
+        .unique(maintain_order=True)
+    )
+
+    # Modify cell barcode if sample ID is specified or an empty string.
+    if sample_id or sample_id == "":
+        separator_and_sample_id = (
+            f"{cb_sample_separator + sample_id}" if cb_sample_separator else sample_id
+        )
+
+        if not cb_end_to_remove:
+            # Append separator and sample ID to cell barcode.
+            cbs = cbs.with_columns(
+                (pl.col("CB").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
+                    pl.Categorical
+                )
+            )
+        else:
+            # Remove `cb_end_to_remove` from the end of the cell barcode before adding
+            # separator and sample ID to cell barcode.
+            cbs = cbs.with_columns(
+                pl.col("CB")
+                .cast(pl.Utf8)
+                .str.replace(cb_end_to_remove + "$", separator_and_sample_id)
+                .cast(pl.Categorical)
+            )
+
+    return cbs.to_series()
 
 
 def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
@@ -496,10 +595,10 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     # those index values or not).
     bed_with_idx_df_pl = (
         bed_df_pl
-        # Add index column and cast it from UInt32 to Int64
-        .with_row_index("__index_level_0__").with_columns(
-            pl.col("__index_level_0__").cast(pl.Int64)
-        )
+        # Add index column and cast it from UInt32 (`polars`) or
+        # UInt64 (`polars-u64-idx`) to Int64.
+        .with_row_index("__index_level_0__")
+        .with_columns(pl.col("__index_level_0__").cast(pl.Int64))
         # Put index column as last column.
         .select(pl.col(pa_schema_fixed_categoricals.names))
     )
@@ -550,7 +649,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
                 # Partition Polars DataFrame with BED entries per chromosome-strand
                 # (stranded).
                 bed_with_idx_df_pl.partition_by(
-                    by=["Chromosome", "Strand"], maintain_order=False, as_dict=True
+                    "Chromosome", "Strand", maintain_order=False, as_dict=True
                 ).items(),
                 key=itemgetter(0),
             )
@@ -564,7 +663,7 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
                 # Partition Polars DataFrame with BED entries per chromosome
                 # (unstranded).
                 bed_with_idx_df_pl.partition_by(
-                    by=["Chromosome"], maintain_order=False, as_dict=True
+                    "Chromosome", maintain_order=False, as_dict=True
                 ).items(),
                 key=itemgetter(0),
             )
@@ -629,24 +728,28 @@ def get_fragments_per_cb(
     fragments_stats_per_cb_df_pl = (
         fragments_df_pl.lazy()
         .rename({"Name": "CB"})
-        .with_columns(
-                (pl.col("End") - pl.col("Start")).alias("fragment_length")
-        )
+        .with_columns((pl.col("End") - pl.col("Start")).alias("fragment_length"))
         .with_columns(
             pl.col("fragment_length").lt(147).alias("nucleosome_free"),
             pl.col("fragment_length").is_between(147, 294).alias("mononucleosome"),
         )
-        .group_by(by="CB", maintain_order=True)
+        .group_by("CB", maintain_order=True)
         .agg(
             [
-                pl.col("Score").sum().alias("total_fragments_count"),
-                pl.len().alias("unique_fragments_count"),
-                (pl.col("mononucleosome").sum() / pl.col("nucleosome_free").sum()).alias("nucleosome_signal")
+                pl.col("Score").sum().cast(pl.UInt32).alias("total_fragments_count"),
+                pl.len().cast(pl.UInt32).alias("unique_fragments_count"),
+                (
+                    pl.col("mononucleosome").sum() / pl.col("nucleosome_free").sum()
+                ).alias("nucleosome_signal"),
             ]
         )
         .filter(pl.col(fragments_count_column) > min_fragments_per_cb)
-        .sort(by=fragments_count_column, descending=True)
-        .with_row_index(name="barcode_rank", offset=1)
+        .sort(fragments_count_column, descending=True)
+        .with_row_index(
+            name="barcode_rank",
+            offset=1,
+        )
+        .with_columns(pl.col("barcode_rank").cast(pl.UInt32))
         .with_columns(
             (pl.col("total_fragments_count") - pl.col("unique_fragments_count")).alias(
                 "duplication_count"
@@ -656,9 +759,10 @@ def get_fragments_per_cb(
             (pl.col("duplication_count") / pl.col("total_fragments_count")).alias(
                 "duplication_ratio"
             )
-        ).select(
+        )
+        .select(
             pl.selectors.all() - pl.selectors.by_name("nucleosome_signal"),
-            pl.selectors.by_name("nucleosome_signal")
+            pl.selectors.by_name("nucleosome_signal"),
         )
         .collect()
     )
@@ -768,7 +872,7 @@ def get_cbs_passing_filter(
     elif isinstance(keep_top_x_cbs, int):
         fragments_stats_per_cb_filtered_df_pl = (
             fragments_stats_per_cb_df_pl.lazy()
-            .sort(by=fragments_count_column, descending=True)
+            .sort(fragments_count_column, descending=True)
             .head(keep_top_x_cbs)
             .collect()
         )
@@ -892,10 +996,6 @@ def get_insert_size_distribution(
     ----------
     fragments_df_pl
         Polars DataFrame with fragments.
-    cbs
-        List/Polars Series with Cell barcodes.
-        See :func:`pycisTopic.fragments.get_cbs_passing_filter` for a way to get a
-        filtered list of cell barcodes (``selected_cbs`` variable).
 
     Returns
     -------
@@ -929,8 +1029,8 @@ def get_insert_size_distribution(
             (pl.col("End") - pl.col("Start")).abs().alias("insert_size"),
         )
         .group_by("insert_size")
-        .agg([pl.len().alias("fragments_count")])
-        .sort(by="insert_size", descending=True)
+        .agg([pl.len().cast(pl.UInt32).alias("fragments_count")])
+        .sort("insert_size", descending=True)
         .with_columns(
             (pl.col("fragments_count") / pl.col("fragments_count").sum()).alias(
                 "fragments_ratio"
@@ -942,7 +1042,10 @@ def get_insert_size_distribution(
     return insert_size_distribution_df_pl
 
 
-def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.DataFrame) -> pl.DataFrame:
+def get_fragments_in_peaks(
+    fragments_df_pl: pl.DataFrame,
+    regions_df_pl: pl.DataFrame,
+) -> pl.DataFrame:
     """
     Get number of total and unique fragments in peaks.
 
@@ -1009,13 +1112,220 @@ def get_fragments_in_peaks(fragments_df_pl: pl.DataFrame, regions_df_pl: pl.Data
             pl.col("Name").alias("CB"),
             pl.col("Score"),
         )
-        .group_by(by="CB", maintain_order=True)
+        .group_by("CB", maintain_order=True)
         .agg(
             [
-                pl.col("Score").sum().alias("total_fragments_in_peaks_count"),
-                pl.len().alias("unique_fragments_in_peaks_count"),
+                pl.col("Score")
+                .sum()
+                .cast(pl.UInt32)
+                .alias("total_fragments_in_peaks_count"),
+                pl.len().cast(pl.UInt32).alias("unique_fragments_in_peaks_count"),
             ]
         )
     )
 
     return fragments_in_peaks_df_pl
+
+
+def create_fragment_matrix_from_fragments(
+    fragments_bed_filename: str | Path,
+    regions_bed_filename: str | Path,
+    barcodes_tsv_filename: str | Path,
+    blacklist_bed_filename: str | Path | None = None,
+    sample_id: str | None = None,
+    cb_end_to_remove: str | None = "-1",
+    cb_sample_separator: str | None = "___",
+):
+    """
+    Create fragments matrix from a fragment file and BED file with regions.
+
+    Parameters
+    ----------
+    fragments_bed_filename
+        Fragments BED filename.
+    regions_bed_filename
+        Consensus peaks / SCREEN regions BED file for which to make the fragments matrix per cell barcode.
+    barcodes_tsv_filename
+        TSV file with selected cell barcodes after pycisTopic QC filtering.
+    blacklist_bed_filename
+        BED file with blacklisted regions (Amemiya et al., 2019). Default: None.
+    sample_id
+        Optional sample ID to append after cell barcode after removing `cb_end_to_remove`
+        and appending `cb_sample_separator`.
+    cb_end_to_remove
+        Remove this string from the end of the cell barcode if `sample_id` is specified.
+    cb_sample_separator
+        Add this string to the cell barcode if `sample_id` is specified, after removing
+        `cb_end_to_remove` and before appending `sample_id`.
+
+    Returns
+    -------
+    (
+        counts_fragments_matrix,
+        cbs,
+        region_ids,
+    )
+
+    References
+    ----------
+    Amemiya, H. M., Kundaje, A., & Boyle, A. P. (2019). The ENCODE blacklist: identification of problematic regions of the genome. Scientific reports, 9(1), 1-5.
+
+    """
+    # Create logger
+    # level = logging.INFO
+    # log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+    # handlers = [logging.StreamHandler(stream=sys.stdout)]
+    # logging.basicConfig(level=level, format=log_format, handlers=handlers)
+    # log = logging.getLogger("cisTopic")
+
+    # Read file with cell barcodes as a Polars Series and add sample ID to cell barcodes.
+    cbs = read_barcodes_file_to_polars_series(
+        barcodes_tsv_filename=barcodes_tsv_filename,
+        sample_id=sample_id,
+        cb_end_to_remove=cb_end_to_remove,
+        cb_sample_separator=cb_sample_separator,
+    )
+
+    # log.info("Reading data for " + project)
+    # Read fragments file to Polars Dataframe and add sample ID to cell barcodes.
+    fragments_df_pl = read_fragments_to_polars_df(
+        fragments_bed_filename=fragments_bed_filename,
+        engine="pyarrow",
+        sample_id=sample_id,
+        cb_end_to_remove=cb_end_to_remove,
+        cb_sample_separator=cb_sample_separator,
+    )
+
+    # Only keep fragments with the requested cell barcode.
+    fragments_cb_filtered_df_pl = filter_fragments_by_cb(
+        fragments_df_pl=fragments_df_pl,
+        cbs=cbs,
+    ).rename({"Name": "CB", "Score": "CB_count"})
+
+    del fragments_df_pl
+
+    # Read regions BED file as a Polars Dataframe.
+    regions_df_pl = (
+        read_bed_to_polars_df(
+            bed_filename=regions_bed_filename,
+            engine="polars",
+            min_column_count=3,
+        )
+        .with_columns(
+            (
+                pl.col("Chromosome")
+                + ":"
+                + pl.col("Start").cast(pl.Utf8)
+                + "-"
+                + pl.col("End").cast(pl.Utf8)
+            )
+            .cast(pl.Categorical)
+            .alias("RegionID")
+        )
+        .select(
+            pl.col("Chromosome"),
+            pl.col("Start"),
+            pl.col("End"),
+            pl.col("RegionID"),
+        )
+    )
+
+    if blacklist_bed_filename:
+        # Read BED file with blacklisted regions .
+        blacklist_df_pl = read_bed_to_polars_df(
+            bed_filename=blacklist_bed_filename,
+            engine="polars",
+            min_column_count=3,
+        ).select(
+            pl.col("Chromosome"),
+            pl.col("Start"),
+            pl.col("End"),
+        )
+
+        # Filter out regions that overlap with blacklisted regions.
+        regions_df_pl = (
+            regions_df_pl.lazy()
+            .join(
+                # Get all regionIDs that overlap with blacklisted regions.
+                gr_overlap(
+                    regions1_df_pl=regions_df_pl,
+                    regions2_df_pl=blacklist_df_pl,
+                    how="first",
+                )
+                .lazy()
+                .select(
+                    pl.col("RegionID"),
+                ),
+                on="RegionID",
+                how="anti",
+            )
+            .select(
+                pl.col("Chromosome"),
+                pl.col("Start"),
+                pl.col("End"),
+                pl.col("RegionID"),
+            )
+            .collect()
+        )
+
+    # Get accessibility (binary and counts) for each region ID and cell barcode.
+    region_cb_df_pl = (
+        gr_intersection(
+            regions1_df_pl=regions_df_pl,
+            regions2_df_pl=fragments_cb_filtered_df_pl,
+            # how: Literal["all", "containment", "first", "last"] | str | None = None,
+            how="all",
+            regions1_info=True,
+            regions2_info=True,
+            regions1_coord=False,
+            regions2_coord=False,
+            regions1_suffix="@1",
+            regions2_suffix="@2",
+        )
+        .rename({"CB@2": "CB"})
+        .lazy()
+        .group_by(["RegionID", "CB"])
+        .agg(
+            # Get accessibility in binary form.
+            pl.lit(1).cast(pl.Int8).alias("accessible_binary"),
+            # Get accessibility in count form.
+            pl.len().cast(pl.UInt32).alias("accessible_count"),
+        )
+        .join(
+            regions_df_pl.lazy()
+            .select(pl.col("RegionID"))
+            .with_row_index("region_idx"),
+            on="RegionID",
+            how="left",
+        )
+        .join(
+            cbs.to_frame().lazy().with_row_index("CB_idx"),
+            on="CB",
+            how="left",
+        )
+        .collect()
+    )
+
+    # Construct binary accessibility matrix as a sparse matrix
+    # (regions as rows and cells as columns).
+    counts_fragments_matrix = sp.sparse.csr_matrix(
+        (
+            # All data points are 1:
+            #   - same as: region_cb_df_pl.get_column("accessible_binary").to_numpy()
+            #   - for count matrix: region_cb_df_pl.get_column("accessible_count").to_numpy()
+            # np.ones(region_cb_df_pl.shape[0], dtype=np.int8),
+            region_cb_df_pl.get_column("accessible_count").to_numpy(),
+            (
+                # Row indices:
+                region_cb_df_pl.get_column("region_idx").to_numpy(),
+                # Column indices:
+                region_cb_df_pl.get_column("CB_idx").to_numpy(),
+            ),
+        )
+    )
+
+    return (
+        counts_fragments_matrix,
+        cbs.to_list(),
+        regions_df_pl.get_column("RegionID").to_list(),
+    )
