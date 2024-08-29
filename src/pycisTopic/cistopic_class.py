@@ -14,10 +14,10 @@ from pycisTopic.utils import (
     get_position_index,
     non_zero_rows,
     prepare_tag_cells,
-    read_fragments_from_file,
     region_names_to_coordinates,
     subset_list,
 )
+from pycisTopic.fragments import read_fragments_to_pyranges
 from scipy import sparse
 
 if TYPE_CHECKING:
@@ -813,7 +813,10 @@ def create_cistopic_object_from_fragments(
         if path_to_fragments is not None:
             log.info("Using fragments of provided pandas data frame")
     else:
-        fragments = read_fragments_from_file(path_to_fragments, use_polars=use_polars)
+        fragments = read_fragments_to_pyranges(
+            fragments_bed_filename=path_to_fragments,
+            engine = "polars"
+        )
 
     if "Score" not in fragments.df:
         fragments_df = fragments.df
