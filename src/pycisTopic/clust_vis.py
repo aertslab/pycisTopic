@@ -14,6 +14,7 @@ import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
+from matplotlib import colormaps
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -941,6 +942,11 @@ def cell_topic_heatmap(
     df = pd.concat([cell_topic, var_data], axis=1, sort=False)
     topic_order = df.groupby(var).mean().idxmax().sort_values().index.to_list()
     cell_topic = cell_topic.loc[:, topic_order].T
+    # Check if color_dictionary exists
+    if color_dictionary == None:
+        for var in variables:
+            c = colormaps['tab20']
+            color_dictionary = {var: {str(k):c(k) for k in sorted(np.unique(cistopic_obj.cell_data[var]).astype(int))}}
     # Color dict
     col_colors = {}
     if variables is not None:
