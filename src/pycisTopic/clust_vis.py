@@ -936,25 +936,25 @@ def cell_topic_heatmap(
 
     cell_topic = cell_topic.transpose()
 
-    var = variables[0]
-    var_data = cell_data.loc[:, var].sort_values()
-    cell_topic = cell_topic.loc[var_data.index.to_list()]
-    df = pd.concat([cell_topic, var_data], axis=1, sort=False)
-    topic_order = df.groupby(var).mean().idxmax().sort_values().index.to_list()
-    cell_topic = cell_topic.loc[:, topic_order].T
-    # Check if color_dictionary exists
-    if color_dictionary == None:
-        for var in variables:
-            c = colormaps['tab20']
-            color_dictionary = {var: {str(k):c(k) for k in sorted(np.unique(cistopic_obj.cell_data[var]).astype(int))}}
-    # Color dict
     col_colors = {}
     if variables is not None:
+        # sort by first variable
+        var = variables[0]
+        var_data = cell_data.loc[:, var].sort_values()
+        cell_topic = cell_topic.loc[var_data.index.to_list()]
+        df = pd.concat([cell_topic, var_data], axis=1, sort=False)
+        topic_order = df.groupby(var).mean().idxmax().sort_values().index.to_list()
+        cell_topic = cell_topic.loc[:, topic_order].T
+
+        if color_dictionary is None:
+            color_dictionary = {}
+
         for var in variables:
             var_data = cell_data.loc[:, var].sort_values()
             categories = set(var_data)
 
             if var not in color_dictionary:
+                # generate random color mapping
                 random.seed(seed)
                 color = [
                     mcolors.to_rgb("#" + "%06x" % random.randint(0, 0xFFFFFF))
@@ -962,7 +962,9 @@ def cell_topic_heatmap(
                 ]
                 color_dict = dict(zip(categories, color))
                 color_dictionary[var] = color_dict
+
             col_colors[var] = var_data.map(color_dictionary[var])
+
         col_colors = pd.concat(
             [col_colors[var] for var in variables], axis=1, sort=False
         )
@@ -996,7 +998,7 @@ def cell_topic_heatmap(
                 loc="center",
                 title=key,
             )
-            ax = plt.gca().add_artist(legend)
+            _ = plt.gca().add_artist(legend)
             pos += legend_dist_y
     else:
         g = sns.clustermap(
