@@ -930,14 +930,13 @@ def cell_topic_heatmap(
             columns=cell_topic.columns,
         )
 
-    if remove_nan and (sum(cell_data[variables].isnull().sum()) > 0):
-        cell_data = cell_data[variables].dropna()
-        cell_topic = cell_topic.loc[:, cell_data.index.tolist()]
-
     cell_topic = cell_topic.transpose()
 
     col_colors = {}
     if variables is not None:
+        if remove_nan and (sum(cell_data[variables].isnull().sum()) > 0):
+            cell_data = cell_data[variables].dropna()
+            cell_topic = cell_topic.loc[:, cell_data.index.tolist()]
         # sort by first variable
         var = variables[0]
         var_data = cell_data.loc[:, var].sort_values()
