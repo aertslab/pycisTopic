@@ -97,10 +97,11 @@ def find_clusters(
     if target == "cell":
         data_mat = model.cell_topic_harmony if harmony else model.cell_topic
         data_names = cistopic_obj.cell_names
-
-    if target == "region":
+    elif target == "region":
         data_mat = model.topic_region.T
         data_names = cistopic_obj.region_names
+    else:
+        raise VallueError(f"target should be 'cell' or 'region' not {target}.")
 
     if selected_topics is not None:
         data_mat = data_mat.loc[["Topic" + str(x) for x in selected_topics]]
