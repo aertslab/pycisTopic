@@ -165,6 +165,7 @@ def get_tss_annotation_from_ensembl(
             "strand",
             "external_gene_name",
             "transcript_biotype",
+            "ensembl_gene_id",
         ],
         filters={"transcript_biotype": transcript_type} if transcript_type else None,
     )
@@ -192,6 +193,7 @@ def get_tss_annotation_from_ensembl(
                 .alias("Strand")
             ),
             pl.col("Transcript type").alias("Transcript_type"),
+            pl.col("Gene stable ID").alias("Ensembl_gene_id"),
         ]
     )
 
