@@ -648,7 +648,7 @@ def get_chrom_sizes_and_alias_mapping_from_ucsc(
             has_header=False,
             comment_prefix="#",
             new_columns=["ucsc", "length"],
-            schema=[pl.Utf8, pl.Int64],
+            schema={"uscc": pl.Utf8, "length": pl.Int64},
         )
 
     else:
