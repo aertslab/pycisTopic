@@ -128,6 +128,26 @@ def non_zero_rows(matrix: Union[sparse.csr_matrix, np.ndarray]):
 
 
 def loglikelihood(nzw, ndz, alpha, eta):
+    """
+    Loglikelihood function to use with collapsed gibbs sampling LDA model from python `lda` package.
+
+    The loglikelihood function in python `lda` package does not return what we want:
+      https://github.com/lda-project/lda/issues/102
+
+    The loglikelihood function is based on the following implementation:
+      https://github.com/slycoder/R-lda/blob/master/src/gibbs.c
+
+    Parameters
+    ----------
+    nzw
+    ndz
+    alpha
+    eta
+
+    Returns
+    -------
+
+    """
     D = ndz.shape[0]
     n_topics = ndz.shape[1]
     vocab_size = nzw.shape[1]
