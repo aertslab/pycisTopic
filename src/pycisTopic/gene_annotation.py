@@ -623,7 +623,7 @@ def get_chrom_sizes_and_alias_mapping_from_ucsc(
             has_header=True,
             comment_prefix="#",
             # Read all columns as strings.
-            infer_schema_length=0,
+            infer_schema=False,
         )
     else:
         raise ValueError(
