@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import gc
 import gzip
-import logging
 import math
 import os
 import re
 from pathlib import Path
-from typing import Literal, Sequence, Union
+from typing import Sequence, Union
 
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
+import numba
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import polars as pl
 import pyranges as pr
@@ -40,10 +41,9 @@ def coord_to_region_names(df_pl: pl.DataFrame) -> list[str]:
 
     Returns
     -------
-
     List of region names.
-    """
 
+    """
     df_pl.select(
         [
             (
@@ -67,10 +67,9 @@ def region_names_to_coordinates(region_names: Sequence[str]) -> pd.DataFrame:
 
     Returns
     -------
-
     Pandas DataFrame with region IDs to coordinates mapping.
-    """
 
+    """
     region_df = (
         pl.DataFrame(
             data={"RegionIDs": region_names},
@@ -125,6 +124,25 @@ def non_zero_rows(matrix: Union[sparse.csr_matrix, np.ndarray]):
     else:
         # For non sparse matrices.
         return np.nonzero(np.count_nonzero(matrix, axis=1))[0]
+
+
+@numba.njit
+def get_nonzero_row_indices(x: npt.NDArray[np.float32]):
+    """Get the indices of the rows that have at least one nonzero element."""
+    # Optimized version of:
+    #   np.nonzero(np.count_nonzero(x, axis=1))[0]
+    nonzero_row_indices = np.empty((x.shape[0],), dtype=np.intp)
+    output_idx = 0
+    for i in range(x.shape[0]):
+        for j in range(x.shape[1]):
+            if x[i, j] != 0:
+                # Found a nonzero element in the row, so keep the row index and go to
+                # the next row.
+                nonzero_row_indices[output_idx] = i
+                output_idx += 1
+                break
+    # Return row indices of nonzero rows (and truncate the array to the correct size).
+    return nonzero_row_indices[:output_idx]
 
 
 def loglikelihood(nzw, ndz, alpha, eta):
@@ -390,8 +408,8 @@ def read_fragments_from_file(
     Returns
     -------
     PyRanges object of fragments.
-    """
 
+    """
     bed_column_names = (
         "Chromosome",
         "Start",
