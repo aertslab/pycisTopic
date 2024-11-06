@@ -18,9 +18,12 @@ from scipy.stats import ranksums
 if TYPE_CHECKING:
     from pycisTopic.cistopic_class import CistopicObject
 
-# FIXME
-from .cistopic_class import *
-from .utils import *
+from pycisTopic.utils import (
+    get_position_index,
+    non_zero_rows,
+    prepare_tag_cells,
+    subset_list,
+)
 
 
 class CistopicImputedFeatures:
@@ -31,7 +34,7 @@ class CistopicImputedFeatures:
     cell names :attr:`cell_names` and feature names :attr:`feature_names`.
 
     Attributes
-    ---------
+    ----------
     mtx: sparse.csr_matrix
         A matrix containing imputed values.
     cell_names: list
@@ -372,7 +375,7 @@ def impute_accessibility(
     if selected_regions is not None:
         topic_region = topic_region.loc[selected_regions]
         region_names = selected_regions
-    # Convert cell_topic and topic_region 2d arrays to np.float32 so
+    # Convert cell_topic and region_topic 2d arrays to np.float32 so
     # multiplying them uses 4 times less memory than with np.float64
     cell_topic = cell_topic.to_numpy().astype(np.float32)
     topic_region = topic_region.to_numpy().astype(np.float32)
