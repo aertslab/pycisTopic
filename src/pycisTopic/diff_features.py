@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from pycisTopic.cistopic_class import CistopicObject
 
 from pycisTopic.utils import (
+    get_nonzero_row_indices,
     get_position_index,
     non_zero_rows,
     prepare_tag_cells,
@@ -322,6 +323,409 @@ class CistopicImputedFeatures:
             )
 
         return imputed_acc_ranking
+
+
+@numba.njit(parallel=False, error_model="numpy")
+def calculate_partial_imputed_acc_sums_per_cell_for_requested_regions(
+    imputed_acc_chunk, region_idx_to_keep_chunk
+):
+    """
+    Calculate (partial) sum of imputed accessibility for the whole (partial) cell column for each cell.
+
+    Calculate (partial) sum of imputed accessibility for the whole (partial) cell
+    column for each cell using all regions for which the whole row is not completely
+    zero (taken from region_idx_to_keep_chunk)
+    (regions which are never accessible in any cell).
+
+    To get the sum of imputed accessibility for the whole (partial) cell
+    column, the values for each imputed_acc_chunk need to be summed together.
+    To avoid problems with precision in summing a lot of values, summing is done
+    with float64 values.
+
+    Memory optimized version of:
+        np.sum(
+            imputed_acc_chunk[region_idx_to_keep_chunk],
+            axis=0,
+            dtype=np.float64,
+        )
+    The above code triggers a memory copy, due to
+    `imputed_acc_chunk[region_idx_to_keep_chunk]`, without subsetting, no copy would
+    be made.
+
+    Returns
+    -------
+    cells_imputed_acc_sums_partial
+
+    """
+    n_cells = imputed_acc_chunk.shape[1]
+
+    # Preallocate imputed accessibility for whole (partial) cell column.
+    cells_imputed_acc_sums_partial = np.zeros((n_cells,), dtype=np.float64)
+
+    # Get each region index of regions to keep and retrieve imputed accessibility
+    # per region and compute (partial) sum of imputed accessibility for the whole
+    # (partial) cell for each cell.
+    for region_idx in region_idx_to_keep_chunk:
+        cells_imputed_acc_sums_partial += imputed_acc_chunk[region_idx].astype(
+            np.float64
+        )
+    return cells_imputed_acc_sums_partial
+
+
+@numba.njit(parallel=True, error_model="numpy")
+def calculate_per_region_mean_and_dispersion_on_imputed_acc_normalized_chunk(
+    imputed_acc_normalized_chunk,
+):
+    """
+    Calculate mean and dispersion on normalized imputed accessibility for each region.
+
+    Parameters
+    ----------
+    imputed_acc_normalized_chunk
+
+    Returns
+    -------
+    (regions_imputed_acc_normalized_means, regions_imputed_acc_normalized_dispersions)
+
+    """
+    # Memory and speed optimized version of:
+    #
+    #     regions_imputed_acc_normalized_means = imputed_acc_normalized_chunk.mean(
+    #         axis=1, dtype=np.float64
+    #     )
+    #     regions_imputed_acc_normalized_variances = imputed_acc_normalized_chunk.var(
+    #         axis=1, dtype=np.float64
+    #     )
+    #     regions_imputed_acc_normalized_means[
+    #         regions_imputed_acc_normalized_means == 0
+    #     ] = 1e-12
+    #     regions_imputed_acc_normalized_dispersions = (
+    #         regions_imputed_acc_normalized_variances
+    #         / regions_imputed_acc_normalized_means
+    #     )
+    #     regions_imputed_acc_normalized_dispersions[
+    #         regions_imputed_acc_normalized_dispersions == 0
+    #     ] = np.nan
+    #     np.log(
+    #         regions_imputed_acc_normalized_dispersions,
+    #         out=regions_imputed_acc_normalized_dispersions,
+    #     )
+    #     return (
+    #         regions_imputed_acc_normalized_means,
+    #         regions_imputed_acc_normalized_dispersions,
+    #     )
+
+    n_regions = imputed_acc_normalized_chunk.shape[0]
+    n_cells = imputed_acc_normalized_chunk.shape[1]
+    regions_imputed_acc_normalized_means = np.empty((n_regions), dtype=np.float64)
+    regions_imputed_acc_normalized_dispersions = np.empty((n_regions), dtype=np.float64)
+
+    for i in numba.prange(n_regions):
+        impute_acc_per_region = imputed_acc_normalized_chunk[i].astype(np.float64)
+
+        # Calculate mean of normalized imputed accessibility for the current region.
+        mean = np.float64(0.0)
+        for j in range(n_cells):
+            mean += impute_acc_per_region[j]
+        mean /= n_cells
+
+        # Calculate variance of normalized imputed accessibility for the current region.
+        variance = np.float64(0.0)
+        for j in range(n_cells):
+            variance += (impute_acc_per_region[j] - mean) ** 2
+        variance /= n_cells
+
+        mean = mean if mean != 0.0 else 1e-12
+        dispersion = variance / mean
+        dispersion = np.log(dispersion) if dispersion != 0.0 else np.nan
+
+        regions_imputed_acc_normalized_means[i] = mean
+        regions_imputed_acc_normalized_dispersions[i] = dispersion
+    return (
+        regions_imputed_acc_normalized_means,
+        regions_imputed_acc_normalized_dispersions,
+    )
+
+
+def calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc(
+    region_topic: np.ndarray,
+    cell_topic: np.ndarray,
+    region_names: list,
+    scale_factor1: int = 10**6,
+    scale_factor2: int = 10**4,
+    chunk_size=20000,
+) -> tuple[np.ndarray, list]:
+    """
+    Calculate per region mean and dispersion on normalized imputed accessibility in chunks of chunk_size.
+
+    Parameters
+    ----------
+    region_topic:
+        Region topic matrix (regions x topics).
+    cell_topic:
+        Cell topic matrix (topic x cells).
+    region_names:
+        List of all region names.
+    scale_factor:
+        A number to multiply the imputed values for. This is useful to convert
+        low probabilities to 0, making the matrix more sparse. Default: 10**6.
+    chunk_size:
+        Chunk size used (number of regions for which imputed accessibility is
+        calculated at the same time).
+
+    Returns
+    -------
+    Numpy array with imputed accessibility for each region and a list of region
+    names (some regions for which all row values were 0 are filtered out).
+    (imputed_acc, region_names_to_keep)
+
+    """
+    # Create cisTopic logger
+    level = logging.INFO
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
+    log = logging.getLogger("cisTopic")
+
+    output_chunk_end = 0
+    n_regions = region_topic.shape[0]
+    n_cells = cell_topic.shape[1]
+    # n_topics = region_topic.shape[1]
+
+    region_idx_to_keep = np.zeros((n_regions,), dtype=np.intp)
+
+    impute_acc_per_cell_sum = np.zeros((n_cells,), dtype=np.float64)
+
+    log.info("Calculate total imputed accessibility per cell.")
+    region_topic = np.asarray(region_topic, dtype=np.float32)
+    cell_topic = np.asarray(cell_topic, dtype=np.float32)
+
+    log.info(
+        f"Allocate {chunk_size * n_cells * 4 / 1024 ** 3:3f} GiB of RAM for calculating (partial) imputed accessibility per cell for ({n_cells}) cells for chunk of {chunk_size} regions."
+    )
+    # Preallocate imputed accessibility chunk array (chunk_size x n_cells) so it can
+    # be reused in each loop iteration (except for the last one as that one will
+    # likely be smaller).
+    imputed_acc_chunk = np.empty((chunk_size, n_cells), dtype=np.float32)
+
+    # Calculate total imputed accessibility per cell.
+    for input_chunk_start in range(0, n_regions, chunk_size):
+        input_chunk_end = input_chunk_start + chunk_size
+
+        # Set correct output chunk start position.
+        output_chunk_start = output_chunk_end
+
+        log.info(
+            "Calculate (partial) imputed accessibility per cell for regions "
+            f"{input_chunk_start}-{input_chunk_end} (out of {n_regions})."
+        )
+
+        # Get the current chunk of regions.
+        topic_region_chunk = region_topic[
+            input_chunk_start : input_chunk_start + chunk_size
+        ]
+        current_chunk_size = topic_region_chunk.shape[0]
+
+        if current_chunk_size < chunk_size:
+            log.info(
+                f"Allocate {current_chunk_size * n_cells * 4 / 1024 ** 3:3f} GiB of RAM for calculating (partial) imputed accessibility per cell for ({n_cells}) cells for chunk of {current_chunk_size} regions."
+            )
+            # Reallocate imputed_acc_chunk to the correct size.
+            del imputed_acc_chunk
+            imputed_acc_chunk = np.empty(
+                (current_chunk_size, n_cells), dtype=np.float32
+            )
+
+        log.info(
+            "  - Calculate imputed accessibility for the current chunk of regions."
+        )
+        # Calculate imputed accessibility for the current chunk of regions.
+        np.matmul(topic_region_chunk, cell_topic, out=imputed_acc_chunk)
+        # imputed_acc_chunk = topic_region_chunk @ cell_topic
+
+        log.info("  - Scale imputed accessibility matrix chunk (CPM normalization).")
+        # Scale imputed accessibility matrix chunk (CPM normalization).
+        imputed_acc_chunk *= np.float32(scale_factor1)
+
+        # log.info("  - Convert from float32 to int32.")
+        # Convert from float32 to int32.
+        # This will convert very small values to zero and removes noise.
+        # imputed_acc_chunk = imputed_acc_chunk.astype(np.int32, copy=False)
+        log.info("  - Only keep integer part.")
+        # Only keep integer part.
+        # This will convert very small values (< 1.0) to zero and removes noise.
+        np.floor(imputed_acc_chunk, out=imputed_acc_chunk)
+
+        log.info("  - Get non-zero regions.")
+        # Get all region index positions of the matrix for which the whole row is not
+        # completely zero (regions which are never accessible in any cell).
+        region_idx_to_keep_chunk = get_nonzero_row_indices(imputed_acc_chunk)
+
+        # Set correct output chunk end position by taking into account
+        # that rows with all zeros will be filtered out.
+        output_chunk_end = output_chunk_start + len(region_idx_to_keep_chunk)
+
+        # Get all region indexes that need to be kept from this chunk and
+        # assign them to the correct positions in the full region_idx_to_keep array.
+        region_idx_to_keep[output_chunk_start:output_chunk_end] = (
+            region_idx_to_keep_chunk + input_chunk_start
+        )
+
+        log.info(
+            "  - Calculate (partial) sum of imputed accessibility for the whole (partial) cell column."
+        )
+        # Calculate (partial) sum of imputed accessibility for the whole (partial) cell
+        # column for each cell using all regions for which the whole row is not
+        # completely zero (regions which are never accessible in any cell).
+        # To avoid problems with precision in summing multiple chunks later, float64 are
+        # used.
+        cells_imputed_acc_sums_partial = (
+            calculate_partial_imputed_acc_sums_per_cell_for_requested_regions(
+                imputed_acc_chunk, region_idx_to_keep_chunk
+            )
+        )
+
+        impute_acc_per_cell_sum += cells_imputed_acc_sums_partial
+
+    del imputed_acc_chunk
+
+    n_regions_to_keep = output_chunk_end
+
+    log.info(f"Keeping {n_regions_to_keep} of {n_regions} (non_zero) regions.")
+
+    # Only retain that part of region_idx_to_keep that was actually
+    # filled in.
+    region_idx_to_keep = region_idx_to_keep[:output_chunk_end]
+
+    # Subset region_topic to regions we want to keep.
+    region_topic = region_topic[region_idx_to_keep]
+
+    # Get all region names that need to be kept.
+    region_names_to_keep = subset_list(
+        region_names,
+        region_idx_to_keep,
+    )
+
+    # Preallocate arrays for mean and dispersion of normalized imputed accessibility per
+    # region.
+    impute_acc_per_region_mean = np.empty((n_regions_to_keep,), dtype=np.float32)
+    impute_acc_per_region_dispersion = np.empty((n_regions_to_keep,), dtype=np.float32)
+
+    log.info(
+        f"Scale total imputed accessibility per cell by dividing by {scale_factor2}."
+    )
+    # Scale total imputed accessibility per cell by dividing by scale_factor2.
+    # The sum was calculated in float64 to avoid problems with precision, but after
+    # scaling it can be converted back to float32 to avoid converting
+    # imputed_acc_normalized_chunk in each for loop iteration to float64, causing a
+    # big allocation (if there are a lot of cells).
+    impute_acc_per_cell_sum_scaled = (impute_acc_per_cell_sum / scale_factor2).astype(
+        np.float32
+    )
+
+    log.info(
+        f"Allocate {(chunk_size * n_cells * 4 / 1024 ** 3):.3f} GiB of RAM for calculating normalized imputed accessibility per region for chunk of {chunk_size} regions."
+    )
+    # Preallocate normalized imputed accessibility chunk array (chunk_size x n_cells)
+    # so it can be reused in each loop iteration (except for the last one as that one
+    # will likely be smaller).
+    imputed_acc_normalized_chunk = np.empty((chunk_size, n_cells), dtype=np.float32)
+
+    output_chunk_end = 0
+
+    log.info(
+        "Calculate mean and dispersion of normalized imputed accessibility per region."
+    )
+
+    # Calculate mean and dispersion of normalized imputed accessibility per region.
+    for input_chunk_start in range(0, n_regions_to_keep, chunk_size):
+        input_chunk_end = input_chunk_start + chunk_size
+
+        # Set correct output chunk start position.
+        output_chunk_start = output_chunk_end
+
+        log.info(
+            "Calculate mean and dispersion of normalized imputed accessibility for regions "
+            f"{input_chunk_start}-{input_chunk_end} (out of {region_topic.shape[0]})."
+        )
+
+        topic_region_chunk = region_topic[
+            input_chunk_start : input_chunk_start + chunk_size
+        ]
+        current_chunk_size = topic_region_chunk.shape[0]
+
+        if current_chunk_size < chunk_size:
+            log.info(
+                f"Allocate {(current_chunk_size * n_cells * 4 / 1024 ** 3):.3f} GiB of RAM for calculating normalized imputed accessibility per region for chunk of {current_chunk_size} regions."
+            )
+            # Reallocate imputed_acc_chunk to the correct size.
+            del imputed_acc_normalized_chunk
+            imputed_acc_normalized_chunk = np.empty(
+                (current_chunk_size, n_cells), dtype=np.float32
+            )
+
+        log.info(
+            "  - Calculate imputed accessibility for the current chunk of regions."
+        )
+        # Calculate imputed accessibility for the current chunk of regions.
+        np.matmul(topic_region_chunk, cell_topic, out=imputed_acc_normalized_chunk)
+        # imputed_acc_normalized_chunk = topic_region_chunk @ cell_topic
+
+        log.info("  - Scale imputed accessibility matrix chunk (CPM normalization).")
+        # Scale imputed accessibility matrix chunk (CPM normalization).
+        imputed_acc_normalized_chunk *= np.float32(scale_factor1)
+
+        log.info("  - Only keep integer part.")
+        # Only keep integer part.
+        # This will convert very small values (< 1.0) to zero and removes noise.
+        np.floor(imputed_acc_normalized_chunk, out=imputed_acc_normalized_chunk)
+
+        # Set correct output chunk end position by taking into account
+        # that rows with all zeros will be filtered out.
+        output_chunk_end = output_chunk_start + chunk_size
+
+        log.info(
+            f"  - Normalize imputed accessibility by dividing by the total imputed accessibility per cell and multiply by {scale_factor2}."
+        )
+        # Normalize imputed accessibility by dividing by the total imputed
+        # accessibility per cell and multiply by 10^4.
+        imputed_acc_normalized_chunk /= impute_acc_per_cell_sum_scaled
+
+        log.info("  - Add pseudocount of 1 and apply log normalization.")
+        # Add pseudocount of 1 and apply log normalization.
+        np.log1p(
+            imputed_acc_normalized_chunk,
+            out=imputed_acc_normalized_chunk,
+        )
+
+        log.info(
+            "  - Calculate mean and dispersion of imputed accessibility per region."
+        )
+        (
+            regions_imputed_acc_means_partial,
+            regions_imputed_acc_dispersions_partial,
+        ) = calculate_per_region_mean_and_dispersion_on_imputed_acc_normalized_chunk(
+            imputed_acc_normalized_chunk
+        )
+
+        impute_acc_per_region_mean[output_chunk_start:output_chunk_end] = (
+            regions_imputed_acc_means_partial
+        )
+        impute_acc_per_region_dispersion[output_chunk_start:output_chunk_end] = (
+            regions_imputed_acc_dispersions_partial
+        )
+
+    del imputed_acc_normalized_chunk
+
+    log.info(
+        "Finished Calculating  mean and dispersion of imputed accessibility per region."
+    )
+
+    return (
+        region_names_to_keep,
+        impute_acc_per_region_mean,
+        impute_acc_per_region_dispersion,
+    )
 
 
 def impute_accessibility(
