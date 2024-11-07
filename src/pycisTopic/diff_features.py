@@ -655,11 +655,11 @@ def calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc(
     # region.
     per_region_means_on_normalized_imputed_acc = np.empty(
         (n_regions_to_keep,),
-        dtype=np.float32,
+        dtype=np.float64,
     )
     per_region_dispersions_on_normalized_imputed_acc = np.empty(
         (n_regions_to_keep,),
-        dtype=np.float32,
+        dtype=np.float64,
     )
 
     log.info(
@@ -959,44 +959,95 @@ def impute_accessibility(
 
 
 def find_highly_variable_features(
-    input_mat: pd.DataFrame | CistopicImputedFeatures,
+    features: list[str],
+    per_region_means_on_normalized_imputed_acc: npt.NDArray[np.float64],
+    per_region_dispersions_on_normalized_imputed_acc: npt.NDArray[np.float64],
     min_disp: float = 0.05,
     min_mean: float = 0.0125,
-    max_disp: float = np.inf,
+    max_disp: float = float("inf"),
     max_mean: float = 3,
     n_bins: int = 20,
-    n_top_features: int = None,
-    plot: bool = True,
-    save: str = None,
+    n_top_features: int | None = None,
+    plot: bool | str | None = True,
 ):
     """
     Find highly variable features.
 
+    Find highly variable features by using output of
+    `calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc`
+    as input:
+      - `features`
+      - `per_region_means_on_normalized_imputed_acc`
+      - `per_region_dispersions_on_normalized_imputed_acc`
+
     Parameters
     ----------
-    input_mat: pd.DataFrame or :class:`CistopicImputedFeatures`
-        A dataframe with values to be normalize or cisTopic imputation data.
-    min_disp: float, optional
-        Minimum dispersion value for a feature to be selected. Default: 0.05
-    min_mean: float, optional
-        Minimum mean value for a feature to be selected. Default: 0.0125
-    max_disp: float, optional
-        Maximum dispersion value for a feature to be selected. Default: np.inf
-    max_mean: float, optional
-        Maximum mean value for a feature to be selected. Default: 3
-    n_bins: int, optional
-        Number of bins for binning the mean gene expression. Normalization is done with respect to each bin. Default: 20
-    n_top_features: int, optional
-        Number of highly-variable features to keep. If specifed, dispersion and mean thresholds will be ignored. Default: None
-    plot: bool, optional
-        Whether to plot dispersion versus mean values. Default: True.
-    save: str, optional
-        Path to save feature selection plot. Default: None
+    features
+        List of feature (region) names.
+    per_region_means_on_normalized_imputed_acc
+        Mean of normalized imputed accessibility per region.
+    per_region_dispersions_on_normalized_imputed_acc
+        Dispersion of normalized imputed accessibility per region.
+    min_disp
+        Minimum dispersion value for a feature to be selected.
+        Default: 0.05
+    min_mean
+        Minimum mean value for a feature to be selected.
+        Default: 0.0125
+    max_disp
+        Maximum dispersion value for a feature to be selected.
+        Default: float("inf")
+    max_mean
+        Maximum mean value for a feature to be selected.
+        Default: 3
+    n_bins
+        Number of bins for binning the mean gene expression.
+        Normalization is done with respect to each bin.
+        Default: 20
+    n_top_features
+        Number of highly-variable features to keep.
+        If specified, dispersion and mean thresholds will be ignored.
+        Default: None
+    plot
+        Whether to plot dispersion versus mean values.
+        If `True`, plot will be shown.
+        if `str`, plot will be saved to the specified path.
+        If `False` or `None, plot will not be shown.
+        Default: True
 
     Return
     ------
-    List
-        List with selected features.
+    List with selected features.
+
+    Examples
+    --------
+    Get mean and dispersion of normalized imputed accessibility per region.
+    >>> (
+    ...     region_names_to_keep,
+    ...     per_region_means_on_normalized_imputed_acc,
+    ...     per_region_dispersions_on_normalized_imputed_acc,
+    ... ) = calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc(
+    ...     region_topic=region_topic,
+    ...     cell_topic=cell_topic,
+    ...     region_names=region_names,
+    ...     scale_factor1 = 10**6,
+    ...     scale_factor2 = 10**4,
+    ...     regions_chunk_size=20000,
+    ... )
+
+    Find highly variable features.
+    >>> find_highly_variable_features(
+    ...    features=region_names_to_keep,
+    ...    per_region_means_on_normalized_imputed_acc=per_region_means_on_normalized_imputed_acc,
+    ...    per_region_dispersions_on_normalized_imputed_acc=per_region_dispersions_on_normalized_imputed_acc,
+    ...    min_disp = 0.05,
+    ...    min_mean = 0.0125,
+    ...    max_disp = float("inf"),
+    ...    max_mean = 3,
+    ...    n_bins = 20,
+    ...    n_top_features = None,
+    ...    plot = True,
+    ... )
 
     """
     # Create cisTopic logger
@@ -1006,36 +1057,22 @@ def find_highly_variable_features(
     logging.basicConfig(level=level, format=log_format, handlers=handlers)
     log = logging.getLogger("cisTopic")
 
-    if isinstance(input_mat, pd.DataFrame):
-        mat = input_mat.values
-        features = input_mat.index.tolist()
-    else:
-        mat = input_mat.mtx
-        features = input_mat.feature_names
-
-    if sparse.issparse(mat):
-        mean, var = sklearn.utils.sparsefuncs.mean_variance_axis(mat, axis=1)
-    else:
-        log.info("Calculating mean")
-        mean = np.mean(mat, axis=1, dtype=np.float32)
-        log.info("Calculating variance")
-        var = np.var(mat, axis=1, dtype=np.float32)
-
-    mean[mean == 0] = 1e-12
-    dispersion = var / mean
-    # Logarithmic dispersion as in Seurat
-    dispersion[dispersion == 0] = np.nan
-    dispersion = np.log(dispersion)
     df = pd.DataFrame()
-    df["means"] = mean
-    df["dispersions"] = dispersion
+    df["means"] = np.asarray(
+        per_region_means_on_normalized_imputed_acc,
+        dtype=np.float64,
+    )
+    df["dispersions"] = np.asarray(
+        per_region_dispersions_on_normalized_imputed_acc,
+        dtype=np.float64,
+    )
     df["mean_bin"] = pd.cut(df["means"], bins=n_bins)
-    disp_grouped = df.groupby("mean_bin")["dispersions"]
+    disp_grouped = df.groupby("mean_bin", observed=False)["dispersions"]
     disp_mean_bin = disp_grouped.mean()
     disp_std_bin = disp_grouped.std(ddof=1)
     # Retrieve those regions that have nan std, these are the ones where
     # only a single gene fell in the bin and implicitly set them to have
-    # a normalized dispersion of 1
+    # a normalized dispersion of 1.
     one_feature_per_bin = disp_std_bin.isnull()
     feature_indices = np.where(one_feature_per_bin[df["mean_bin"].values])[0].tolist()
 
@@ -1071,8 +1108,8 @@ def find_highly_variable_features(
         dispersion_norm[np.isnan(dispersion_norm)] = 0  # similar to Seurat
         feature_subset = np.logical_and.reduce(
             (
-                mean > min_mean,
-                mean < max_mean,
+                per_region_means_on_normalized_imputed_acc > min_mean,
+                per_region_means_on_normalized_imputed_acc < max_mean,
                 dispersion_norm > min_disp,
                 dispersion_norm < max_disp,
             )
@@ -1081,16 +1118,16 @@ def find_highly_variable_features(
     df["highly_variable"] = feature_subset
     var_features = [features[i] for i in df[df.highly_variable].index.to_list()]
 
-    fig = plt.figure()
     if plot:
+        fig = plt.figure()
         matplotlib.rcParams["agg.path.chunksize"] = 10000
         plt.scatter(
             df["means"], df["dispersions_norm"], c=feature_subset, s=10, alpha=0.1
         )
         plt.xlabel("Mean measurement of features")
         plt.ylabel("Normalized dispersion of the features")
-        if save is not None:
-            fig.savefig(save)
+        if isinstance(plot, str):
+            fig.savefig(plot)
         plt.show()
 
     log.info("Done!")
