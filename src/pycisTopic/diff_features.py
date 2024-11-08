@@ -4,6 +4,7 @@ import logging
 import sys
 from typing import TYPE_CHECKING, Self
 
+import math
 import matplotlib
 import matplotlib.pyplot as plt
 import numba
@@ -1445,10 +1446,9 @@ def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
     return wilcox_test_pvalues_part
 
 
-def p_adjust_bh(p: float):
-    """
-    Benjamini-Hochberg p-value correction for multiple hypothesis testing.
-    """
+# TODO: Add these generic functions to another package
+def p_adjust_bh(p: npt.NDArray):
+    """Benjamini-Hochberg p-value correction for multiple hypothesis testing."""
     p = np.asfarray(p)
     by_descend = p.argsort()[::-1]
     by_orig = by_descend.argsort()
@@ -1458,7 +1458,7 @@ def p_adjust_bh(p: float):
 
 
 @numba.njit(parallel=True)
-def subset_array_second_axis(arr, col_indices):
+def subset_array_second_axis(arr: npt.NDArray, col_indices: npt.NDArray):
     """
     Subset array by second axis based on provided `col_indices`.
 
@@ -1473,6 +1473,12 @@ def subset_array_second_axis(arr, col_indices):
         1D-numpy array (preferably with np.int64 as dtype) with column indices.
 
     """
+    if arr.ndim != 2:
+        raise ValueError("arr should be a 2D array")
+
+    if col_indices.ndim != 1:
+        raise ValueError("col_indices should be a 1D array")
+
     if np.max(col_indices) >= arr.shape[1]:
         raise IndexError(
             f"index {np.max(col_indices)} is out of bounds for axis 1 with size {arr.shape[1]}"
@@ -1496,7 +1502,7 @@ def subset_array_second_axis(arr, col_indices):
 
 
 @numba.njit(parallel=True)
-def mean_axis1(arr):
+def mean_axis1(arr: npt.NDArray):
     """
     Calculate column wise mean of 2D-numpy matrix with numba, mimicking `np.mean(x, axis=1)`.
 
@@ -1513,7 +1519,7 @@ def mean_axis1(arr):
 
 
 @numba.njit
-def get_log2_fc(fg_mat, bg_mat):
+def get_log2_fc(fg_mat: npt.NDArray, bg_mat: npt.NDArray):
     """
     Calculate log2 fold change between foreground and background matrix.
 
@@ -1525,6 +1531,9 @@ def get_log2_fc(fg_mat, bg_mat):
         2D-numpy background matrix.
 
     """
+    if fg_mat.ndim != 2 or bg_mat.ndim != 2:
+        raise ValueError("fg_mat and bg_mat should be 2D arrays")
+
     if fg_mat.shape[0] != bg_mat.shape[0]:
         raise ValueError(
             "Foreground matrix and background matrix have a different first dimension:"
@@ -1537,3 +1546,89 @@ def get_log2_fc(fg_mat, bg_mat):
     #        (np.mean(fg_mat, axis=1) + 10**-12) / (np.mean(bg_mat, axis=1) + 10**-12)
     #    )
     return np.log2((mean_axis1(fg_mat) + 10**-12) / (mean_axis1(bg_mat) + 10**-12))
+
+
+@numba.jit(nopython=True)
+def rankdata_average_numba(arr: npt.NDArray):
+    """
+    Assign ranks to data, dealing with ties by taking average of ranks that would have been assigned to all tied values.
+
+    Ranks begin at 1.
+
+    Algorithm based on `scipy.stats.ranksums` of scipy 1.11.x with the following
+    parameters: `rankdata(a, method="average, axis=None, nan_policy="omit")`,
+    but with the assumption that there are no `np.nan` values.
+
+    https://github.com/scipy/scipy/blob/maintenance/1.11.x/scipy/stats/_stats_py.py#L10123-L10267
+
+    """
+    sorter = np.argsort(arr, kind="quicksort")
+    inv = np.empty(sorter.size, dtype=np.intp)
+    inv[sorter] = np.arange(sorter.size, dtype=np.intp)
+    arr = arr[sorter]
+    obs = np.empty(arr.shape, dtype=np.intp)
+    obs[0] = True
+    obs[1:] = arr[1:] != arr[:-1]
+    dense = obs.cumsum()[inv]
+    non_zero = np.nonzero(obs)[0]
+    count = np.empty(non_zero.shape[0] + 1)
+    count[0:-1] = non_zero
+    count[-1] = len(obs)
+    result = 0.5 * (count[dense] + count[dense - 1] + 1)
+    return result
+
+
+@numba.jit(nopython=True)
+def norm_sf(z: float):
+    """Survival function (1 - `cdf`) at z of the given RV."""
+    return (1.0 + math.erf(-z / math.sqrt(2.0))) / 2.0
+
+
+@numba.jit(nopython=True)
+def ranksums_numba(x: npt.NDArray, y: npt.NDArray):
+    """
+    Compute the Wilcoxon rank-sum statistic for two samples.
+
+    The Wilcoxon rank-sum test tests the null hypothesis that two sets
+    of measurements are drawn from the same distribution.  The alternative
+    hypothesis is that values in one sample are more likely to be
+    larger than the values in the other sample.
+
+    This test should be used to compare two samples from continuous
+    distributions.  It does not handle ties between measurements
+    in x and y.
+
+    Algorithm based on `scipy.stats.ranksums`.
+    """
+    n1 = len(x)
+    n2 = len(y)
+    alldata = np.concatenate((x, y))
+    ranked = rankdata_average_numba(alldata)
+    x = ranked[:n1]
+    s = np.sum(x, axis=0)
+    expected = n1 * (n1 + n2 + 1) / 2.0
+    z = (s - expected) / np.sqrt(n1 * n2 * (n1 + n2 + 1) / 12.0)
+    prob = 2 * norm_sf(abs(z))
+    return z, prob
+
+
+@numba.jit(nopython=True, parallel=True)
+def ranksums_numba_multiple(X: npt.NDArray, Y: npt.NDArray):
+    """
+    Compute multiple Wilcoxon rank-sum statistics for two samples.
+
+    For each row of X and Y Wilcoxon rank-sum statistics for two samples are computed.
+
+    """
+    if X.ndim != 2 or Y.ndim != 2:
+        raise ValueError("X and Y should be 2D arrays")
+    n = X.shape[0]
+    if Y.shape[0] != n:
+        raise ValueError("X and Y should have the same shape on dimension 0")
+    ranksums_z = np.empty((n,), dtype=np.float64)
+    ranksums_p = np.empty((n,), dtype=np.float64)
+    for i in numba.prange(n):
+        z, p = ranksums_numba(X[i], Y[i])
+        ranksums_z[i] = z
+        ranksums_p[i] = p
+    return ranksums_z, ranksums_p
