@@ -1337,10 +1337,10 @@ def markers(
 
         chunk_size = 3000
 
-        # Calculate wilcox test for each region in multiple ray processes (3000 regions per process).
-        wilcox_test_pvalues_nested_list = ray.get(
+        # Calculate wilcoxon test for each region in multiple ray processes (3000 regions per process).
+        wilcoxon_test_pvalues_nested_list = ray.get(
             [
-                get_wilcox_test_pvalues_ray.remote(
+                get_wilcoxon_test_pvalues_ray.remote(
                     fg_mat_ref,
                     bg_mat_ref,
                     start=start,
@@ -1353,18 +1353,18 @@ def markers(
         # Remove foreground and background matrix from ray object store.
         del fg_mat_ref, bg_mat_ref
 
-        # Flatten wilcox tests pvalues nested list.
-        wilcox_test_pvalues = []
+        # Flatten wilcoxon tests pvalues nested list.
+        wilcoxon_test_pvalues = []
 
-        for wilcox_test_pvalues_part in wilcox_test_pvalues_nested_list:
-            wilcox_test_pvalues.extend(wilcox_test_pvalues_part)
+        for wilcoxon_test_pvalues_part in wilcoxon_test_pvalues_nested_list:
+            wilcoxon_test_pvalues.extend(wilcoxon_test_pvalues_part)
     else:
-        wilcox_test_pvalues = get_wilcox_test_pvalues(fg_mat, bg_mat)
+        wilcoxon_test_pvalues = get_wilcoxon_test_pvalues(fg_mat, bg_mat)
 
     log.info(f"Computing log2FC for {contrast_name}")
     log2_fc = get_log2_fc(fg_mat, bg_mat)
 
-    adj_pvalues = p_adjust_bh(wilcox_test_pvalues)
+    adj_pvalues = p_adjust_bh(wilcoxon_test_pvalues)
 
     markers_dataframe = pd.DataFrame(
         {
@@ -1387,9 +1387,9 @@ def markers(
     return markers_dataframe
 
 
-def get_wilcox_test_pvalues(fg_mat, bg_mat):
+def get_wilcoxon_test_pvalues(fg_mat, bg_mat):
     """
-    Calculate wilcox test p-values between foreground and background matrix.
+    Calculate wilcoxon test p-values between foreground and background matrix.
 
     Parameters
     ----------
@@ -1405,20 +1405,20 @@ def get_wilcox_test_pvalues(fg_mat, bg_mat):
             f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
         )
 
-    wilcox_test_pvalues = [
-        wilcox_test.pvalue
-        for wilcox_test in [
+    wilcoxon_test_pvalues = [
+        wilcoxon_test.pvalue
+        for wilcoxon_test in [
             ranksums(fg_mat[i], y=bg_mat[i]) for i in range(fg_mat.shape[0])
         ]
     ]
 
-    return wilcox_test_pvalues
+    return wilcoxon_test_pvalues
 
 
 @ray.remote
-def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
+def get_wilcoxon_test_pvalues_ray(fg_mat, bg_mat, start, end):
     """
-    Calculate wilcox test p-values with ray between a subset of foreground and background matrix.
+    Calculate wilcoxon test p-values with ray between a subset of foreground and background matrix.
 
     Parameters
     ----------
@@ -1438,12 +1438,14 @@ def get_wilcox_test_pvalues_ray(fg_mat, bg_mat, start, end):
             f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
         )
 
-    wilcox_test_pvalues_part = [
-        wilcox_test.pvalue
-        for wilcox_test in [ranksums(fg_mat[i], y=bg_mat[i]) for i in range(start, end)]
+    wilcoxon_test_pvalues_part = [
+        wilcoxon_test.pvalue
+        for wilcoxon_test in [
+            ranksums(fg_mat[i], y=bg_mat[i]) for i in range(start, end)
+        ]
     ]
 
-    return wilcox_test_pvalues_part
+    return wilcoxon_test_pvalues_part
 
 
 # TODO: Add these generic functions to another package
