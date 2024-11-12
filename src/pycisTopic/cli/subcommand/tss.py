@@ -582,7 +582,10 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         action="store_false",
         required=False,
         default=True,
-        help="Disable caching of requests to Ensembl BioMart server.",
+        help="Disable caching of requests to Ensembl BioMart server. Cached requests "
+        'can also be removed by deleting ".pybiomart.sqlite" file in the current '
+        'working directory. If you got a crash running the "get_tss" subcommand, try '
+        'to remove the ".pybiomart.sqlite" file or add "--no_cache".',
     )
 
     group_tgt_remap_chroms = parser_tss_get_tss.add_argument_group(
@@ -683,7 +686,10 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         action="store_false",
         required=False,
         default=True,
-        help="Disable caching of requests to Ensembl BioMart server.",
+        help="Disable caching of requests to Ensembl BioMart server. Cached requests "
+        'can also be removed by deleting ".pybiomart.sqlite" file in the current '
+        'working directory. If you got a crash running the "gene_annotation_list" '
+        'subcommand, try to remove the ".pybiomart.sqlite" file or add "--no_cache".',
     )
 
     parser_tss_get_ncbi_acc = subparser_tss.add_parser(
