@@ -161,12 +161,24 @@ def get_tss_annotation_bed_file(
         f"  - use_cache: {use_cache}",
         file=sys.stderr,
     )
-    tss_annotation_bed_df_pl = ga.get_tss_annotation_from_ensembl(
-        biomart_name=biomart_name,
-        biomart_host=biomart_host,
-        transcript_type=transcript_type,
-        use_cache=use_cache,
-    )
+
+    try:
+        tss_annotation_bed_df_pl = ga.get_tss_annotation_from_ensembl(
+            biomart_name=biomart_name,
+            biomart_host=biomart_host,
+            transcript_type=transcript_type,
+            use_cache=use_cache,
+        )
+    except Exception as e:
+        print(
+            "\nError: Could not get TSS annotation from Ensembl BioMart. "
+            "Likely this is caused by and invalid/incomplete cached request from "
+            "BioMart.\n\n"
+            'Use "--no-cache" or remove ".pybiomart.sqlite" in the current working '
+            "directory and try again.\n",
+            file=sys.stderr,
+        )
+        raise e
 
     if to_chrom_source_name and (
         chrom_sizes_and_alias_tsv_filename or ncbi_accession_id or ucsc_assembly
@@ -296,10 +308,21 @@ def get_species_gene_annotation_ensembl_biomart_dataset_names(
     """  # noqa: W505
     import pycisTopic.gene_annotation as ga
 
-    biomart_datasets = ga.get_all_gene_annotation_ensembl_biomart_dataset_names(
-        biomart_host=biomart_host,
-        use_cache=use_cache,
-    )
+    try:
+        biomart_datasets = ga.get_all_gene_annotation_ensembl_biomart_dataset_names(
+            biomart_host=biomart_host,
+            use_cache=use_cache,
+        )
+    except Exception as e:
+        print(
+            "Error: Could not get gene annotation Ensembl BioMart dataset names. "
+            "Likely this is caused by and invalid/incomplete cached request from "
+            "BioMart.\n\n"
+            'Use "--no-cache" or remove ".pybiomart.sqlite" in the current working '
+            "directory and try again.\n",
+            file=sys.stderr,
+        )
+        raise e
 
     if not species:
         biomart_datasets.to_csv(sys.stdout, sep="\t", header=False, index=False)
