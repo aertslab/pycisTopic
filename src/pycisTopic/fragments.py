@@ -12,7 +12,7 @@ import pyarrow.csv  # type: ignore[import]
 import pyranges as pr  # type: ignore[import]
 import scipy as sp
 from pycisTopic.genomic_ranges import intersection as gr_intersection
-from pycistopic.genomic_ranges import overlap as gr_overlap
+from pycisTopic.genomic_ranges import overlap as gr_overlap
 from pycisTopic.utils import normalise_filepath
 
 if TYPE_CHECKING:
