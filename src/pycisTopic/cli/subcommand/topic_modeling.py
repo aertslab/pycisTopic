@@ -219,6 +219,102 @@ def run_mallet_calculate_model_evaluation_stats(args):
             top_topics_coh=5,
         )
 
+def binarize_cell_or_region_topic(args):
+    """
+    target, method, ntop, smooth_topics, nbins, cb, regions, output, topic
+    """
+
+    target = args.target
+    method = args.method
+    ntop = args.ntop
+    smooth_topics = args.smooth_topics
+    nbins = args.nbins
+    cell_barcodes_filename = args.cell_barcodes_filename
+    region_ids_filename = args.region_ids_filename
+    output_prefix = args.output_prefix
+    n_topics = args.n_topics
+    out_dir = args.out_dir
+
+    # input validation
+    if target == "cell" and cell_barcodes_filename is None:
+        raise ValueError("`cell_barcodes_filename` using `--cb` should be provided when target is `cell`")
+    if target == "region" and region_ids_filename is None:
+        raise ValueError("`region_ids_filename` using `--regions` should be provided when target is `region`")
+    
+    import os
+    if not os.path.exists(out_dir):
+        print(f'Making directory: {out_dir}')
+        os.makedirs(out_dir)
+    
+    from pycisTopic.fragments import read_barcodes_file_to_polars_series
+    from pycisTopic.lda_models import LDAMallet, LDAMalletFilenames
+    from pycisTopic.topic_binarization import binarize_topics
+
+    lda_mallet_filenames = LDAMalletFilenames(
+        output_prefix=output_prefix, n_topics=n_topics
+    )
+
+    if target == "cell":
+        print(f'Read cell barcodes filename "{cell_barcodes_filename}".')
+        cell_or_region_names = read_barcodes_file_to_polars_series(
+            barcodes_tsv_filename=cell_barcodes_filename,
+            sample_id=None,
+            cb_end_to_remove=None,
+            cb_sample_separator=None,
+        ).to_list()
+        print(f'Read cell-topic probabilities filename "{lda_mallet_filenames.cell_topic_probabilities_parquet_filename}".')
+        cell_or_region_topic_prob = LDAMallet.read_cell_topic_probabilities_parquet_file(
+            mallet_cell_topic_probabilities_parquet_filename=lda_mallet_filenames.cell_topic_probabilities_parquet_filename
+        )
+
+    if target == "region":
+        print(f'Read region IDs filename "{region_ids_filename}".')
+        cell_or_region_names = read_barcodes_file_to_polars_series(
+            barcodes_tsv_filename=region_ids_filename,
+            sample_id=None,
+            cb_end_to_remove=None,
+            cb_sample_separator=None,
+        ).to_list()
+        print(f'Read region-topic probabilities filename "{lda_mallet_filenames.region_topic_counts_parquet_filename}".')
+        cell_or_region_topic_prob = LDAMallet.read_region_topic_counts_parquet_file_to_region_topic_probabilities(
+            mallet_region_topic_counts_parquet_filename=lda_mallet_filenames.region_topic_counts_parquet_filename
+        ).T
+    
+    print("Binarizing topics ...")
+    cell_or_region_names_per_topic, scores_per_topic, thresholds = binarize_topics(
+        cell_or_region_topic_prob=cell_or_region_topic_prob,
+        cell_or_region_names=cell_or_region_names,
+        method=method,
+        smooth_topics=smooth_topics,
+        ntop=ntop,
+        nbins=nbins
+    )
+
+    print(f'Saving results to "{out_dir}".')
+
+    with open(os.path.join(out_dir, f"{target}_thresholds.tsv"), "wt") as f:
+        for topic, thr in enumerate(thresholds):
+            _ = f.write(
+                f"{topic + 1}\t{thr}\n"
+            )
+    
+    if target == "cell":
+        for topic, (cells, scores) in enumerate(zip(cell_or_region_names_per_topic, scores_per_topic)):
+            with open(os.path.join(out_dir, f"{target}_Topic_{topic + 1}_binarized.txt"), "wt") as f:
+                for cell, score in zip(cells, scores):
+                    _ = f.write(
+                        f"{cell}\t{score}\n"
+                    )
+
+    elif target == "region":
+        for topic, (regions, scores) in enumerate(zip(cell_or_region_names_per_topic, scores_per_topic)):
+            with open(os.path.join(out_dir, f"{target}_Topic_{topic + 1}_binarized.bed"), "wt") as f:
+                for region, score in zip(regions, scores):
+                    chrom, start, end = region.replace(":", "-").split("-")
+                    _ = f.write(
+                        f"{chrom}\t{start}\t{end}\tTopic_{topic + 1}\t{score}\n"
+                    )
+
 
 def str_to_bool(v: str) -> bool:
     """
@@ -637,4 +733,103 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         action="store_true",
         required=False,
         help="Enable verbose mode.",
+    )
+
+    parser_topic_modeling_mallet_binarize = subparser_topic_modeling_mallet.add_parser(
+        "binarize", help="Binarize cell- or region-topic probabilities"
+    )
+    parser_topic_modeling_mallet_binarize.set_defaults(func=binarize_cell_or_region_topic)
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-a",
+        "--target",
+        dest="target",
+        action="store",
+        type=str,
+        choices=["region", "cell"],
+        required=True,
+        help='Choose between "region" or "cell" topic binarization.'
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-m",
+        "--method",
+        dest="method",
+        action="store",
+        type=str,
+        choices=("ntop", "otsu", "aucell", "li", "yen"),
+        required=True,
+        help='Binarization method. Choose between "ntop", "otsu", "aucell", "li" or "yen" for cell-or region-topic binarization.'
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-n",
+        "--ntop",
+        dest="ntop",
+        action="store",
+        type=int,
+        required=False,
+        help="Number of top regions to select. Can only be used when `--method` is set to `ntop`."
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-s",
+        "--smooth",
+        dest="smooth_topics",
+        action="store",
+        type=str_to_bool,
+        choices=(True, False),
+        required=False,
+        default=True,
+        help="Wether to smooth the cell- or region-topic probabilities."
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-b",
+        "--nbins",
+        dest="nbins",
+        action="store",
+        type=int,
+        required=False,
+        default=100,
+        help="Number of bins to use in the histogram used for `otsu`, `yen` and `li` thresholding."
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-c",
+        "--cb",
+        dest="cell_barcodes_filename",
+        action="store",
+        type=str,
+        required=False,
+        help="Filename with cell barcodes.",
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-r",
+        "--regions",
+        dest="region_ids_filename",
+        action="store",
+        type=str,
+        required=False,
+        help="Filename with region IDs.",
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-o",
+        "--output",
+        dest="output_prefix",
+        action="store",
+        type=str,
+        required=True,
+        help="Topic model output prefix.",
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-t",
+        "--n_topics",
+        dest="n_topics",
+        type=int,
+        required=True,
+        help="Model with `topic` number of topics to binarize.",
+    )
+    parser_topic_modeling_mallet_binarize.add_argument(
+        "-p",
+        "--output_dir",
+        dest="out_dir",
+        action="store",
+        type=str,
+        required=True,
+        help="Directory to store results.",
     )

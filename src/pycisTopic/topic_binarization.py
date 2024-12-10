@@ -1,210 +1,17 @@
 from __future__ import annotations
 
-import logging
-import sys
-from typing import TYPE_CHECKING
+from functools import partial
+from typing import Callable, Literal
 
-import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from pyscenic import binarization
 
-if TYPE_CHECKING:
-    from pycisTopic.cistopic_class import CistopicObject
-
-
-def binarize_topics(
-    cistopic_obj: CistopicObject,
-    target: str | None = "region",
-    method: str | None = "otsu",
-    smooth_topics: bool = True,
-    ntop: int = 2000,
-    predefined_thr: dict[str, float] | None = None,
-    nbins: int = 100,
-    plot: bool = False,
-    figsize: tuple[float, float] | None = (6.4, 4.8),
-    num_columns: int = 1,
-    save: str | None = None,
-):
-    r"""
-    Binarize topic distributions.
-
-    Parameters
-    ----------
-    cistopic_obj
-        A cisTopic object with a model in :class:`CistopicObject`.
-    target
-        Whether cell-topic ("cell") or region-topic ("region") distributions should be
-        binarized. Default: "region".
-    method
-        Method to use for topic binarization. Possible options are:
-          - ``otsu`` [Otsu, 1979]
-          - ``yen`` [Yen et al., 1995]
-          - ``li`` [Li & Lee, 1993]
-          - ``aucell`` [Van de Sande et al., 2020]
-          - ``ntop`` [Taking the top n regions per topic]
-        Default: ``otsu``.
-    smooth_topics
-        Whether to smooth topics distributions to penalize regions enriched across many
-        topics. The following formula is applied:
-
-        .. math::
-          \beta_{w, k} (\log\beta_{w,k} - 1 / K \sum_{k'} \log \beta_{w,k'})
-    ntop
-        Number of top regions to select when using ``method="ntop"``.
-        Default: 2000.
-    predefined_thr
-        A dictionary containing topics as keys and threshold as values. If a topic is
-        not present, thresholds will be computed with the specified method.
-        This can be used for manually adjusting thresholds when necessary.
-        Default: None.
-    nbins
-        Number of bins to use in the histogram used for ``otsu``, ``yen`` and
-        ``li`` thresholding.
-        Default: 100.
-    plot
-        Whether to plot region-topic distributions and their threshold.
-        Default: False.
-    figsize
-        Size of the figure. If num_columns is 1, this is the size for each figure.
-        If ``num_columns`` is above 1, this is the overall size of the figure.
-        If keeping the default, it will be the size of each subplot in the figure.
-        Default: (6.4, 4.8).
-    num_columns
-        For multiplot figures, indicates the number of columns (the number of rows will
-        be automatically determined based on the number of plots).
-        Default: 1.
-    save
-        Path to save plot.
-        Default: None.
-
-    Returns
-    -------
-    A dictionary containing a pd.DataFrame with the selected regions with region names
-    as indexes and a topic score column.
-
-    References
-    ----------
-    - Otsu, N., 1979.
-      A threshold selection method from gray-level histograms.
-      IEEE transactions on systems, man, and cybernetics, 9(1), pp.62-66.
-    - Yen, J.C., Chang, F.J. and Chang, S., 1995.
-      A new criterion for automatic multilevel thresholding.
-      IEEE Transactions on Image Processing, 4(3), pp.370-378.
-    - Li, C.H. and Lee, C.K., 1993.
-      Minimum cross entropy thresholding.
-      Pattern recognition, 26(4), pp.617-625.
-    - Van de Sande, B., Flerin, C., Davie, K., De Waegeneer, M., Hulselmans, G.,
-      Aibar, S., Seurinck, R., Saelens, W., Cannoodt, R., Rouchon, Q. and
-      Verbeiren, T., 2020.
-      A scalable SCENIC workflow for single-cell gene regulatory network analysis.
-      Nature Protocols, 15(7), pp.2247-2276.
-
-    """
-    # Create cisTopic logger
-    level = logging.INFO
-    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger("cisTopic")
-
-    if target == "region":
-        topic_dist = cistopic_obj.selected_model.topic_region
-    elif target == "cell":
-        topic_dist = cistopic_obj.selected_model.cell_topic.T
-
-    if smooth_topics:
-        topic_dist = smooth_topics_distributions(topic_dist)
-
-    binarized_topics = {}
-    pdf = None
-    if (save is not None) and (num_columns == 1):
-        pdf = matplotlib.backends.backend_pdf.PdfPages(save)
-
-    if num_columns > 1:
-        num_rows = int(np.ceil(topic_dist.shape[1] / num_columns))
-        if figsize == (6.4, 4.8):
-            figsize = (6.4 * num_columns, 4.8 * num_rows)
-
-    fig = plt.figure(figsize=figsize)
-    j = 1
-    for i in range(topic_dist.shape[1]):
-        l = np.asarray(topic_dist.iloc[:, i])
-        l_norm = (l - np.min(l)) / np.ptp(l)
-        if isinstance(predefined_thr, dict) and "Topic" + str(i + 1) in (
-            list(predefined_thr.keys())
-        ):
-            thr = predefined_thr["Topic" + str(i + 1)]
-        elif method == "otsu":
-            thr = threshold_otsu(l_norm, nbins=nbins)
-        elif method == "yen":
-            thr = threshold_yen(l_norm, nbins=nbins)
-        elif method == "li":
-            thresholds = np.arange(np.min(l_norm) + 0.01, np.max(l_norm) - 0.01, 0.01)
-            entropies = [cross_entropy(l_norm, t, nbins=nbins) for t in thresholds]
-            thr = thresholds[np.argmin(entropies)]
-        elif method == "aucell":
-            df, thr = binarization.binarize(pd.DataFrame(l_norm))
-            thr = float(thr)
-        elif method == "ntop":
-            data = pd.DataFrame(l_norm).sort_values(0, ascending=False)
-            thr = float(data.iloc[ntop,])
-        else:
-            log.info(
-                'Binarization method not found. Please choose: "otsu", "yen", "li" or "ntop".'
-            )
-
-        if plot:
-            if num_columns > 1:
-                plt.subplot(num_rows, num_columns, j)
-                j = j + 1
-            plt.hist(l_norm, bins=nbins)
-            plt.axvline(thr, color="tomato", linestyle="--")
-            plt.xlabel(
-                "Standardized probability Topic "
-                + str(i + 1)
-                + "\n"
-                + "Selected:"
-                + str(sum(l_norm > thr)),
-                fontsize=10,
-            )
-            if num_columns == 1:
-                if pdf is not None:
-                    pdf.savefig(fig, bbox_inches="tight")
-                if plot:
-                    plt.show()
-        binarized_topics["Topic" + str(i + 1)] = pd.DataFrame(
-            topic_dist.iloc[l_norm > thr, i]
-        ).sort_values("Topic" + str(i + 1), ascending=False)
-
-    if target == "region":
-        cistopic_obj.selected_model.topic_ass["Regions_in_binarized_topic"] = [
-            binarized_topics[x].shape[0] for x in binarized_topics
-        ]
-    elif target == "cell":
-        cistopic_obj.selected_model.topic_ass["Cells_in_binarized_topic"] = [
-            binarized_topics[x].shape[0] for x in binarized_topics
-        ]
-
-    if num_columns > 1:
-        plt.tight_layout()
-        if save is not None:
-            fig.savefig(save, bbox_inches="tight")
-        if plot:
-            plt.show()
-        else:
-            plt.close()
-
-    if pdf is not None:
-        pdf.close()
-
-    return binarized_topics
-
 
 def smooth_topics_distributions(
-    topic_region_distributions: pd.DataFrame,
-) -> pd.DataFrame:
+    cell_or_region_topic_prob: npt.NDArray[np.float64],
+) -> npt.NDArray[np.float64]:
     r"""
     Smooth topic-region distributions.
 
@@ -216,9 +23,8 @@ def smooth_topics_distributions(
 
     Parameters
     ----------
-    topic_region_distributions
-        A pandas dataframe with topic-region distributions
-        (with topics as columns and regions as rows).
+    cell_or_region_topic_prob
+       Numpy array containing cell or region topic probabilities with topics along columns.
 
     Returns
     -------
@@ -226,7 +32,9 @@ def smooth_topics_distributions(
 
     """
 
-    def smooth_topic_distribution(x: np.ndarray) -> np.ndarray:
+    def smooth_topic_distribution(
+        x: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
         """
         Smooth topic-region distribution for a topic.
 
@@ -240,21 +48,12 @@ def smooth_topics_distributions(
         Smoothed topic-region distribution for a topic.
 
         """
-        return x * (np.log(x + 1e-100) - np.sum(np.log(x + 1e-100)) / x.shape[0])
+        return x * (np.log(x + 1e-45) - np.sum(np.log(x + 1e-45)) / x.shape[0])
 
-    smoothed_topic_region_distributions = pd.DataFrame(
-        np.apply_along_axis(
-            smooth_topic_distribution,
-            1,
-            topic_region_distributions.values,
-        ),
-        index=topic_region_distributions.index,
-        columns=topic_region_distributions.columns,
-    )
-    return smoothed_topic_region_distributions
+    return np.apply_along_axis(smooth_topic_distribution, 1, cell_or_region_topic_prob)
 
 
-def threshold_yen(array: np.ndarray, nbins: int = 100) -> float:
+def threshold_yen(array: npt.NDArray[np.float64], nbins: int = 100) -> float:
     """
     Apply Yen threshold on topic-region distributions [Yen et al., 1995].
 
@@ -288,7 +87,7 @@ def threshold_yen(array: np.ndarray, nbins: int = 100) -> float:
     return bin_centers[crit.argmax()]
 
 
-def threshold_otsu(array: np.ndarray, nbins: int = 100) -> float:
+def threshold_otsu(array: npt.NDArray[np.float64], nbins: int = 100) -> float:
     """
     Apply Otsu threshold on topic-region distributions [Otsu, 1979].
 
@@ -326,7 +125,9 @@ def threshold_otsu(array: np.ndarray, nbins: int = 100) -> float:
     return threshold
 
 
-def cross_entropy(array: np.ndarray, threshold: float, nbins: int = 100) -> float:
+def cross_entropy(
+    array: npt.NDArray[np.float64], threshold: float, nbins: int = 100
+) -> float:
     """
     Calculate entropies for Li thresholding on topic-region distributions [Li & Lee, 1993].
 
@@ -362,8 +163,8 @@ def cross_entropy(array: np.ndarray, threshold: float, nbins: int = 100) -> floa
 
 
 def histogram_and_bin_centers(
-    array: np.ndarray, nbins: int = 100
-) -> tuple[np.ndarray, np.ndarray]:
+    array: npt.NDArray[np.float64], nbins: int = 100
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     Draw histogram from distribution and identify centers.
 
@@ -383,3 +184,133 @@ def histogram_and_bin_centers(
     hist, bin_edges = np.histogram(array, bins=nbins, range=None)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     return hist, bin_centers
+
+
+def threshold_li(array: npt.NDArray[np.float64], nbins) -> float:
+    thresholds = np.arange(np.min(array) + 0.01, np.max(array) - 0.01, 0.01)
+    entropies = [cross_entropy(array, t, nbins=nbins) for t in thresholds]
+    thr = thresholds[np.argmin(entropies)]
+    return thr
+
+
+def threshold_aucell(array: npt.NDArray[np.float64]):
+    _, thr = binarization.binarize(pd.DataFrame(array))
+    return float(thr)
+
+
+def threshold_ntop(array: npt.NDArray[np.float64], ntop: int) -> float:
+    return np.sort(array)[::-1][ntop]
+
+
+def binarize_topics(
+    cell_or_region_topic_prob: npt.NDArray[np.float64],
+    cell_or_region_names: list[str],
+    method: Literal["otsu", "ntop", "li", "yen", "aucell"] = "otsu",
+    smooth_topics: bool = True,
+    ntop: int | None = None,
+    nbins: int = 100,
+) -> tuple[list[list[str]], list[npt.NDArray[np.float64]], list[float]]:
+    r"""
+    Binarize topic distributions.
+
+    Parameters
+    ----------
+    cell_or_region_topic_prob
+        Numpy array containing cell or region topic probabilities with topics along columns.
+    cell_or_region_names
+        A list of str containing cell or region names (should be the same length as the number of rows in `cell_or_region_topic_prob`)
+    method
+        Method to use for topic binarization. Possible options are:
+          - ``otsu`` [Otsu, 1979]
+          - ``yen`` [Yen et al., 1995]
+          - ``li`` [Li & Lee, 1993]
+          - ``aucell`` [Van de Sande et al., 2020]
+          - ``ntop`` [Taking the top n regions per topic]
+
+    smooth_topics
+        Whether to smooth topics distributions to penalize regions enriched across many
+        topics. The following formula is applied:
+
+        .. math::
+          \beta_{w, k} (\log\beta_{w,k} - 1 / K \sum_{k'} \log \beta_{w,k'})
+    ntop
+        Number of top regions to select when using ``method="ntop"``.
+    nbins
+        Number of bins to use in the histogram used for ``otsu``, ``yen`` and
+        ``li`` thresholding.
+        Default: 100.
+
+    Returns
+    -------
+    A list of string containing binarized cells or regions, an array of scores and a list of floats containing thresholds
+
+    """
+    # input validation
+    if len(cell_or_region_names) != cell_or_region_topic_prob.shape[0]:
+        raise ValueError(
+            f"{len(cell_or_region_names)} cells or region names provided while `cell_or_region_topic_prob` only has {cell_or_region_topic_prob.shape[0]} rows."
+        )
+
+    if len(cell_or_region_names) != len(set(cell_or_region_names)):
+        raise ValueError("`cell_or_region_names` contains duplicates.")
+
+    if method == "ntop" and ntop is None:
+        raise ValueError(
+            "A value for ntop should be provided when using `ntop` as binarization method."
+        )
+
+    method_to_bin_func: dict[str, Callable[[npt.NDArray[np.float64]], float]] = {
+        "otsu": partial(threshold_otsu, nbins=nbins),
+        "yen": partial(threshold_yen, nbins=nbins),
+        "li": partial(threshold_li, nbins=nbins),
+        "aucell": threshold_aucell,
+        "ntop": partial(threshold_ntop, ntop=ntop),  # type: ignore
+    }
+
+    bin_func = method_to_bin_func.get(method)
+
+    if bin_func is None:
+        raise ValueError(
+            f'`method` should be one of "otsu", "ntop", "li", "yen", "aucell". Not {method}.'
+        )
+
+    # create index used for sorting
+    cell_or_region_names_idx = {x: i for i, x in enumerate(cell_or_region_names)}
+
+    if smooth_topics:
+        cell_or_region_topic_prob = smooth_topics_distributions(
+            cell_or_region_topic_prob
+        )
+
+    cell_or_region_names_per_topic: list[list[str]] = []
+    scores_per_topic: list[npt.NDArray[np.float64]] = []
+    thresholds: list[float] = []
+
+    # iterate over topics
+    for i in range(cell_or_region_topic_prob.shape[1]):
+        # normalize between 0 and 1
+        l_norm = (
+            cell_or_region_topic_prob[:, i] - np.min(cell_or_region_topic_prob[:, i])
+        ) / np.ptp(cell_or_region_topic_prob[:, i])
+        # get threshold
+        thr = bin_func(l_norm)
+        # sort cell or region names based on l_norm, features with highest score first (reverse=True)
+        cell_or_region_names_sorted = sorted(
+            cell_or_region_names,
+            key=lambda x: l_norm[cell_or_region_names_idx[x]],
+            reverse=True,
+        )
+        # get cell or regions passing threshold
+        l_norm_a_sort = np.argsort(l_norm)[::-1]
+        l_norm_sorted = l_norm[l_norm_a_sort]
+        cell_or_regions_passing_threshold = cell_or_region_names_sorted[
+            0 : np.where(l_norm_sorted > thr)[0].max() + 1
+        ]
+        scores_passing_threshold = cell_or_region_topic_prob[l_norm_a_sort, i][
+            0 : np.where(l_norm_sorted > thr)[0].max() + 1
+        ]
+        cell_or_region_names_per_topic.append(cell_or_regions_passing_threshold)
+        scores_per_topic.append(scores_passing_threshold)
+        thresholds.append(thr)
+
+    return cell_or_region_names_per_topic, scores_per_topic, thresholds
