@@ -47,3 +47,8 @@ share/python-wheels/
 *.egg
 target/
 *.out
+
+# Local directories
+stubs/
+test_files/
+test_scripts/
