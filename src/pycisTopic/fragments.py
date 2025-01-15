@@ -11,6 +11,7 @@ import pyarrow as pa  # type: ignore[import]
 import pyarrow.csv  # type: ignore[import]
 import pyranges as pr  # type: ignore[import]
 import scipy as sp
+
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.genomic_ranges import overlap as gr_overlap
 from pycisTopic.utils import normalise_filepath
@@ -1322,7 +1323,11 @@ def create_fragment_matrix_from_fragments(
                 # Column indices:
                 region_cb_df_pl.get_column("CB_idx").to_numpy(),
             ),
-        )
+        ),
+        # Specify shape of the sparse matrix to avoid potential issues if the last
+        # (few) rows or (few) columns are empty as this will cause the CB list
+        # and regions list to be greater than the dimensions of the sparse matrix.
+        shape=(regions_df_pl.height, cbs.len()),
     )
 
     return (
