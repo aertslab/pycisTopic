@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 import pyranges as pr
 import sklearn.preprocessing as sp
+from scipy import sparse
+
+from pycisTopic.fragments import read_fragments_to_pyranges
 from pycisTopic.utils import (
     collapse_duplicates,
     get_position_index,
@@ -17,8 +20,6 @@ from pycisTopic.utils import (
     region_names_to_coordinates,
     subset_list,
 )
-from pycisTopic.fragments import read_fragments_to_pyranges
-from scipy import sparse
 
 if TYPE_CHECKING:
     from pycisTopic.lda_models import CistopicLDAModel
