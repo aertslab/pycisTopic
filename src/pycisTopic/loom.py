@@ -7,7 +7,6 @@ import sys
 from collections import OrderedDict
 from itertools import chain, islice, repeat
 from multiprocessing import cpu_count
-from operator import attrgetter
 from typing import TYPE_CHECKING
 
 import loompy as lp
@@ -21,8 +20,8 @@ from pyscenic.binarization import binarize
 from sklearn.feature_extraction.text import CountVectorizer
 
 if TYPE_CHECKING:
-    from pycisTopic.diff_features import CistopicImputedFeatures
     from pycisTopic.cistopic_class import CistopicObject
+    from pycisTopic.diff_features import CistopicImputedFeatures
 
 
 def export_gene_activity_to_loom(
@@ -47,7 +46,7 @@ def export_gene_activity_to_loom(
     Create SCope [Davie et al, 2018] compatible loom files for gene activity exploration
 
     Parameters
-    ---------
+    ----------
     gene_activity_matrix: class::CistopicImputedFeatures or class::pd.DataFrame
         A cisTopic imputed features object containing imputed gene activity as values. Alternatively, a pandas data frame with genes as
         columns, cells as rows and gene activity per gene as values.
@@ -84,12 +83,13 @@ def export_gene_activity_to_loom(
 
 
     References
-    -----------
+    ----------
     Davie, K., Janssens, J., Koldere, D., De Waegeneer, M., Pech, U., Kreft, Ł., ... & Aerts, S. (2018). A single-cell transcriptome atlas of the
     aging Drosophila brain. Cell, 174(4), 982-998.
 
     Van de Sande, B., Flerin, C., Davie, K., De Waegeneer, M., Hulselmans, G., Aibar, S., ... & Aerts, S. (2020). A scalable SCENIC
     workflow for single-cell gene regulatory network analysis. Nature Protocols, 15(7), 2247-2276.
+
     """
     # Create logger
     level = logging.INFO
@@ -464,7 +464,7 @@ def export_minimal_loom_gene(
     # All three levels need to be supplied
     assert len(tree_structure) <= 3, ""
     general_attrs.update(
-        ("SCopeTreeL{}".format(idx + 1), category)
+        (f"SCopeTreeL{idx + 1}", category)
         for idx, category in enumerate(
             list(islice(chain(tree_structure, repeat("")), 3))
         )
@@ -508,7 +508,7 @@ def export_region_accessibility_to_loom(
     Create SCope [Davie et al, 2018] compatible loom files for accessibility data exploration
 
     Parameters
-    ---------
+    ----------
     accessibility_matrix: class::CistopicImputedFeatures or class::pd.DataFrame
         A cisTopic imputed features object containing imputed accessibility as values. Alternatively, a pandas data frame with regions as
         columns, cells as rows and accessibility per regions as values.
@@ -546,11 +546,11 @@ def export_region_accessibility_to_loom(
 
 
     References
-    -----------
+    ----------
     Davie, K., Janssens, J., Koldere, D., De Waegeneer, M., Pech, U., Kreft, Ł., ... & Aerts, S. (2018). A single-cell transcriptome atlas of the
     aging Drosophila brain. Cell, 174(4), 982-998.
-    """
 
+    """
     # Create logger
     level = logging.INFO
     log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
@@ -614,7 +614,7 @@ def export_region_accessibility_to_loom(
         x: binarized_topic_region[x][
             binarized_topic_region[x].index.isin(feature_names)
         ]
-        for x in binarized_topic_region.keys()
+        for x in binarized_topic_region
     }
     regulon_mat = cistopic_obj.selected_model.topic_region.copy()
     for col_idx in regulon_mat:
@@ -646,7 +646,7 @@ def export_region_accessibility_to_loom(
     # Keep only cells in data
     binarized_cell_topic = {
         x: binarized_cell_topic[x][binarized_cell_topic[x].index.isin(cell_names)]
-        for x in binarized_cell_topic.keys()
+        for x in binarized_cell_topic
     }
     cell_topic = cell_topic.T
     topic_thresholds = pd.Series(
@@ -876,7 +876,7 @@ def export_minimal_loom_region(
     # All three levels need to be supplied
     assert len(tree_structure) <= 3, ""
     general_attrs.update(
-        ("SCopeTreeL{}".format(idx + 1), category)
+        (f"SCopeTreeL{idx + 1}", category)
         for idx, category in enumerate(
             list(islice(chain(tree_structure, repeat("")), 3))
         )
@@ -1069,13 +1069,13 @@ def add_markers(loom: SCopeLoom, markers_dict: dict[str, dict[str, pd.DataFrame]
 
         # Update row attribute Dict
         row_attrs_cluster_markers = {
-            f"ClusterMarkers_{str(idx)}": df_to_named_matrix(
+            f"ClusterMarkers_{idx!s}": df_to_named_matrix(
                 cluster_markers.astype(np.int8)
             ),
-            f"ClusterMarkers_{str(idx)}_avg_logFC": df_to_named_matrix(
+            f"ClusterMarkers_{idx!s}_avg_logFC": df_to_named_matrix(
                 cluster_markers_avg_logfc.astype(np.float32)
             ),
-            f"ClusterMarkers_{str(idx)}_pval": df_to_named_matrix(
+            f"ClusterMarkers_{idx!s}_pval": df_to_named_matrix(
                 cluster_markers_pval.astype(np.float32)
             ),
         }
