@@ -10,6 +10,7 @@ import pyranges as pr
 import ray
 import requests
 from bs4 import BeautifulSoup
+
 from pycisTopic.utils import coord_to_region_names, region_names_to_coordinates
 
 # Set stderr to null when using ray.init to avoid ray printing Broken pipe million times
@@ -92,7 +93,7 @@ def pyGREAT(
                     bg_choice,
                     tmp_dir,
                 )
-                for key in region_sets.keys()
+                for key in region_sets
             ]
         )
         ray.shutdown()
@@ -116,7 +117,7 @@ def pyGREAT(
                 bg_choice,
                 tmp_dir,
             )
-            for key in region_sets.keys()
+            for key in region_sets
         }
     return pyGREAT_dict
 
