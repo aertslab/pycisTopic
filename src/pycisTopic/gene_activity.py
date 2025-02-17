@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pyranges as pr
 import scipy.sparse as sparse
+
 from pycisTopic.diff_features import CistopicImputedFeatures
 
 # FIXME
@@ -169,24 +170,25 @@ def weighted_aggregation(
     Weighted aggregation of region probabilities into gene activity
 
     Parameters
-    ---------
+    ----------
     imputed_acc_obj_mtx: sparse.csr_matrix
         A sparse matrix with regions as rows and cells as columns.
     region_weights_df_per_gene: pd.DataFrame
         A data frame with region index (from the sparse matrix) for the gene
     average_score: bool
         Whether final values should be divided by the total number of regions aggregated
+
     """
     if average_scores:
         gene_act = (
             imputed_acc_obj_mtx[region_weights_df_per_gene.Index, :].T.dot(
-                (region_weights_df_per_gene.Weight.values)
+                region_weights_df_per_gene.Weight.values
             )
             / region_weights_df_per_gene.shape[0]
         )
     else:
         gene_act = imputed_acc_obj_mtx[region_weights_df_per_gene.Index, :].T.dot(
-            (region_weights_df_per_gene.Weight.values)
+            region_weights_df_per_gene.Weight.values
         )
     return gene_act
 
@@ -535,7 +537,7 @@ def region_weights(
         gini_weight = pd.DataFrame(
             gini_weight, columns=["Gini"], index=subset_imputed_acc_object.feature_names
         )
-        gini_weight["Gini_weight"] = np.exp((1 - gini_weight["Gini"])) + np.exp(-1)
+        gini_weight["Gini_weight"] = np.exp(1 - gini_weight["Gini"]) + np.exp(-1)
         gini_weight = gini_weight.loc[regions_per_gene.Name,]
         regions_per_gene.Gini_weight = gini_weight.loc[:, "Gini_weight"]
     else:
@@ -630,8 +632,7 @@ def reduce_pyranges_with_limits_b(pr_obj: pr.PyRanges):
 
 def extend_pyranges(pr_obj: pr.PyRanges, upstream: int, downstream: int):
     """
-    A helper function to extend coordinates downstream/upstream in a pyRanges given upstream and downstream
-    distances.
+    Extend coordinates downstream/upstream of a pyRanges object.
     """
     # Split per strand
     positive_pr = pr_obj[pr_obj.Strand == "+"]
@@ -651,8 +652,7 @@ def extend_pyranges(pr_obj: pr.PyRanges, upstream: int, downstream: int):
 
 def reduce_pyranges_b(pr_obj: pr.PyRanges, upstream: int, downstream: int):
     """
-    A helper function to reduce coordinates downstream/upstream in a pyRanges given upstream and downstream
-    distances.
+    Reduce coordinates downstream/upstream of a pyRanges object.
     """
     # Split per strand
     positive_pr = pr_obj[pr_obj.Strand == "+"]
