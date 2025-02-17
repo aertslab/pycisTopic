@@ -14,9 +14,6 @@ from statsmodels.stats import proportion
 if TYPE_CHECKING:
     from pycisTopic.cistopic_class import CistopicObject
 
-# FIXME
-from .cistopic_class import *
-
 
 def compute_topic_metrics(
     cistopic_obj: CistopicObject,
@@ -27,22 +24,27 @@ def compute_topic_metrics(
 
     Parameters
     ----------
-    cistopic_obj: `class::CistopicObject`
-            A cisTopic object with a model in `class::CistopicObject.selected_model`.
-    return_metrics: bool, optional
-            Whether to return metrics as `class::pd.DataFrame`. The metrics will be also appended to
-            `class::CistopicObject.selected_model.topic_qc_metrics` despite the value of this parameter. Default: True.
+    cistopic_obj
+        A cisTopic object with a model in `class::CistopicObject.selected_model`.
+    return_metrics
+        Whether to return metrics as `class::pd.DataFrame`. The metrics will be also
+        appended to `class::CistopicObject.selected_model.topic_qc_metrics` despite
+        the value of this parameter. Default: True.
 
-    Return
-    ---------
-    pd.DataFrame
-            Data frame containing a column with topic metrics: the number of assignments, the topic coherence (Mimno et al., 2011), the
-            marginal topic distribution (which indicates how much each topic contributes to the model), and the gini index (which indicates
-            the specificity of topics. If topics have been binarized, the number of regions/cells per topic will be added.
+    Returns
+    -------
+    Data frame containing a column with topic metrics: the number of assignments, the
+    topic coherence (Mimno et al., 2011), the marginal topic distribution (which
+    indicates how much each topic contributes to the model), and the gini index (which
+    indicates the specificity of topics. If topics have been binarized, the number of
+    regions/cells per topic will be added.
 
     References
     ----------
-    Mimno, D., Wallach, H., Talley, E., Leenders, M., & McCallum, A. (2011). Optimizing semantic coherence in topic models. In Proceedings of the 2011 Conference on Empirical Methods in Natural Language Processing (pp. 262-272).
+    Mimno, D., Wallach, H., Talley, E., Leenders, M., & McCallum, A. (2011).
+    Optimizing semantic coherence in topic models.
+    In Proceedings of the 2011 Conference on Empirical Methods in Natural Language
+    Processing (pp. 262-272).
 
     """
     model = cistopic_obj.selected_model
@@ -79,7 +81,7 @@ def compute_topic_metrics(
 
 
 def plot_topic_qc(
-    topic_qc_metrics: pd.DataFrame | CistopicObject,
+    topic_qc_metrics: pd.DataFrame,
     var_x: str,
     var_y: str,
     min_x: int | None = None,
@@ -100,52 +102,45 @@ def plot_topic_qc(
 
     Parameters
     ----------
-    topic_qc_metrics: `class::pd.DataFrame` or `class::CistopicObject`
-            A topic metrics dataframe or a cisTopic object with `class::CistopicObject.selected_model.topic_qc_metrics` filled.
-    var_x: str
-            Metric to plot.
-    var_y: str, optional
-            A second metric to plot in combination with `var_x`.
-    min_x: float, optional
-            Minimum value on `var_x` to keep the barcode/cell. Default: None.
-    max_x: float, optional
-            Maximum value on `var_x` to keep the barcode/cell. Default: None.
-    min_y: float, optional
-            Minimum value on `var_y` to keep the barcode/cell. Default: None.
-    max_y: float, optional
-            Maximum value on `var_y` to keep the barcode/cell. Default: None.
-    var_color: str, optional
-            Metric to color plot by. Default: None
-    cmap: str, optional
-            Color map to color 2D dot plots by density. Default: None.
-    dot_size: int, optional
-            Dot size in the plot. Default: 10
-    text_size: int, optional
-            Size of the labels in the plot. Default: 10
-    plot: bool, optional
-            Whether the plots should be returned to the console. Default: True.
-    save: bool, optional
-            Path to save plots as a file. Default: None.
-    return_topics: bool, optional
-            Whether to return selected topics based on user-given thresholds. Default: True.
-    return_fig: bool, optional
-            Whether to return the plot figure; if several samples it will return a dictionary with the figures per sample. Default: False.
+    topic_qc_metrics
+        A topic metrics dataframe.
+    var_x
+        Metric to plot.
+    var_y
+        A second metric to plot in combination with `var_x`.
+    min_x
+        Minimum value on `var_x` to keep the barcode/cell. Default: None.
+    max_x
+        Maximum value on `var_x` to keep the barcode/cell. Default: None.
+    min_y
+        Minimum value on `var_y` to keep the barcode/cell. Default: None.
+    max_y
+        Maximum value on `var_y` to keep the barcode/cell. Default: None.
+    var_color
+        Metric to color plot by. Default: None
+    cmap
+        Color map to color 2D dot plots by density. Default: None.
+    dot_size
+        Dot size in the plot. Default: 10
+    text_size
+        Size of the labels in the plot. Default: 10
+    plot
+        Whether the plots should be returned to the console. Default: True.
+    save
+        Path to save plots as a file. Default: None.
+    return_topics
+        Whether to return selected topics based on user-given thresholds.
+        Default: True.
+    return_fig
+        Whether to return the plot figure; if several samples it will return a
+        dictionary with the figures per sample. Default: False.
 
-    Return
-    ------
-    list
-            A list with the selected topics.
+    Returns
+    -------
+    A list with the selected topics.
 
     """
-    if not isinstance(topic_qc_metrics, pd.DataFrame):
-        try:
-            topic_qc_metrics = cistopic_obj.selected_model.topic_qc_metrics
-        except BaseException:
-            log.error(
-                "This cisTopic object does not include topic qc metrics. Please run compute_topic_metrics() first."
-            )
-
-    # Plot xy
+    # Plot xy.
     fig = plt.figure()
     if var_color is not None:
         plt.scatter(
@@ -158,14 +153,14 @@ def plot_topic_qc(
     else:
         plt.scatter(topic_qc_metrics[var_x], topic_qc_metrics[var_y], s=dot_size)
 
-    # Topics
+    # Topics.
     n = topic_qc_metrics.index.tolist()
 
     plt.xlabel(var_x, fontsize=10)
     plt.ylabel(var_y, fontsize=10)
-    # Add topic number
+    # Add topic number.
     texts = []
-    for i, txt in enumerate(n):
+    for i, _txt in enumerate(n):
         texts.append(
             plt.text(
                 topic_qc_metrics[var_x][i],
@@ -178,9 +173,9 @@ def plot_topic_qc(
                 path_effects=[PathEffects.withStroke(linewidth=3, foreground="w")],
             )
         )
-    adjust_text(texts, arrowprops=dict(arrowstyle="-", color="gray", alpha=0.5))
+    adjust_text(texts, arrowprops={"arrowstyle": "-", "color": "gray", "alpha": 0.5})
 
-    # Add limits
+    # Add limits.
     x = topic_qc_metrics[var_x]
     y = topic_qc_metrics[var_y]
     if min_x is not None:
@@ -204,7 +199,7 @@ def plot_topic_qc(
         x = x[list(y < max_y)]
         y = y[list(y < max_y)]
 
-    # setup the colorbar
+    # Setup the colorbar.
     if var_color is not None:
         scalarmappaple = cm.ScalarMappable(cmap=cmap)
         scalarmappaple.set_array(topic_qc_metrics[var_color])
@@ -243,25 +238,30 @@ def topic_annotation(
 
     Parameters
     ----------
-    cistopic_obj: `class::CistopicObject`
-            A cisTopic object with a model in `class::CistopicObject.selected_model`.
-    annot_var: str
-            Name of the variable (contained in 'class::CistopicObject.cell_data') to use for annotation
-    binarized_cell_topic: Dict, optional
-            A dictionary containing binarized cell topic distributions (from `binarize_topics()`). If not provided, `binarized_topics()`
-            will be run. Default: None.
-    general_topic_thr: float, optional
-            Threshold for considering a topic as general. After assigning topics to annotations, the ratio of cells in the binarized topic
-            in the whole population is compared with the ratio of the total number of cells in the assigned groups versus the whole population.
-            If the difference is above this threshold, the topic is considered general. Default: 0.2.
+    cistopic_obj
+        A cisTopic object with a model in `class::CistopicObject.selected_model`.
+    annot_var
+        Name of the variable (contained in 'class::CistopicObject.cell_data') to use
+        for annotation.
+    binarized_cell_topic
+        A dictionary containing binarized cell topic distributions (from
+        `binarize_topics()`). If not provided, `binarized_topics()` will be run.
+        Default: None.
+    general_topic_thr
+        Threshold for considering a topic as general. After assigning topics to
+        annotations, the ratio of cells in the binarized topic in the whole
+        population is compared with the ratio of the total number of cells in the
+        assigned groups versus the whole population.
+        If the difference is above this threshold, the topic is considered general.
+        Default: 0.2.
     **kwargs
-            Arguments to pass to `binarize_topics()`
+        Arguments to pass to `binarize_topics()`
 
-    Return
-    ---------
-    pd.DataFrame
-            Data frame containing a column with the annotations (separated by ,), the ratio of cells in the binarized topic and the ratio of
-            cells assigned to a topic based on the annotated groups.
+    Returns
+    -------
+        Data frame containing a column with the annotations (separated by `,`),
+        the ratio of cells in the binarized topic and the ratio of cells assigned
+        to a topic based on the annotated groups.
 
     """
     model = cistopic_obj.selected_model
@@ -292,9 +292,7 @@ def topic_annotation(
                 topic_annot_dict[topic].append(group)
                 group_size_dict[topic].append(nobs)
 
-    topic_annot_dict = {
-        x: ", ".join(topic_annot_dict[x]) for x in topic_annot_dict.keys()
-    }
+    topic_annot_dict = {x: ", ".join(topic_annot_dict[x]) for x in topic_annot_dict}
     topic_annot = pd.DataFrame(
         [
             list(topic_annot_dict.values()),
@@ -317,9 +315,7 @@ def topic_annotation(
 
 
 def gini_coefficient(x):
-    """
-    Compute Gini coefficient of array of values
-    """
+    """Compute Gini coefficient of array of values."""
     diffsum = 0
     for i, xi in enumerate(x[:-1], 1):
         diffsum += np.sum(np.abs(xi - x[i:]))
