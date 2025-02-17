@@ -28,7 +28,7 @@ def get_consensus_peaks(
     This approach is described in Corces et al. 2018.
 
     Parameters
-    ---------
+    ----------
     narrow_peaks_dict: dict
             A dictionary containing group labels as keys and pr.PyRanges with the narrowPeak results from MACS2 as values (as returned by .pseudobulkPeakCalling.peakCalling()).
     peak_half_width: int
@@ -45,11 +45,12 @@ def get_consensus_peaks(
             consensus region.
 
     References
-    ------
+    ----------
     Corces, M. R., Granja, J. M., Shams, S., Louie, B. H., Seoane, J. A., Zhou, W., ... & Chang, H. Y. (2018). The chromatin accessibility
     landscape of primary human cancers. Science, 362(6413).
     Amemiya, H. M., Kundaje, A., & Boyle, A. P. (2019). The ENCODE blacklist: identification of problematic regions of the genome.
     Scientific reports, 9(1), 1-5.
+
     """
     # Create logger
     level = logging.INFO
@@ -85,10 +86,10 @@ def get_consensus_peaks(
 
 def cpm(x: pr.PyRanges, column: str):
     """
-    cpm normalization
+    Cpm normalization.
 
     Parameters
-    ---------
+    ----------
     x: pr.PyRanges
              A pyRanges object
     column: str
@@ -98,6 +99,7 @@ def cpm(x: pr.PyRanges, column: str):
     ------
     pr.PyRanges
             A pyRanges with the normalized column.
+
     """
     x.loc[:, column] = x.loc[:, column] / sum(x.loc[:, column]) * 1000000
     return x
@@ -173,7 +175,7 @@ def iterative_peak_filtering(center_extended_peaks: pr.PyRanges):
             consensus region.
 
     References
-    ------
+    ----------
     Corces, M. R., Granja, J. M., Shams, S., Louie, B. H., Seoane, J. A., Zhou, W., ... & Chang, H. Y. (2018). The chromatin accessibility
     landscape of primary human cancers. Science, 362(6413).
     Amemiya, H. M., Kundaje, A., & Boyle, A. P. (2019). The ENCODE blacklist: identification of problematic regions of the genome.
