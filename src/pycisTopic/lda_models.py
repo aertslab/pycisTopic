@@ -20,6 +20,7 @@ import polars as pl
 import ray
 import scipy
 import tmtoolkit
+
 from pycisTopic.utils import loglikelihood, subset_list
 
 if TYPE_CHECKING:
