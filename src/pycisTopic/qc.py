@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import polars as pl
+
 from pycisTopic.fragments import (
     get_fragments_in_peaks,
     get_fragments_per_cb,
@@ -18,7 +19,11 @@ from pycisTopic.fragments import (
 )
 from pycisTopic.topic_binarization import threshold_otsu
 from pycisTopic.tss_profile import get_tss_profile
-from scipy.stats import gaussian_kde
+
+try:
+    from jax.scipy.stats import gaussian_kde
+except ImportError:
+    from scipy.stats import gaussian_kde
 
 if TYPE_CHECKING:
     import numpy.typing as npt
