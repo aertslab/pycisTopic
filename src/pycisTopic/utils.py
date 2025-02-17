@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import gc
-import gzip
 import math
 import os
 import re
-from pathlib import Path
-from typing import Sequence, Union
+from typing import TYPE_CHECKING, Sequence
 
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
@@ -19,12 +17,12 @@ import pyranges as pr
 from PIL import Image
 from scipy import sparse
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 def normalise_filepath(path: str | Path, check_not_directory: bool = True) -> str:
-    """
-    Create a string path, expanding the home directory if present.
-
-    """
+    """Create a string path, expanding the home directory if present."""
     path = os.path.expanduser(path)
     if check_not_directory and os.path.exists(path) and os.path.isdir(path):
         raise IsADirectoryError(f"Expected a file path; {path!r} is a directory")
@@ -114,7 +112,7 @@ def subset_list(target_list: Sequence[str], index_list: Sequence[int]) -> Sequen
     return list(map(target_list.__getitem__, index_list))
 
 
-def non_zero_rows(matrix: Union[sparse.csr_matrix, np.ndarray]):
+def non_zero_rows(matrix: sparse.csr_matrix | np.ndarray):
     if isinstance(matrix, sparse.csr_matrix):
         # Remove all explicit zeros in sparse matrix.
         matrix.eliminate_zeros()
@@ -311,7 +309,7 @@ def multiplot_from_generator(
 
 
 def fig2img(fig):
-    """Convert a Matplotlib figure to a PIL Image and return it"""
+    """Convert a Matplotlib figure to a PIL Image and return it."""
     import io
 
     buf = io.BytesIO()
@@ -322,9 +320,7 @@ def fig2img(fig):
 
 
 def collapse_duplicates(df):
-    """
-    Collapse duplicates from fragments df
-    """
+    """Collapse duplicates from fragments df."""
     a = df.values
     sidx = np.lexsort(a[:, :4].T)
     b = a[sidx, :4]
@@ -334,9 +330,7 @@ def collapse_duplicates(df):
 
 
 def get_tss_matrix(fragments, flank_window, tss_space_annotation):
-    """
-    Get TSS matrix
-    """
+    """Get TSS matrix."""
     overlap_with_TSS = fragments.join(tss_space_annotation, nb_cpu=1).df
     if len(overlap_with_TSS) == 0:
         return
@@ -395,9 +389,7 @@ def get_tss_matrix(fragments, flank_window, tss_space_annotation):
 
 
 def coord_to_region_names(coord):
-    """
-    PyRanges to region names
-    """
+    """PyRanges to region names."""
     if isinstance(coord, pr.PyRanges):
         coord = coord.as_df()
         return list(
