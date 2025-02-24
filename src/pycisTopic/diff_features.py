@@ -12,11 +12,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import polars as pl
-import ray
-import scipy
 import scipy.sparse as sparse
-import sklearn
-from scipy.stats import ranksums
 
 if TYPE_CHECKING:
     from pycisTopic.cistopic_class import CistopicObject
@@ -1485,67 +1481,6 @@ def find_diff_accessible_regions(
         )
 
     return markers_dict
-
-
-def get_wilcoxon_test_pvalues(fg_mat, bg_mat):
-    """
-    Calculate wilcoxon test p-values between foreground and background matrix.
-
-    Parameters
-    ----------
-    fg_mat
-        2D-numpy foreground matrix.
-    bg_mat
-        2D-numpy background matrix.
-
-    """
-    if fg_mat.shape[0] != bg_mat.shape[0]:
-        raise ValueError(
-            "Foreground matrix and background matrix have a different first dimension:"
-            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
-        )
-
-    wilcoxon_test_pvalues = [
-        wilcoxon_test.pvalue
-        for wilcoxon_test in [
-            ranksums(fg_mat[i], y=bg_mat[i]) for i in range(fg_mat.shape[0])
-        ]
-    ]
-
-    return wilcoxon_test_pvalues
-
-
-@ray.remote
-def get_wilcoxon_test_pvalues_ray(fg_mat, bg_mat, start, end):
-    """
-    Calculate wilcoxon test p-values with ray between a subset of foreground and background matrix.
-
-    Parameters
-    ----------
-    fg_mat
-        2D-numpy foreground matrix.
-    bg_mat
-        2D-numpy background matrix.
-    start
-        Starting row index (included).
-    end
-        Ending row index (excluded).
-
-    """
-    if fg_mat.shape[0] != bg_mat.shape[0]:
-        raise ValueError(
-            "Foreground matrix and background matrix have a different first dimension:"
-            f" {fg_mat.shape[0]} vs {bg_mat.shape[0]}"
-        )
-
-    wilcoxon_test_pvalues_part = [
-        wilcoxon_test.pvalue
-        for wilcoxon_test in [
-            ranksums(fg_mat[i], y=bg_mat[i]) for i in range(start, end)
-        ]
-    ]
-
-    return wilcoxon_test_pvalues_part
 
 
 # TODO: Add these generic functions to another package
