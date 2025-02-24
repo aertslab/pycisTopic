@@ -1391,125 +1391,98 @@ def get_marker_regions_for_contrast(
     return markers_df
 
 
-def find_diff_features(
-    cistopic_obj: CistopicObject,
-    imputed_features_obj: CistopicImputedFeatures,
-    variable: str,
-    var_features: str | None = None,
-    contrasts: list[list[str]] = None,
-    adjpval_thr: float = 0.05,
-    log2fc_thr: float = np.log2(1.5),
-    split_pattern: str = "___",
-    n_cpu: int = 1,
-    **kwargs,
-):
+def find_diff_accessible_regions(
+    region_topic: npt.NDArray[np.float32],
+    cell_topic: npt.NDArray[np.float32],
+    region_names: list[str],
+    cell_names: list[str],
+    highly_variable_regions: list[str],
+    contrasts: dict[str, list[str], list[str]],
+    scale_factor1: int = 10**6,
+    regions_chunk_size: int = 20000,
+    adjusted_pvalue_threshold: float = 0.05,
+    log2_fold_change_threshold: float = math.log2(1.5),
+) -> dict[str, pl.DataFrame]:
     """
-    Find differential imputed features.
+    Find differential imputed regions for multiple contrasts.
+
+    Get marker regions for each contrast of foreground and background cells by
+    calculating the adjusted p-values and log2 fold change for the scaled imputed
+    accessibility of foreground cells vs background cells for each highly variable
+    region.
+
+    High level overview of the function:
+      - Subset region_topic and cell_topic to requested regions (highly variable regions)
+        and cells (foreground + background).
+      - Calculate imputed accessibility: `region_topic @ cell_topic`.
+      - Scale imputed accessibility is scaled by `scale_factor1` to create a "count"
+        matrix.
+      - Only keep integer part of the scaled imputed accessibility.
+      - Error out if there are regions for which scaled imputed accessibility was 0 in
+        all cells as this indicates that those regions are not highly variable and thus
+        that the user gave the wrong (unfiltered) regions.
+      - Calculate adjusted Wilcoxon test p-values and log2 fold change for scaled
+        imputed accessibility of foreground cells vs background cells for each highly
+        variable region.
 
     Parameters
     ----------
-    cistopic_obj: `class::CistopicObject`
-        A cisTopic object including the cells in imputed_features_obj.
-    imputed_features_obj: :class:`CistopicImputedFeatures`
-        A cisTopic imputation data object.
-    variable: str
-        Name of the group variable to do comparison. It must be included in `class::CistopicObject.cell_data`
-    var_features: list, optional
-        A list of features to use (e.g. variable features from `find_highly_variable_features()`)
-    contrasts: List, optional
-        A list including contrasts to make in the form of lists with foreground and background, e.g.
-        [[['Group_1'], ['Group_2, 'Group_3']], []['Group_2'], ['Group_1, 'Group_3']], []['Group_1'], ['Group_2, 'Group_3']]].
-        Default: None.
-    adjpval_thr: float, optional
-        Adjusted p-values threshold. Default: 0.05
-    log2fc_thr: float, optional
-        Log2FC threshold. Default: np.log2(1.5)
-    split_pattern: str
-        Pattern to split cell barcode from sample id. Default: `___`
-    n_cpu: int, optional
-        Number of cores to use. Default: 1
-    **kwargs
-        Parameters to pass to ray.init()
+    region_topic
+        Region topic matrix (regions x topics).
+    cell_topic
+        Cell topic matrix (topic x cells).
+    region_names
+        List of all region names in the region topic matrix.
+    cell_names
+        List of all cell names in the cell topic matrix.
+    highly_variable_regions
+        List of highly variable regions. Only these regions will be used to calculate
+        the adjusted p-values and log2 fold change for the foreground and background
+        cells contrast.
+    contrasts
+        Dictionary with as keys the contrast names and as values a tuple with a list
+        of selected foreground and a list of background cells for that contrast.
+    scale_factor1
+        Multiply imputed accessibility by this scale factor to create a "count" matrix.
+        This will remove noise by putting very small values to zero.
+        Default: `10**6`.
+    regions_chunk_size
+        Regions chunk size used (number of regions for which imputed accessibility is
+        calculated at the same time).
+        Default: `20000`.
+    adjusted_pvalue_threshold
+        Adjusted p-value threshold.
+        Default: `0.05`.
+    log2_fold_change_threshold
+        Log2FC threshold.
+        Default: `math.log2(1.5)`.
 
-    Return
-    ------
-    List
-        List of `class::pd.DataFrame` per contrast with the selected features and logFC and adjusted p-values.
+    Returns
+    -------
+    Dictionary with as keys the contrast names and as values a Polars DataFrame with
+    marker regions, log2 fold change and adjusted p-values for that contrast.
 
     """
-    # Create cisTopic logger.
-    level = logging.INFO
-    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
-    handlers = [logging.StreamHandler(stream=sys.stdout)]
-    logging.basicConfig(level=level, format=log_format, handlers=handlers)
-    log = logging.getLogger("cisTopic")
+    markers_dict = {}
 
-    selected_cells = list(
-        set(cistopic_obj.cell_data.index.tolist())
-        & set(imputed_features_obj.cell_names)
-    )
-    group_var = cistopic_obj.cell_data.loc[selected_cells, variable].dropna()
-    if contrasts is None:
-        levels = sorted(list(set(group_var.tolist())))
-        contrasts = [
-            [[x], levels[: levels.index(x)] + levels[levels.index(x) + 1 :]]
-            for x in levels
-        ]
-        contrasts_names = levels
-    else:
-        contrasts_names = [
-            "_".join(contrasts[i][0]) + "_VS_" + "_".join(contrasts[i][1])
-            for i in range(len(contrasts))
-        ]
-
-    # Get barcodes in each class per contrasts.
-    barcode_groups = [
-        [
-            group_var[group_var.isin(contrasts[i][0])].index.tolist(),
-            group_var[group_var.isin(contrasts[i][1])].index.tolist(),
-        ]
-        for i in range(len(contrasts))
-    ]
-
-    # Subset imputed accessibility matrix.
-    subset_imputed_features_obj = imputed_features_obj.subset(
-        cells=None, features=var_features, copy=True, split_pattern=split_pattern
-    )
-
-    # Compute p-val and log2FC.
-    if n_cpu > 1:
-        ray.init(num_cpus=n_cpu, **kwargs)
-
-        markers_list = [
-            markers(
-                subset_imputed_features_obj,
-                barcode_groups[i],
-                contrasts_names[i],
-                adjpval_thr=adjpval_thr,
-                log2fc_thr=log2fc_thr,
-                n_cpu=n_cpu,
-            )
-            for i in range(len(contrasts))
-        ]
-
-        ray.shutdown()
-    else:
-        markers_list = [
-            markers(
-                subset_imputed_features_obj,
-                barcode_groups[i],
-                contrasts_names[i],
-                adjpval_thr=adjpval_thr,
-                log2fc_thr=log2fc_thr,
-                n_cpu=1,
-            )
-            for i in range(len(contrasts))
-        ]
-
-    markers_dict = {
-        contrasts_name: marker
-        for contrasts_name, marker in zip(contrasts_names, markers_list)
-    }
+    for contrast_name, (
+        selected_foreground_cells,
+        selected_background_cells,
+    ) in contrasts.items():
+        markers_dict[contrast_name] = get_marker_regions_for_contrast(
+            region_topic=region_topic,
+            cell_topic=cell_topic,
+            region_names=region_names,
+            cell_names=cell_names,
+            highly_variable_regions=highly_variable_regions,
+            contrast_name=contrast_name,
+            selected_foreground_cells=selected_foreground_cells,
+            selected_background_cells=selected_background_cells,
+            scale_factor1=scale_factor1,
+            regions_chunk_size=regions_chunk_size,
+            adjusted_pvalue_threshold=adjusted_pvalue_threshold,
+            log2_fold_change_threshold=log2_fold_change_threshold,
+        )
 
     return markers_dict
 
