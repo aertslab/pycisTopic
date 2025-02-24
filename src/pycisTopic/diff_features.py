@@ -960,8 +960,8 @@ def impute_accessibility(
     return imputed_acc_obj
 
 
-def find_highly_variable_features(
-    features: list[str],
+def find_highly_variable_regions(
+    regions: list[str],
     per_region_means_on_normalized_imputed_acc: npt.NDArray[np.float64],
     per_region_dispersions_on_normalized_imputed_acc: npt.NDArray[np.float64],
     min_disp: float = 0.05,
@@ -973,19 +973,19 @@ def find_highly_variable_features(
     plot: bool | str | None = True,
 ):
     """
-    Find highly variable features.
+    Find highly variable regions.
 
-    Find highly variable features by using output of
+    Find highly variable regions by using output of
     `calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc`
     as input:
-      - `features`
+      - `regions`
       - `per_region_means_on_normalized_imputed_acc`
       - `per_region_dispersions_on_normalized_imputed_acc`
 
     Parameters
     ----------
-    features
-        List of feature (region) names.
+    regions
+        List of region names.
     per_region_means_on_normalized_imputed_acc
         Mean of normalized imputed accessibility per region.
     per_region_dispersions_on_normalized_imputed_acc
@@ -1007,7 +1007,7 @@ def find_highly_variable_features(
         Normalization is done with respect to each bin.
         Default: 20
     n_top_features
-        Number of highly-variable features to keep.
+        Number of highly-variable regions to keep.
         If specified, dispersion and mean thresholds will be ignored.
         Default: None
     plot
@@ -1019,7 +1019,7 @@ def find_highly_variable_features(
 
     Return
     ------
-    List with selected features.
+    List with highly variable regions.
 
     Examples
     --------
@@ -1037,9 +1037,9 @@ def find_highly_variable_features(
     ...     regions_chunk_size=20000,
     ... )
 
-    Find highly variable features.
-    >>> find_highly_variable_features(
-    ...    features=region_names_to_keep,
+    Find highly variable regions.
+    >>> find_highly_variable_regions(
+    ...    regions=region_names_to_keep,
     ...    per_region_means_on_normalized_imputed_acc=per_region_means_on_normalized_imputed_acc,
     ...    per_region_dispersions_on_normalized_imputed_acc=per_region_dispersions_on_normalized_imputed_acc,
     ...    min_disp = 0.05,
@@ -1103,7 +1103,7 @@ def find_highly_variable_features(
         disp_cut_off = dispersion_norm[n_top_features - 1]
         feature_subset = np.nan_to_num(df["dispersions_norm"].values) >= disp_cut_off
         log.debug(
-            f"the {n_top_features} top features correspond to a "
+            f"the {n_top_features} top regions correspond to a "
             f"normalized dispersion cutoff of {disp_cut_off}"
         )
     else:
@@ -1118,7 +1118,9 @@ def find_highly_variable_features(
         )
 
     df["highly_variable"] = feature_subset
-    var_features = [features[i] for i in df[df.highly_variable].index.to_list()]
+    highly_variable_regions = [
+        regions[i] for i in df[df.highly_variable].index.to_list()
+    ]
 
     if plot:
         fig = plt.figure()
@@ -1126,14 +1128,14 @@ def find_highly_variable_features(
         plt.scatter(
             df["means"], df["dispersions_norm"], c=feature_subset, s=10, alpha=0.1
         )
-        plt.xlabel("Mean measurement of features")
-        plt.ylabel("Normalized dispersion of the features")
+        plt.xlabel("Mean measurement of regions")
+        plt.ylabel("Normalized dispersion of the regions")
         if isinstance(plot, str):
             fig.savefig(plot)
         plt.show()
 
     log.info("Done!")
-    return var_features
+    return highly_variable_regions
 
 
 def get_marker_regions_for_contrast(
