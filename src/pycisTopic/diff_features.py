@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import logging
+import math
 import sys
 from typing import TYPE_CHECKING, Self
 
-import math
 import matplotlib
 import matplotlib.pyplot as plt
 import numba
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
 import ray
 import scipy
 import scipy.sparse as sparse
@@ -1133,6 +1134,259 @@ def find_highly_variable_features(
 
     log.info("Done!")
     return var_features
+
+
+def get_marker_regions_for_contrast(
+    region_topic: npt.NDArray[np.float32],
+    cell_topic: npt.NDArray[np.float32],
+    region_names: list[str],
+    cell_names: list[str],
+    highly_variable_regions: list[str],
+    contrast_name: str,
+    selected_foreground_cells: list[str],
+    selected_background_cells: list[str],
+    scale_factor1: int = 10**6,
+    regions_chunk_size: int = 20000,
+    adjusted_pvalue_threshold: float = 0.05,
+    log2_fold_change_threshold: float = math.log2(1.5),
+) -> pl.DataFrame:
+    """
+    Get marker regions for a contrast.
+
+    Get marker regions for a contrast of foreground and background cells by calculating
+    the adjusted p-values and log2 fold change for the scaled imputed accessibility of
+    foreground cells vs background cells for each highly variable region.
+
+    High level overview of the function:
+      - Subset region_topic and cell_topic to requested regions (highly variable regions)
+        and cells (foreground + background).
+      - Calculate imputed accessibility: `region_topic @ cell_topic`.
+      - Scale imputed accessibility is scaled by `scale_factor1` to create a "count"
+        matrix.
+      - Only keep integer part of the scaled imputed accessibility.
+      - Error out if there are regions for which scaled imputed accessibility was 0 in
+        all cells as this indicates that those regions are not highly variable and thus
+        that the user gave the wrong (unfiltered) regions.
+      - Calculate adjusted Wilcoxon test p-values and log2 fold change for scaled
+        imputed accessibility of foreground cells vs background cells for each highly
+        variable region.
+
+    Parameters
+    ----------
+    region_topic
+        Region topic matrix (regions x topics).
+    cell_topic
+        Cell topic matrix (topic x cells).
+    region_names
+        List of all region names in the region topic matrix.
+    cell_names
+        List of all cell names in the cell topic matrix.
+    highly_variable_regions
+        List of highly variable regions. Only these regions will be used to calculate
+        the adjusted p-values and log2 fold change for the foreground and background
+        cells contrast.
+    contrast_name
+        Name of the contrast.
+    selected_foreground_cells
+        List of foreground cells for the contrast.
+    selected_background_cells
+        List of background cells for the contrast.
+    scale_factor1
+        Multiply imputed accessibility by this scale factor to create a "count" matrix.
+        This will remove noise by putting very small values to zero.
+        Default: `10**6`.
+    regions_chunk_size
+        Regions chunk size used (number of regions for which imputed accessibility is
+        calculated at the same time).
+        Default: `20000`.
+    adjusted_pvalue_threshold
+        Adjusted p-value threshold.
+        Default: `0.05`.
+    log2_fold_change_threshold
+        Log2FC threshold.
+        Default: `math.log2(1.5)`.
+
+    Returns
+    -------
+    Polars DataFrame with highly variable regions, log2 fold change, adjusted p-values
+    for contrast.
+
+    """
+    # Create cisTopic logger
+    level = logging.INFO
+    log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+    handlers = [logging.StreamHandler(stream=sys.stdout)]
+    logging.basicConfig(level=level, format=log_format, handlers=handlers)
+    log = logging.getLogger("cisTopic")
+
+    # Get subset of region names index positions.
+    selected_region_names_idx = get_position_index(
+        highly_variable_regions, region_names
+    )
+
+    # Get subset of cell names index positions for foreground and background cells.
+    selected_foreground_and_background_cell_names_idx = get_position_index(
+        selected_foreground_cells + selected_background_cells,
+        cell_names,
+    )
+
+    # Get number of foreground cells as it will be used later to divide the imputed
+    # accessibility chunk back in a foreground and background part.
+    n_foreground_cells = len(selected_foreground_cells)
+    n_background_cells = len(selected_background_cells)
+
+    # Subset region_topic and cell_topic to regions and cells we want to keep.
+    region_topic_subset = np.asarray(region_topic, dtype=np.float32)[
+        selected_region_names_idx, :
+    ]
+    cell_topic_subset = np.asarray(cell_topic, dtype=np.float32)[
+        :, selected_foreground_and_background_cell_names_idx
+    ]
+
+    output_regions_chunk_end = 0
+    n_regions = region_topic_subset.shape[0]
+    n_cells = cell_topic_subset.shape[1]
+    # n_topics = region_topic_subset.shape[1]
+
+    adjusted_pvalues = np.zeros((n_regions,), dtype=np.float64)
+    log2_fold_change = np.zeros((n_regions,), dtype=np.float64)
+
+    log.info(
+        "Calculate adjusted Wilcoxon test p-values and log2 fold change for imputed "
+        "accessibility of foreground cells vs background cells for each highly "
+        f'variable region for "{contrast_name}".'
+    )
+
+    log.info(
+        f"Allocate {(regions_chunk_size * n_cells * 4 / 1024**3):.3f} GiB of RAM "
+        f"for calculating imputed accessibility for {n_foreground_cells} foreground "
+        f"and {n_background_cells} background cells for chunk of {regions_chunk_size} "
+        f"regions."
+    )
+    # Preallocate imputed accessibility chunk array (regions_chunk_size x n_cells) so
+    # it can be reused in each loop iteration (except for the last one as that one will
+    # likely be smaller).
+    imputed_acc_chunk = np.empty((regions_chunk_size, n_cells), dtype=np.float32)
+
+    # Calculate total imputed accessibility per cell.
+    for input_regions_chunk_start in range(0, n_regions, regions_chunk_size):
+        input_regions_chunk_end = input_regions_chunk_start + regions_chunk_size
+
+        # Set correct output chunk start position.
+        output_regions_chunk_start = output_regions_chunk_end
+
+        log.info(
+            "Calculate adjusted Wilcoxon test p-values and log2 fold change for regions "
+            f"{input_regions_chunk_start}-{input_regions_chunk_end} (out of {n_regions})."
+        )
+
+        # Get the current chunk of regions.
+        topic_region_chunk = region_topic_subset[
+            input_regions_chunk_start : input_regions_chunk_start + regions_chunk_size
+        ]
+        current_regions_chunk_size = topic_region_chunk.shape[0]
+
+        if current_regions_chunk_size < regions_chunk_size:
+            log.info(
+                f"Allocate {(regions_chunk_size * n_cells * 4 / 1024**3):.3f} GiB of "
+                f"RAM for calculating imputed accessibility for {n_foreground_cells} "
+                f"foreground and {n_background_cells} background cells for chunk of "
+                f"{current_regions_chunk_size} regions."
+            )
+            # Reallocate imputed_acc_chunk to the correct size.
+            del imputed_acc_chunk
+            imputed_acc_chunk = np.empty(
+                (current_regions_chunk_size, n_cells), dtype=np.float32
+            )
+
+        log.info(
+            "  - Calculate imputed accessibility for the current chunk of regions."
+        )
+        # Calculate imputed accessibility for the current chunk of regions.
+        np.matmul(topic_region_chunk, cell_topic_subset, out=imputed_acc_chunk)
+
+        log.info('  - Scale imputed accessibility matrix chunk ("count" matrix).')
+        # Scale imputed accessibility matrix chunk ("count" matrix).
+        imputed_acc_chunk *= np.float32(scale_factor1)
+
+        log.info("  - Only keep integer part.")
+        # Only keep integer part.
+        # This will convert very small values (< 1.0) to zero and removes noise.
+        np.floor(imputed_acc_chunk, out=imputed_acc_chunk)
+
+        log.info("  - Get non-zero regions.")
+        # Get all region index positions of the matrix for which the whole row is not
+        # completely zero (regions which are never accessible in any cell).
+        region_idx_to_keep_chunk = get_nonzero_row_indices(imputed_acc_chunk)
+
+        if len(region_idx_to_keep_chunk) != current_regions_chunk_size:
+            raise ValueError(
+                '"highly_variable_regions" contains regions that are never accessible '
+                "in any cell"
+            )
+
+        # Set correct output chunk end position by taking into account that rows with
+        # all zeros will be filtered out if the above check would be removed.
+        # In the current case the output chunk positions would be the same as the input.
+        output_regions_chunk_end = output_regions_chunk_start + len(
+            region_idx_to_keep_chunk
+        )
+
+        # Extract imputed accessibility for foreground and background cells.
+        imputed_acc_chunk_foreground_cells = imputed_acc_chunk[:, :n_foreground_cells]
+        imputed_acc_chunk_background_cells = imputed_acc_chunk[:, n_foreground_cells:]
+
+        log.info("  - Calculate adjusted Wilcoxon test p-values.")
+        # Calculate Wilcoxon test p-values for each region in the current chunk
+        # and calculate adjusted p-values for them.
+        wilcoxon_test_pvalues_chunk = ranksums_numba_multiple(
+            imputed_acc_chunk_foreground_cells.astype(np.uint32),
+            imputed_acc_chunk_background_cells.astype(np.uint32),
+        )[1]
+        adjusted_pvalues_chunk = p_adjust_bh(wilcoxon_test_pvalues_chunk)
+
+        log.info("  - Calculate log2 fold change.")
+        # Calculate log2 fold change for each region in the current chunk between
+        # foreground and background cells.
+        log2_fold_change_chunk = get_log2_fc(
+            imputed_acc_chunk_foreground_cells, imputed_acc_chunk_background_cells
+        )
+
+        # Fill full adjusted p-values and log2 fold change arrays with the values calculated on the current chunk.
+        adjusted_pvalues[output_regions_chunk_start:output_regions_chunk_end] = (
+            adjusted_pvalues_chunk
+        )
+        log2_fold_change[output_regions_chunk_start:output_regions_chunk_end] = (
+            log2_fold_change_chunk
+        )
+
+    del imputed_acc_chunk
+
+    markers_df = (
+        pl.DataFrame(
+            {
+                "RegionNames": highly_variable_regions,
+                "Log2FC": log2_fold_change,
+                "Adjusted_pval": adjusted_pvalues,
+            }
+        )
+        .lazy()
+        .with_columns(pl.lit(contrast_name).alias("Contrast"))
+        .filter(pl.col("Adjusted_pval") <= adjusted_pvalue_threshold)
+        .filter(pl.col("Log2FC") >= log2_fold_change_threshold)
+        .sort(
+            ["Log2FC", "Adjusted_pval"], descending=[True, False], maintain_order=True
+        )
+        .collect()
+    )
+
+    log.info(
+        "Finished calculating adjusted Wilcoxon test p-values and log2 fold change "
+        "for imputed accessibility of foreground cells vs background cells for each "
+        f'highly variable region for "{contrast_name}".'
+    )
+
+    return markers_df
 
 
 def find_diff_features(
