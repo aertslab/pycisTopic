@@ -43,6 +43,7 @@ class CistopicImputedFeatures:
         A list containing feature names.
     project: str
         Name of the cisTopic imputation project.
+
     """
 
     def __init__(
@@ -88,7 +89,6 @@ class CistopicImputedFeatures:
             A :class:`CistopicImputedFeatures` containing the selected cells and/or features.
 
         """
-
         # Create cisTopic logger
         level = logging.INFO
         log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
@@ -542,7 +542,7 @@ def calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc(
     cell_topic = np.asarray(cell_topic, dtype=np.float32)
 
     log.info(
-        f"Allocate {(regions_chunk_size * n_cells * 4 / 1024 ** 3):.3f} GiB of RAM for "
+        f"Allocate {(regions_chunk_size * n_cells * 4 / 1024**3):.3f} GiB of RAM for "
         f"calculating (partial) imputed accessibility per cell for ({n_cells}) cells "
         f"for chunk of {regions_chunk_size} regions."
     )
@@ -571,7 +571,7 @@ def calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc(
 
         if current_regions_chunk_size < regions_chunk_size:
             log.info(
-                f"Allocate {(current_regions_chunk_size * n_cells * 4 / 1024 ** 3):.3f} "
+                f"Allocate {(current_regions_chunk_size * n_cells * 4 / 1024**3):.3f} "
                 "GiB of RAM for calculating (partial) imputed accessibility per cell "
                 f"for ({n_cells}) cells for chunk of {current_regions_chunk_size} "
                 "regions."
@@ -673,7 +673,7 @@ def calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc(
     )
 
     log.info(
-        f"Allocate {(regions_chunk_size * n_cells * 4 / 1024 ** 3):.3f} GiB of RAM "
+        f"Allocate {(regions_chunk_size * n_cells * 4 / 1024**3):.3f} GiB of RAM "
         "for calculating normalized imputed accessibility per region for chunk of "
         f"{regions_chunk_size} regions."
     )
@@ -710,7 +710,7 @@ def calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc(
 
         if current_regions_chunk_size < regions_chunk_size:
             log.info(
-                f"Allocate {(current_regions_chunk_size * n_cells * 4 / 1024 ** 3):.3f} "
+                f"Allocate {(current_regions_chunk_size * n_cells * 4 / 1024**3):.3f} "
                 f"GiB of RAM for calculating normalized imputed accessibility per "
                 f"region for chunk of {current_regions_chunk_size} regions."
             )
