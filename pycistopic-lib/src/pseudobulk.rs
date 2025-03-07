@@ -13,7 +13,7 @@ use flate2::write::GzEncoder;
 use std::thread;
 
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Clone)]
 struct GenomicRange {
     chromosome: String,
     start: usize,
@@ -38,7 +38,7 @@ impl PartialOrd for GenomicRange {
 }
 
 impl GenomicRange {
-    fn new(line: String, file_index: usize, filename: &str) -> Result<GenomicRange, custom_errors::InvalidFragmentFileError> {
+    fn new(line: &str, file_index: usize, filename: &str) -> Result<GenomicRange, custom_errors::InvalidFragmentFileError> {
         let fields: Vec<&str> = line.split('\t').collect();
         if fields.len() < 4 {
             return Err(custom_errors::InvalidFragmentFileError::new(filename));
@@ -79,6 +79,102 @@ impl fmt::Display for GenomicRange {
 }
 
 
+struct FragmentFileReader {
+    reader: std::io::BufReader<MultiGzDecoder<File>>,
+    fragment: Result<GenomicRange, custom_errors::InvalidFragmentFileError>,
+    buffer: String,
+    valid_cell_barcodes: Vec<String>,
+    target_chrom: String,
+    file_index: usize,
+    file_name: String,
+    at_end_of_file: bool,
+}
+
+impl FragmentFileReader {
+    fn new(fragment_file_path: &str, valid_cell_barcodes: Vec<String>, target_chrom: String, file_index: usize) -> Result<FragmentFileReader, std::io::Error> {
+        let file = File::open(Path::new(fragment_file_path))?;
+        let d_file = MultiGzDecoder::new(file);
+        let reader = std::io::BufReader::new(d_file);
+        Ok(FragmentFileReader{
+            reader,
+            fragment: GenomicRange::new("", file_index, fragment_file_path),
+            buffer: String::new(),
+            valid_cell_barcodes,
+            target_chrom,
+            file_index, 
+            file_name: fragment_file_path.to_string(),
+            at_end_of_file: false
+        })
+    }
+
+    fn at_chrom(&self) -> bool {
+        if let Ok(fragment) = &self.fragment{
+            fragment.chromosome == self.target_chrom
+        } else {
+            false
+        }
+    }
+
+    fn read_next(&mut self) -> Result<(), custom_errors::InvalidFragmentFileError>{
+        self.buffer.clear();
+        match self.reader.read_line(&mut self.buffer) {
+            Ok(bytes_read) => {
+                if bytes_read == 0 {
+                    self.at_end_of_file = true
+                }
+            },
+            Err(_) => {
+                return Err(custom_errors::InvalidFragmentFileError::new(&self.file_name))
+            }
+        }
+        self.buffer = self.buffer.trim().to_string();
+        self.fragment = GenomicRange::new(&self.buffer, self.file_index, &self.file_name);
+        Ok(())
+    }
+
+    fn skip_header(&mut self, pattern: &str) -> Result<(), custom_errors::InvalidFragmentFileError> {
+        self.buffer = pattern.to_string();
+        while self.buffer.starts_with(pattern) && !self.at_end_of_file {
+            self.read_next()?;
+        }
+        Ok(())
+    }
+
+    fn skip_to_chromosome(&mut self, chromosome: &str) -> Result<(), custom_errors::InvalidFragmentFileError> {
+        while !self.at_end_of_file {
+            if let Ok(fragment) = &self.fragment {
+                if fragment.chromosome == chromosome {
+                    return Ok(());
+                }
+            };
+            self.read_next()?;
+        }
+        Ok(())
+    }
+
+    fn get_next_valid_fragment(&mut self) -> Result<Option<GenomicRange>, custom_errors::InvalidFragmentFileError> {
+        while !self.at_end_of_file {
+            // first check current fragment
+            // it could be that after skip_header and skip_to_chromosome we are already at a 
+            // valid fragment.
+            if let Ok(fragment) = &self.fragment {
+                if self.valid_cell_barcodes.contains(&fragment.cell_barcode) {
+                    let fragment = fragment.clone();
+                    if fragment.chromosome != self.target_chrom {
+                        return Ok(None)
+                    }
+                    // read next fragment so next time we enter this function we have a new frag,et
+                    self.read_next()?;
+                    return Ok(Some(fragment));
+                }
+            }
+            self.read_next()?;
+        }
+        Ok(None)
+    }
+}
+
+
 fn split_fragments_by_cell_barcodes_for_chromosome(
     fragment_file_paths: &[&str],
     fragment_file_to_cell_barcode: &HashMap<String, Vec<String>>,
@@ -87,130 +183,40 @@ fn split_fragments_by_cell_barcodes_for_chromosome(
 ) -> PyResult<()>{
 
     // Open fragment files which are gzipped, and pos-sorted.
-    let mut readers: Vec<_> = fragment_file_paths
-        .iter()
-        .map(|&path| {
-            let file = File::open(Path::new(path))?;
-            let d_file = MultiGzDecoder::new(file);
-            Ok(std::io::BufReader::new(d_file))
-        })
-        .collect::<Result<_, std::io::Error>>()?;
+    let mut readers: Vec<FragmentFileReader> = Vec::new();
+    for (file_index, fragment_file_path) in fragment_file_paths.iter().enumerate() {
+        if let Some(cell_barcodes) = fragment_file_to_cell_barcode.get(&fragment_file_path.to_string()) {
+            readers.push(
+                FragmentFileReader::new(
+                    fragment_file_path,
+                    cell_barcodes.to_vec(),
+                    chromosome.to_string(),
+                    file_index)?
+            );
+        }
+    }
 
     // A binary heap will be used to write fragments in order from different files
     let mut heap = BinaryHeap::new();
     
-    let mut line = "#".to_string();
-    let mut bytes_read;
-
-    // Push the first fragment from each file to the heap
-    for (
-            fragment_file,
-            (index, reader)
-    ) in fragment_file_paths.iter().zip(readers.iter_mut().enumerate()) {
-        // skip header lines
-        while line.starts_with("#") {
-            line.clear();
-            reader.read_line(&mut line)?;
-            line = line.trim().to_string();
-        }
-        // Loop until a fragment with cell barcode, on the correct chromosome, in fragment_file_to_cell_barcode is found
-        let mut fragment_found = false;
-        // is the barcode found for the first (non-header) line?
-        let fragment = GenomicRange::new(
-            line.to_string(), index, fragment_file
-        )?;
-        match fragment_file_to_cell_barcode.get(&fragment_file.to_string()) {
-            Some(cell_barcodes) => {
-                if cell_barcodes.contains(&fragment.cell_barcode) && fragment.chromosome == chromosome {
-                    // Reverse so that "smaller" fragments (i.e. lower genomic location
-                    // are written first later on (heap will pop large elements first).
-                    heap.push(Reverse(fragment));
-                    fragment_found = true;
-                }
-            },
-            None => {
-                return Err(
-                    custom_errors::ValueError::new(
-                        format!(
-                            "fragment_file_to_cell_barcode does not contain entry for {}",
-                            fragment_file)
-                    ).into());
-            }
-        }
-
-        // barcode not in first line.
-        // keep reading until a fragment with correct barcode, on correct chromosome, is found.
-        while !fragment_found {
-            line.clear();
-            bytes_read = reader.read_line(&mut line)?;
-            if bytes_read == 0 {
-                // end of file
-                break;
-            }
-            line = line.trim().to_string();
-            let fragment = GenomicRange::new(
-                line.to_string(), index, fragment_file
-            )?;
-            match fragment_file_to_cell_barcode.get(&fragment_file.to_string()) {
-                Some(cell_barcodes) => {
-                    if cell_barcodes.contains(&fragment.cell_barcode) && fragment.chromosome == chromosome {
-                        // Reverse so that "smaller" fragments (i.e. lower genomic location
-                        // are written first later on (heap will pop large elements first).
-                        heap.push(Reverse(fragment));
-                        fragment_found = true;
-                    }
-                },
-                None => {
-                    return Err(
-                        custom_errors::ValueError::new(
-                            format!(
-                                "fragment_file_to_cell_barcode does not contain entry for {}",
-                                fragment_file)
-                        ).into());
-                }
+    // skip header lines, go to correct chromosome, and push first valid fragment to binary heap
+    for reader in readers.iter_mut(){
+        reader.skip_header("#")?;
+        reader.skip_to_chromosome(chromosome)?;
+        if !reader.at_end_of_file  && reader.at_chrom() {
+            if let Some(fragment) = reader.get_next_valid_fragment()? {
+                heap.push(Reverse(fragment));
             }
         }
     }
 
     while let Some(Reverse(fragment)) = heap.pop() {
         gz_output_file.write_all(format!("{}\n", fragment).as_bytes())?;
-        // Loop until a fragment with cell barcode in fragment_file_to_cell_barcode is found
-        let mut fragment_found  = false;
-        while !fragment_found {
-            // Read next range from file that had the smallest range and add this to the heap.
-            line.clear();
-            bytes_read = readers[fragment.file_index].read_line(&mut line)?;
-            if bytes_read == 0 {
-                // end of file
-                break;
-            }
-            line = line.trim().to_string();
-            let next_fragment = GenomicRange::new(
-                line.to_string(), fragment.file_index, &fragment.file_name
-            )?;
-            // Assuming that the fragment files are sorted.
-            // Using the previous while loop, for each file, we should be at the correct location of the file
-            // (i.e. where the current chromosomes are located).
-            // if the next fragment file has a different chromosome, we should be done with this file and we can skip it.
-            if next_fragment.chromosome != chromosome {
-                break;
-            }
-            match fragment_file_to_cell_barcode.get(&next_fragment.file_name) {
-                Some(cell_barcodes) => {
-                    if cell_barcodes.contains(&next_fragment.cell_barcode) {
-                        heap.push(Reverse(next_fragment));
-                        fragment_found = true;
-                    }
-                },
-                None => {
-                    return Err(
-                        custom_errors::ValueError::new(
-                            format!(
-                                "fragment_file_to_cell_barcode does not contain entry for {}",
-                                next_fragment.file_name)
-                        ).into()
-                    );
-                }
+        // read from file that currently has the smallest genomic range
+        let reader = &mut readers[fragment.file_index];
+        if !reader.at_end_of_file && reader.at_chrom() {
+            if let Some(fragment) = reader.get_next_valid_fragment()? {
+                heap.push(Reverse(fragment));
             }
         }
     }
