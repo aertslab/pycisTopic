@@ -1,18 +1,22 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+module-name = "pycistopic_lib"
+manifest-path = "pycistopic-lib/Cargo.toml"
 
 [project]
 name = "pycisTopic"
 authors = [
   { name = "Carmen Bravo", email = "carmen.bravogonzalezblas@kuleuven.be" },
   { name = "Gert Hulselmans", email = "gert.hulselmans@kuleuven.be" },
-  { name = "Seppe De Winter", email = "seppe.dewinter@kuleuven.be" }
+  { name = "Seppe De Winter", email = "seppe.dewinter@kuleuven.be" },
 ]
 description = "pycisTopic is a Python module to simultaneously identify cell states and cis-regulatory topics from single cell epigenomics data."
 readme = "README.rst"
-version = "2.0a"
-requires-python = "~=3.11"
+version = "3.0"
+requires-python = ">=3.10"
 keywords = ["scATAC", "cell state", "topic modeling", "LDA", "enhancer"]
 license = { file = "LICENSE.txt" }
 classifiers = [
@@ -24,61 +28,27 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
-dependencies = [
-  "numpy >= 1.20.3, < 2",
-  "pandas == 1.5",
-  "polars >= 1",
-  "pyarrow >= 8.0.0",
-  "pyranges < 0.0.128",
-  "numba",
-  "ray",
-  "scatac_fragment_tools >= 0.1.2",
-  "scikit-learn",
-  "lda",
-  "matplotlib < 3.7",
-  "tmtoolkit",
-  "gensim",
-  "macs2",
-  "pybiomart",
-  "pyscenic",
-  "scrublet",
-  "harmonypy",
-  "igraph",
-  "leidenalg",
-  "seaborn",
-  "adjustText",
-  "statsmodels",
-  "scanpy",
-  "scanorama",
-  "bbknn",
-  "loomxpy",
-  "bs4",
-  "lxml"
-]
+dependencies = []
 
 [project.optional-dependencies]
 docs = [
-	"sphinx_rtd_theme",
-	"nbsphinx",
-	"nbsphinx_link",
-	"numpydoc",
-	"sphinx_autosummary_accessors",
-	"autodocsumm",
-	"sphinx_copybutton",
-	"sphinx_design",
-	"sphinx_favicon",
-	"pandoc"
+  "sphinx_rtd_theme",
+  "nbsphinx",
+  "nbsphinx_link",
+  "numpydoc",
+  "sphinx_autosummary_accessors",
+  "autodocsumm",
+  "sphinx_copybutton",
+  "sphinx_design",
+  "sphinx_favicon",
+  "pandoc",
 ]
-development = [
-  "mypy",
-  "ruff"
-]
+development = ["mypy", "ruff", "pytest", "maturin"]
 
 [project.urls]
 Homepage = "https://github.com/aertslab/pycisTopic"
@@ -95,19 +65,19 @@ line-length = 88
 fix = true
 
 lint.select = [
-  "E", # pycodestyle
-  "W", # pycodestyle
-  "F", # Pyflakes
-  "B", # flake8-bugbear
-  "C4", # flake8-comprehensions
-  "D", # flake8-docstrings
-  "I", # isort
+  "E",   # pycodestyle
+  "W",   # pycodestyle
+  "F",   # Pyflakes
+  "B",   # flake8-bugbear
+  "C4",  # flake8-comprehensions
+  "D",   # flake8-docstrings
+  "I",   # isort
   "SIM", # flake8-simplify
   "TCH", # flake8-type-checking
   "TID", # flake8-tidy-imports
-  "Q", # flake8-quotes
-  "UP", # pyupgrade
-  "PT", # flake8-pytest-style
+  "Q",   # flake8-quotes
+  "UP",  # pyupgrade
+  "PT",  # flake8-pytest-style
   "RUF", # Ruff-specific rules
 ]
 
