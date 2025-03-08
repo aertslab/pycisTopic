@@ -6,12 +6,11 @@ use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::cmp::Reverse;
 use std::io::{BufRead, Write};
-use flate2::Compression;
 use pyo3::prelude::*;
-use flate2::read::MultiGzDecoder;
-use flate2::write::GzEncoder;
 use std::thread;
-
+use noodles::{tabix, bgzf};
+use noodles::csi::BinningIndex;
+use noodles::core::{region::Interval, Position};
 
 #[derive(Eq, PartialEq, Clone)]
 struct GenomicRange {
@@ -80,7 +79,8 @@ impl fmt::Display for GenomicRange {
 
 
 struct FragmentFileReader {
-    reader: std::io::BufReader<MultiGzDecoder<File>>,
+    reader: bgzf::Reader<File>,
+    index: Option<tabix::Index>,
     fragment: Result<GenomicRange, custom_errors::InvalidFragmentFileError>,
     buffer: String,
     valid_cell_barcodes: Vec<String>,
@@ -92,11 +92,15 @@ struct FragmentFileReader {
 
 impl FragmentFileReader {
     fn new(fragment_file_path: &str, valid_cell_barcodes: Vec<String>, target_chrom: String, file_index: usize) -> Result<FragmentFileReader, std::io::Error> {
-        let file = File::open(Path::new(fragment_file_path))?;
-        let d_file = MultiGzDecoder::new(file);
-        let reader = std::io::BufReader::new(d_file);
+        let reader = bgzf::Reader::new(File::open(Path::new(fragment_file_path))?);
+        let mut index: Option<tabix::Index> = None;
+        if Path::new(&format!("{}.tbi", fragment_file_path)).exists() {
+            println!("Index found: {}", format!("{}.tbi", fragment_file_path));
+            index = Some(tabix::fs::read(format!("{}.tbi", fragment_file_path))?);
+        }
         Ok(FragmentFileReader{
             reader,
+            index,
             fragment: GenomicRange::new("", file_index, fragment_file_path),
             buffer: String::new(),
             valid_cell_barcodes,
@@ -141,6 +145,23 @@ impl FragmentFileReader {
     }
 
     fn skip_to_chromosome(&mut self, chromosome: &str) -> Result<(), custom_errors::InvalidFragmentFileError> {
+        if let Some(index) = &self.index {
+            if let Some(header) = index.header() {
+                let seq_names = header.reference_sequence_names();
+                if let Some(chromosome_index) = seq_names.get_index_of(chromosome.as_bytes()) {
+                    if let Ok(q) = index.query(
+                        chromosome_index,
+                        Interval::from(Position::MIN..)
+                    ) {
+                        let first_chunk = q[0];
+                        self.reader.seek(first_chunk.start()).map_err(|_| custom_errors::InvalidFragmentFileError::new(&self.file_name))?;
+                        self.read_next()?;
+                    } 
+                }
+            }
+        } else {
+            println!("Something is wrong with the index");
+        }
         while !self.at_end_of_file {
             if let Ok(fragment) = &self.fragment {
                 if fragment.chromosome == chromosome {
@@ -174,12 +195,11 @@ impl FragmentFileReader {
     }
 }
 
-
 fn split_fragments_by_cell_barcodes_for_chromosome(
     fragment_file_paths: &[&str],
     fragment_file_to_cell_barcode: &HashMap<String, Vec<String>>,
     chromosome: &str,
-    gz_output_file: &mut GzEncoder<File>
+    gz_output_file: &mut bgzf::Writer<File>
 ) -> PyResult<()>{
 
     // Open fragment files which are gzipped, and pos-sorted.
@@ -242,7 +262,7 @@ pub fn split_fragment_files_by_cell_type(
             let file = File::create(output_file_name)?;
             let chromosome = chromosome.clone();
             let handle = thread::spawn(move || {
-                let mut gz_output_file = GzEncoder::new(file, Compression::default());
+                let mut gz_output_file = bgzf::Writer::new(file);
                 split_fragments_by_cell_barcodes_for_chromosome(
                     &fragment_file_paths.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
                     &fragment_file_to_cell_barcode,
