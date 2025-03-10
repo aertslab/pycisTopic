@@ -145,6 +145,7 @@ impl FragmentFileReader {
     }
 
     fn skip_to_chromosome(&mut self, chromosome: &str) -> Result<(), custom_errors::InvalidFragmentFileError> {
+        let mut using_index = false;
         if let Some(index) = &self.index {
             if let Some(header) = index.header() {
                 let seq_names = header.reference_sequence_names();
@@ -156,11 +157,15 @@ impl FragmentFileReader {
                         let first_chunk = q[0];
                         self.reader.seek(first_chunk.start()).map_err(|_| custom_errors::InvalidFragmentFileError::new(&self.file_name))?;
                         self.read_next()?;
+                        using_index = true;
                     } 
                 }
             }
-        } else {
-            println!("Something is wrong with the index");
+        } 
+        if !using_index {
+            // If no index, manually skip header lines.
+            // otherwise this is done automatically
+            self.skip_header("#")?;
         }
         while !self.at_end_of_file {
             if let Ok(fragment) = &self.fragment {
@@ -219,9 +224,8 @@ fn split_fragments_by_cell_barcodes_for_chromosome(
     // A binary heap will be used to write fragments in order from different files
     let mut heap = BinaryHeap::new();
     
-    // skip header lines, go to correct chromosome, and push first valid fragment to binary heap
+    // go to correct chromosome and push first valid fragment to binary heap
     for reader in readers.iter_mut(){
-        reader.skip_header("#")?;
         reader.skip_to_chromosome(chromosome)?;
         if !reader.at_end_of_file  && reader.at_chrom() {
             if let Some(fragment) = reader.get_next_valid_fragment()? {
