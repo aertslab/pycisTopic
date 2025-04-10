@@ -34,7 +34,7 @@ def find_clusters(
     selected_model: CistopicLDAModel,
     target: str = "cell",
     k: int = 10,
-    res: list[float] = [0.6],
+    res: list[float] | None  = None,
     seed: int = 555,
     scale: bool = False,
     prefix: str = "",
@@ -92,6 +92,9 @@ def find_clusters(
 
     log.info("Finding neighbours")
     model = selected_model
+    
+    if res is None:
+        res = [0.6]
 
     if target == "cell":
         data_mat = model.cell_topic_harmony if harmony else model.cell_topic
