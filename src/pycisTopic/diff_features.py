@@ -284,14 +284,19 @@ class CistopicImputedFeatures:
             random_permutations_to_break_ties_numpy = rng.permutation(
                 scores_with_ties_for_motif_or_track_numpy.shape[0]
             )
-            ranking_with_broken_ties_for_motif_or_track_numpy = (
+            ranking_with_broken_ties_for_motif_or_track_numpy = np.empty(
+                scores_with_ties_for_motif_or_track_numpy.shape[0],
+                dtype=imputed_acc_obj_ranking_db_dtype,
+            )
+            ranking_with_broken_ties_for_motif_or_track_numpy[
                 random_permutations_to_break_ties_numpy[
                     (-scores_with_ties_for_motif_or_track_numpy)[
                         random_permutations_to_break_ties_numpy
                     ].argsort()
                 ]
-                .argsort()
-                .astype(imputed_acc_obj_ranking_db_dtype)
+            ] = np.arange(
+                scores_with_ties_for_motif_or_track_numpy.shape[0],
+                dtype=imputed_acc_obj_ranking_db_dtype,
             )
 
             return ranking_with_broken_ties_for_motif_or_track_numpy
