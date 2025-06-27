@@ -1,10 +1,6 @@
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
-build-backend = "maturin"
-
-[tool.maturin]
-module-name = "pycistopic_lib"
-manifest-path = "pycistopic-lib/Cargo.toml"
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "pycisTopic"
