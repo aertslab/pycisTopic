@@ -407,13 +407,43 @@ def read_fragments_to_polars_df(
                 )
             )
         else:
+            fraction_of_CBs_with_end_to_remove = (
+                fragments_df_pl.select(
+                    pl.col("Name").cat.get_categories().alias("CB"),
+                )
+                .select(
+                    pl.col("CB")
+                    .str.ends_with(cb_end_to_remove)
+                    .sum()
+                    .alias("CBs_with_end_to_remove"),
+                    pl.col("CB").count().alias("CB_count"),
+                )
+                .select(
+                    (pl.col("CBs_with_end_to_remove") / pl.col("CB_count")).alias(
+                        "fraction_of_CBs_with_end_to_remove"
+                    ),
+                )
+                .collect()
+                .to_series()[0]
+            )
+
+            if fraction_of_CBs_with_end_to_remove != 1.0:
+                print(
+                    f'Warning: Not all cell barcodes in fragments file "{fragments_bed_filename}" end with '
+                    f'"{cb_end_to_remove}". Percentage of cell barcodes with '
+                    f'"{cb_end_to_remove}" at the end: '
+                    f"{(fraction_of_CBs_with_end_to_remove * 100):.2f}%."
+                )
+
             # Remove `cb_end_to_remove` from the end of the cell barcode before adding
             # separator and sample ID to cell barcode.
             fragments_df_pl = fragments_df_pl.with_columns(
-                pl.col("Name")
-                .cast(pl.Utf8)
-                .str.replace(cb_end_to_remove + "$", separator_and_sample_id)
+                (
+                    pl.col("Name").cast(pl.Utf8).str.strip_suffix(cb_end_to_remove)
+                    + pl.lit(separator_and_sample_id)
+                )
                 .cast(pl.Categorical)
+                .alias("Name")
             )
 
     fragments_df_pl = fragments_df_pl.collect()
@@ -504,13 +534,40 @@ def read_barcodes_file_to_polars_series(
                 )
             )
         else:
+            # Check fraction of cell barcodes which have the `cb_end_to_remove` string at the end.
+            fraction_of_CBs_with_end_to_remove = (
+                cbs.select(
+                    pl.col("CB")
+                    .cat.ends_with(cb_end_to_remove)
+                    .sum()
+                    .alias("CBs_with_end_to_remove"),
+                    pl.col("CB").count().alias("CB_count"),
+                )
+                .select(
+                    (pl.col("CBs_with_end_to_remove") / pl.col("CB_count")).alias(
+                        "fraction_of_CBs_with_end_to_remove"
+                    ),
+                )
+                .to_series()[0]
+            )
+
+            if fraction_of_CBs_with_end_to_remove != 1.0:
+                print(
+                    f'Warning: Not all cell barcodes in "{barcodes_tsv_filename}" end with '
+                    f'"{cb_end_to_remove}". Percentage of cell barcodes with '
+                    f'"{cb_end_to_remove}" at the end: '
+                    f"{(fraction_of_CBs_with_end_to_remove * 100):.2f}%."
+                )
+
             # Remove `cb_end_to_remove` from the end of the cell barcode before adding
             # separator and sample ID to cell barcode.
             cbs = cbs.with_columns(
-                pl.col("CB")
-                .cast(pl.Utf8)
-                .str.replace(cb_end_to_remove + "$", separator_and_sample_id)
+                (
+                    pl.col("CB").cast(pl.Utf8).str.strip_suffix(cb_end_to_remove)
+                    + pl.lit(separator_and_sample_id)
+                )
                 .cast(pl.Categorical)
+                .alias("CB")
             )
 
     return cbs.to_series()
