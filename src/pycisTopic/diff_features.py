@@ -258,27 +258,39 @@ class CistopicImputedFeatures:
             self.feature_names = feature_names
             self.project = project
 
-    def make_rankings(self, seed=123):
+    def make_rankings(
+        self, seed=123, method: str = "polars"
+    ) -> CistopicImputedFeatures:
         """
         A function to generate rankings per cell based on the imputed accessibility scores per region.
 
         Parameters
         ----------
-        seed: int, optional
+        seed
             Random seed to ensure reproducibility of the rankings when there are ties
+        method
+            Method to use for the ranking implementation.
+            Options are "numpy" (same rankings as with older versions of pycisTopic)
+            or "polars" (fastest). Default: "polars".
+
         Return
         ------
            CistopicImputedFeatures
             A :class:`CistopicImputedFeatures` containing with ranking values rather than scores.
 
         """
-        # Initialize random number generator, for handling ties
+        if method != "numpy" and method != "polars":
+            raise ValueError(
+                f'Invalid method ("{method}") for ranking implementation. Use "numpy" or "polars".'
+            )
+
+        # Initialize random number generator, for handling ties.
         rng = np.random.default_rng(seed=seed)
 
-        # Function to make rankings per array
-        def rank_scores_and_assign_random_ranking_in_range_for_ties(
-            scores_with_ties_for_motif_or_track_numpy: np.ndarray,
-        ) -> np.ndarray:
+        # Function to make rankings per array.
+        def rank_scores_and_assign_random_ranking_in_range_for_ties_with_numpy(
+            scores_with_ties_for_motif_or_track_numpy: npt.NDarray,
+        ) -> npt.NDarray:
             #
             # Create random permutation so tied scores will have a different ranking each time.
             random_permutations_to_break_ties_numpy = rng.permutation(
@@ -301,6 +313,27 @@ class CistopicImputedFeatures:
 
             return ranking_with_broken_ties_for_motif_or_track_numpy
 
+        def rank_scores_and_assign_random_ranking_in_range_for_ties_with_polars(
+            scores_with_ties_for_motif_or_track_numpy: npt.NDArray,
+            seed: int,
+        ) -> npt.NDarray:
+            # Rank scores and assign a random ranking in range for regions/genes with
+            # the same score.
+            #   - Convert numpy array to Polars Series.
+            #   - Replace NaN values with the minimum value of the dtype, so NaNs are
+            #     ranked last.
+            #   - Use the `rank` method from Polars to assign ranks, using the "random"
+            #     method to break ties so that regions/genes with the same score get a
+            #     random ranking in the range of their scores instead of depending on
+            #     the order in which they appear in the input array.
+            #   - Subtract 1 from the ranks to make them zero-based.
+            return (
+                pl.Series(scores_with_ties_for_motif_or_track_numpy)
+                .fill_nan(np.finfo(scores_with_ties_for_motif_or_track_numpy.dtype).min)
+                .rank(method="random", descending=True, seed=seed)
+                - 1
+            ).to_numpy()
+
         # Create zeroed imputed object rankings database.
         imputed_acc_ranking = CistopicImputedFeatures(
             np.zeros((len(self.feature_names), len(self.cell_names)), dtype=np.int32),
@@ -319,12 +352,21 @@ class CistopicImputedFeatures:
             mtx = self.mtx
 
         # Rank all scores per motif/track and assign a random ranking in range for regions/genes with the same score.
-        for col_idx in range(len(imputed_acc_ranking.cell_names)):
-            imputed_acc_ranking.mtx[:, col_idx] = (
-                rank_scores_and_assign_random_ranking_in_range_for_ties(
-                    mtx[:, col_idx].toarray().flatten()
+        if method == "numpy":
+            for col_idx in range(len(imputed_acc_ranking.cell_names)):
+                imputed_acc_ranking.mtx[:, col_idx] = (
+                    rank_scores_and_assign_random_ranking_in_range_for_ties_with_numpy(
+                        mtx[:, col_idx].toarray().flatten()
+                    )
                 )
-            )
+        else:
+            for col_idx in range(len(imputed_acc_ranking.cell_names)):
+                imputed_acc_ranking.mtx[:, col_idx] = (
+                    rank_scores_and_assign_random_ranking_in_range_for_ties_with_polars(
+                        mtx[:, col_idx].toarray().flatten(),
+                        seed=rng.integers(2**64 - 1),
+                    )
+                )
 
         return imputed_acc_ranking
 
