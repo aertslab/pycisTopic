@@ -1,6 +1,6 @@
-import contextlib
+from importlib.metadata import version, PackageNotFoundError
 
-from pkg_resources import DistributionNotFound, get_distribution
-
-with contextlib.suppress(DistributionNotFound):
-    __version__ = get_distribution("pycisTopic").version
+try:
+    __version__ = version(__name__)
+except PackageNotFoundError:
+    __version__ = "unknown"
