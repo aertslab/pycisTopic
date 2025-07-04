@@ -29,7 +29,9 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
-dependencies = []
+dependencies = [
+    "polars>=1.31.0",
+]
 
 [project.optional-dependencies]
 docs = [
