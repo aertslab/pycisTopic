@@ -30,7 +30,12 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
+    "ncls>=0.0.70",
     "polars>=1.31.0",
+    "pyarrow>=20.0.0",
+    "pybiomart>=0.2.0",
+    "requests>=2.32.4",
+    "scipy>=1.15.3",
 ]
 
 [project.optional-dependencies]
@@ -47,6 +52,9 @@ docs = [
   "pandoc",
 ]
 development = ["mypy", "ruff", "pytest", "maturin"]
+plot = [
+    "matplotlib>=3.10.3",
+]
 
 [project.urls]
 Homepage = "https://github.com/aertslab/pycisTopic"

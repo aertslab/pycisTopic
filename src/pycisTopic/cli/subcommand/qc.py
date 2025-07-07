@@ -271,6 +271,52 @@ def qc_filter_barcodes(
         include_header=False,
     )
 
+def qc_plot(
+    sample_id: str | Path,
+    pycistopic_qc_output_dir: str | Path,
+    unique_fragments_threshold: int | None = None,
+    tss_enrichment_threshold: float | None = None,
+    frip_threshold: float | None = None,
+    plot_file_format: str = "png"
+):
+    try:
+        from pycisTopic.plotting.qc_plot import plot_barcode_stats, plot_sample_stats
+    except ImportError as e:
+        raise ImportError(
+            "Please try again after installing the optional plot dependencies: `pip install pycisTopic[plot]`"
+        ) from e
+    from pycisTopic.qc import get_barcodes_passing_qc_for_sample
+
+    bc_passing_filter, thresholds = get_barcodes_passing_qc_for_sample(
+        sample_id=sample_id,
+        pycistopic_qc_output_dir=pycistopic_qc_output_dir,
+        unique_fragments_threshold=unique_fragments_threshold,
+        tss_enrichment_threshold=tss_enrichment_threshold,
+        frip_threshold=frip_threshold,
+        use_automatic_thresholds=True
+    )
+
+    _ = plot_sample_stats(
+        sample_id=sample_id,
+        pycistopic_qc_output_dir=pycistopic_qc_output_dir,
+        save=os.path.join(
+            pycistopic_qc_output_dir,
+            f"{sample_id}_sample_stats.{plot_file_format}"
+        )
+    )
+
+    _ = plot_barcode_stats(
+        sample_id=sample_id,
+        pycistopic_qc_output_dir=pycistopic_qc_output_dir,
+        bc_passing_filters=bc_passing_filter,
+        detailed_title=False,
+        save=os.path.join(
+            pycistopic_qc_output_dir,
+            f"{sample_id}_bc_stats.{plot_file_format}"
+        ),
+        **thresholds
+    )
+
 
 def run_qc_run(args):
     qc(
@@ -300,6 +346,15 @@ def run_qc_filter_barcodes(args):
         frip_threshold=args.frip_threshold,
     )
 
+def run_qc_plot(args):
+    qc_plot(
+        sample_id=args.sample_id,
+        pycistopic_qc_output_dir=args.pycistopic_qc_output_dir,
+        unique_fragments_threshold=args.unique_fragments_threshold,
+        tss_enrichment_threshold=args.tss_enrichment_threshold,
+        frip_threshold=args.frip_threshold,
+        plot_file_format=args.plot_file_format
+    )
 
 def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
     parser_qc = subparsers.add_parser(
@@ -556,4 +611,74 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         required=False,
         default=0.0,
         help="Threshold for fraction of reads in peaks (FRiP). Default: 0.0.",
+    )
+
+    parser_qc_plot = subparser_qc.add_parser(
+        "plot",
+        help="Plot QC metrics.",
+    )
+    parser_qc_plot.set_defaults(func=run_qc_plot)
+
+    parser_qc_plot.add_argument(
+        "-s",
+        "--sample",
+        dest="sample_id",
+        action="store",
+        type=str,
+        required=True,
+        help="Sample ID for which to get list of cell barcodes based on QC statistics.",
+    )
+
+    parser_qc_plot.add_argument(
+        "-o",
+        "--output",
+        dest="pycistopic_qc_output_dir",
+        action="store",
+        type=str,
+        required=True,
+        help='Output directory from "pycistopic run qc" which contains QC statistics parquet output files.',
+    )
+
+    parser_qc_plot.add_argument(
+        "-f",
+        "--fragments",
+        dest="unique_fragments_threshold",
+        action="store",
+        type=int,
+        required=False,
+        default=None,
+        help="Threshold for number of unique fragments in peaks. Default: None (automatically determined).",
+    )
+
+    parser_qc_plot.add_argument(
+        "-t",
+        "--tss",
+        dest="tss_enrichment_threshold",
+        action="store",
+        type=float,
+        required=False,
+        default=None,
+        help="Threshold for TSS enrichment score. Default: None (automatically determined).",
+    )
+
+    parser_qc_plot.add_argument(
+        "-p",
+        "--frip",
+        dest="frip_threshold",
+        action="store",
+        type=float,
+        required=False,
+        default=0.0,
+        help="Threshold for fraction of reads in peaks (FRiP). Default: 0.0.",
+    )
+
+    parser_qc_plot.add_argument(
+        "-q",
+        "--format",
+        dest="plot_file_format",
+        action="store",
+        type=str,
+        required=False,
+        default="png",
+        help="File format of the resulting plots. Default: png",
     )
