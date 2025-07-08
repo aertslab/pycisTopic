@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import os
 from operator import itemgetter
 from typing import TYPE_CHECKING, Literal, Sequence
 
@@ -9,15 +10,22 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa  # type: ignore[import]
 import pyarrow.csv  # type: ignore[import]
-import pyranges as pr  # type: ignore[import]
+import pyranges as pr
 import scipy as sp
 
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.genomic_ranges import overlap as gr_overlap
-from pycisTopic.utils import normalise_filepath
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def normalise_filepath(path: str | Path, check_not_directory: bool = True) -> str:
+    """Create a string path, expanding the home directory if present."""
+    path = os.path.expanduser(path)
+    if check_not_directory and os.path.exists(path) and os.path.isdir(path):
+        raise IsADirectoryError(f"Expected a file path; {path!r} is a directory")
+    return path
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
