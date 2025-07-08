@@ -201,6 +201,15 @@ def run_mallet_calculate_model_evaluation_stats(args):
             top_topics_coh=5,
         )
 
+def run_mallet_plot_model_evaluation_stats(args):
+    from pycisTopic.topic_modeling.plot_stats import plot_stats
+
+    plot_stats(
+        output_prefix=args.output_prefix,
+        n_topics=args.n_topics,
+        plot_file_format=args.plot_file_format
+    )
+
 
 def binarize_cell_or_region_topic(args):
     """Binarize cell-topics or region-topics."""
@@ -706,6 +715,41 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         action="store_true",
         required=False,
         help="Enable verbose mode.",
+    )
+
+    parser_topic_modeling_mallet_plot_stats = subparser_topic_modeling_mallet.add_parser(
+        "plot_stats", help="Plot evaluation statistics"
+    )
+    parser_topic_modeling_mallet_plot_stats.set_defaults(
+        func=run_mallet_plot_model_evaluation_stats
+    )
+    parser_topic_modeling_mallet_plot_stats.add_argument(
+        "-o",
+        "--output",
+        dest="output_prefix",
+        action="store",
+        type=str,
+        required=True,
+        help="Topic model output prefix.",
+    )
+    parser_topic_modeling_mallet_plot_stats.add_argument(
+        "-t",
+        "--topics",
+        dest="n_topics",
+        type=int,
+        required=True,
+        nargs="+",
+        help="Topic number(s) to create the model evaluation statistics for.",
+    )
+    parser_topic_modeling_mallet_plot_stats.add_argument(
+        "-q",
+        "--format",
+        dest="plot_file_format",
+        action="store",
+        type=str,
+        required=False,
+        default="png",
+        help="File format of the resulting plots. Default: png",
     )
 
     parser_topic_modeling_mallet_binarize = subparser_topic_modeling_mallet.add_parser(
