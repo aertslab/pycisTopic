@@ -5,6 +5,7 @@ from typing import Callable, Literal
 
 import numpy as np
 import numpy.typing as npt
+
 #from pyscenic import binarization
 
 

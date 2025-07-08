@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 def run_topic_modeling_with_lda(args):
-    from pycisTopic.lda_models import run_cgs_models
+    from pycisTopic.topic_modeling.lda_models import run_cgs_models
 
     input_filename = args.input
     output_filename = args.output
@@ -79,7 +79,7 @@ def run_topic_modeling_with_lda(args):
 
 
 def run_topic_modeling_with_mallet(args):
-    from pycisTopic.lda_models import LDAMallet
+    from pycisTopic.topic_modeling.mallet_models import LDAMallet
 
     mallet_corpus_filename = args.mallet_corpus_filename
     output_prefix = args.output_prefix
@@ -145,7 +145,7 @@ def run_topic_modeling_with_mallet(args):
 def run_convert_binary_matrix_to_mallet_corpus_file(args):
     import scipy
 
-    from pycisTopic.lda_models import LDAMallet
+    from pycisTopic.topic_modeling.mallet_models import LDAMallet
 
     binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     mallet_corpus_filename = args.mallet_corpus_filename
@@ -178,12 +178,9 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
 def run_mallet_calculate_model_evaluation_stats(args):
     import scipy
 
-    from pycisTopic.fragments import read_barcodes_file_to_polars_series
-    from pycisTopic.lda_models import calculate_model_evaluation_stats
+    from pycisTopic.topic_modeling.stats import calculate_model_evaluation_stats
 
     binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
-    cell_barcodes_filename = args.cell_barcodes_filename
-    region_ids_filename = args.region_ids_filename
     output_prefix = args.output_prefix
     n_topics_list = [args.topics] if isinstance(args.topics, int) else args.topics
 
@@ -192,21 +189,6 @@ def run_mallet_calculate_model_evaluation_stats(args):
     )
     binary_accessibility_matrix = scipy.io.mmread(binary_accessibility_matrix_filename)
 
-    print(f'Read cell barcodes filename "{cell_barcodes_filename}".')
-    cell_barcodes = read_barcodes_file_to_polars_series(
-        barcodes_tsv_filename=cell_barcodes_filename,
-        sample_id=None,
-        cb_end_to_remove=None,
-        cb_sample_separator=None,
-    ).to_list()
-
-    print(f'Read region IDs filename "{region_ids_filename}".')
-    region_ids = read_barcodes_file_to_polars_series(
-        barcodes_tsv_filename=region_ids_filename,
-        sample_id=None,
-        cb_end_to_remove=None,
-        cb_sample_separator=None,
-    ).to_list()
 
     for n_topics in n_topics_list:
         print(
@@ -214,8 +196,6 @@ def run_mallet_calculate_model_evaluation_stats(args):
         )
         calculate_model_evaluation_stats(
             binary_accessibility_matrix=binary_accessibility_matrix,
-            cell_barcodes=cell_barcodes,
-            region_ids=region_ids,
             output_prefix=output_prefix,
             n_topics=n_topics,
             top_topics_coh=5,
@@ -223,9 +203,7 @@ def run_mallet_calculate_model_evaluation_stats(args):
 
 
 def binarize_cell_or_region_topic(args):
-    """
-    Binarize cell-topics or region-topics.
-    """
+    """Binarize cell-topics or region-topics."""
     target = args.target
     method = args.method
     ntop = args.ntop
@@ -254,8 +232,8 @@ def binarize_cell_or_region_topic(args):
         os.makedirs(out_dir)
 
     from pycisTopic.fragments import read_barcodes_file_to_polars_series
-    from pycisTopic.lda_models import LDAMallet, LDAMalletFilenames
     from pycisTopic.topic_binarization import binarize_topics
+    from pycisTopic.topic_modeling.mallet_models import LDAMallet, LDAMalletFilenames
 
     lda_mallet_filenames = LDAMalletFilenames(
         output_prefix=output_prefix, n_topics=n_topics
@@ -702,24 +680,6 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=str,
         required=True,
         help="Binary accessibility matrix (region IDs vs cell barcodes) in Matrix Market format.",
-    )
-    parser_topic_modeling_mallet_calculate_stats.add_argument(
-        "-c",
-        "--cb",
-        dest="cell_barcodes_filename",
-        action="store",
-        type=str,
-        required=True,
-        help="Filename with cell barcodes.",
-    )
-    parser_topic_modeling_mallet_calculate_stats.add_argument(
-        "-r",
-        "--regions",
-        dest="region_ids_filename",
-        action="store",
-        type=str,
-        required=True,
-        help="Filename with region IDs.",
     )
     parser_topic_modeling_mallet_calculate_stats.add_argument(
         "-o",
