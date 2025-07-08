@@ -5,8 +5,7 @@ from typing import Callable, Literal
 
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
-from pyscenic import binarization
+#from pyscenic import binarization
 
 
 def smooth_topics_distributions(
@@ -194,8 +193,10 @@ def threshold_li(array: npt.NDArray[np.float64], nbins) -> float:
 
 
 def threshold_aucell(array: npt.NDArray[np.float64]):
-    _, thr = binarization.binarize(pd.DataFrame(array))
-    return float(thr)
+    # implement this function to avoid pyscenic dependency
+    raise NotImplementedError("AUCell binarizatio is not implemented in this version of pycisTopic.")
+    #_, thr = binarization.binarize(pd.DataFrame(array))
+    #return float(thr)
 
 
 def threshold_ntop(array: npt.NDArray[np.float64], ntop: int) -> float:
