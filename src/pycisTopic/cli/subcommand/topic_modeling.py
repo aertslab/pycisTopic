@@ -316,6 +316,26 @@ def binarize_cell_or_region_topic(args):
                     f.write(f"{chrom}\t{start}\t{end}\tTopic_{topic + 1}\t{score}\n")
 
 
+def run_create_anndata_from_mallet(args):
+    from pycisTopic.topic_modeling.create_anndata import create_anndata_from_mallet
+
+    cell_barcodes: list[str] = []
+    with open(args.cell_barcodes) as f:
+        for line in f:
+            cell_barcodes.append(line.strip())
+
+    region_ids: list[str] = []
+    with open(args.region_ids) as f:
+        for line in f:
+            region_ids.append(line.strip())
+
+    create_anndata_from_mallet(
+        output_prefix=args.output_prefix,
+        n_topics=args.n_topics,
+        cell_barcodes=cell_barcodes,
+        region_ids=region_ids
+    )
+
 def str_to_bool(v: str) -> bool:
     """
     Convert string representation of a boolean value to a boolean.
@@ -851,4 +871,47 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=str,
         required=True,
         help="Directory to store results.",
+    )
+
+    parser_topic_modeling_mallet_anndata = subparser_topic_modeling_mallet.add_parser(
+        "create_anndata", help="Generate AnnData h5ad file from mallet result."
+    )
+    parser_topic_modeling_mallet_anndata.set_defaults(
+        func=run_create_anndata_from_mallet
+    )
+
+    parser_topic_modeling_mallet_anndata.add_argument(
+        "-c",
+        "--cb",
+        dest="cell_barcodes",
+        action="store",
+        type=str,
+        required=False,
+        help="Filename with cell barcodes.",
+    )
+    parser_topic_modeling_mallet_anndata.add_argument(
+        "-r",
+        "--regions",
+        dest="region_ids",
+        action="store",
+        type=str,
+        required=False,
+        help="Filename with region IDs.",
+    )
+    parser_topic_modeling_mallet_anndata.add_argument(
+        "-o",
+        "--output",
+        dest="output_prefix",
+        action="store",
+        type=str,
+        required=True,
+        help="Topic model output prefix.",
+    )
+    parser_topic_modeling_mallet_anndata.add_argument(
+        "-t",
+        "--n_topics",
+        dest="n_topics",
+        type=int,
+        required=True,
+        help="Model with `topic` number of topics to generate AnnData from.",
     )
