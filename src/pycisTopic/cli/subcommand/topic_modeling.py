@@ -81,6 +81,8 @@ def run_topic_modeling_with_lda(args):
 def run_topic_modeling_with_mallet(args):
     from pycisTopic.topic_modeling.mallet_models import LDAMallet
 
+    check_java_exists()
+    
     mallet_corpus_filename = args.mallet_corpus_filename
     output_prefix = args.output_prefix
     n_topics_list = [args.topics] if isinstance(args.topics, int) else args.topics
@@ -147,6 +149,8 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
 
     from pycisTopic.topic_modeling.mallet_models import LDAMallet
 
+    check_java_exists()
+    
     binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     mallet_corpus_filename = args.mallet_corpus_filename
     mallet_path = args.mallet_path
@@ -361,7 +365,16 @@ def str_to_bool(v: str) -> bool:
             return False
     raise ArgumentTypeError("Boolean value expected.")
 
+def check_java_exists():
+    import subprocess
 
+    print("Checking whether Java exists.")
+    subprocess.run(
+        ["java", "--version"],
+        shell=False,
+        stdout=subprocess.DEVNULL
+    )
+    
 def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     """Creates an ArgumentParser to read the options for this script."""
     parser_topic_modeling = subparsers.add_parser(
