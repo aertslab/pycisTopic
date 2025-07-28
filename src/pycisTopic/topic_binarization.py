@@ -194,8 +194,8 @@ def threshold_li(array: npt.NDArray[np.float64], nbins) -> float:
 
 
 def threshold_aucell(array: npt.NDArray[np.float64]):
-    # implement this function to avoid pyscenic dependency
-    raise NotImplementedError("AUCell binarizatio is not implemented in this version of pycisTopic.")
+    # TODO: implement this function to avoid pyscenic dependency
+    raise NotImplementedError("AUCell binarization is not implemented in this version of pycisTopic.")
     #_, thr = binarization.binarize(pd.DataFrame(array))
     #return float(thr)
 
