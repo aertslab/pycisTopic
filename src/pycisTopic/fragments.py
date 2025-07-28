@@ -10,14 +10,14 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa  # type: ignore[import]
 import pyarrow.csv  # type: ignore[import]
-import pyranges as pr
 import scipy as sp
-
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.genomic_ranges import overlap as gr_overlap
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pyranges as pr
 
 
 def normalise_filepath(path: str | Path, check_not_directory: bool = True) -> str:
@@ -26,6 +26,7 @@ def normalise_filepath(path: str | Path, check_not_directory: bool = True) -> st
     if check_not_directory and os.path.exists(path) and os.path.isdir(path):
         raise IsADirectoryError(f"Expected a file path; {path!r} is a directory")
     return path
+
 
 # Enable Polars global string cache so all categoricals are created with the same
 # string cache.
@@ -172,6 +173,8 @@ def read_fragments_to_pyranges(
                 "Strand": "category",
             },
         )
+
+    import pyranges as pr
 
     # Convert Pandas DataFrame to PyRanges DataFrame.
     # This will convert "Chromosome" and "Strand" columns to pd.Categorical.
@@ -620,6 +623,8 @@ def create_pyranges_from_polars_df(bed_df_pl: pl.DataFrame) -> pr.PyRanges:
     # chromosome-strand (stranded) combination or a Pandas DataFrame per chromosome
     # (unstranded). So instead, create the PyRanges object manually with the use of
     # Polars and pyarrow.
+
+    import pyranges as pr
 
     # Create empty PyRanges object, which will be populated later.
     df_pr = pr.PyRanges()
