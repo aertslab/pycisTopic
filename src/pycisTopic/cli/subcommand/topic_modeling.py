@@ -82,7 +82,7 @@ def run_topic_modeling_with_mallet(args):
     from pycisTopic.topic_modeling.mallet_models import LDAMallet
 
     check_java_exists()
-    
+
     mallet_corpus_filename = args.mallet_corpus_filename
     output_prefix = args.output_prefix
     n_topics_list = [args.topics] if isinstance(args.topics, int) else args.topics
@@ -150,7 +150,7 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
     from pycisTopic.topic_modeling.mallet_models import LDAMallet
 
     check_java_exists()
-    
+
     binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     mallet_corpus_filename = args.mallet_corpus_filename
     mallet_path = args.mallet_path
@@ -193,7 +193,6 @@ def run_mallet_calculate_model_evaluation_stats(args):
     )
     binary_accessibility_matrix = scipy.io.mmread(binary_accessibility_matrix_filename)
 
-
     for n_topics in n_topics_list:
         print(
             f'Calculate model evaluation statistics for {n_topics} topics from "{output_prefix}.{n_topics}_topics.*"...'
@@ -205,13 +204,14 @@ def run_mallet_calculate_model_evaluation_stats(args):
             top_topics_coh=5,
         )
 
+
 def run_mallet_plot_model_evaluation_stats(args):
     from pycisTopic.topic_modeling.plot_stats import plot_stats
 
     plot_stats(
         output_prefix=args.output_prefix,
         n_topics=args.n_topics,
-        plot_file_format=args.plot_file_format
+        plot_file_format=args.plot_file_format,
     )
 
 
@@ -337,8 +337,9 @@ def run_create_anndata_from_mallet(args):
         output_prefix=args.output_prefix,
         n_topics=args.n_topics,
         cell_barcodes=cell_barcodes,
-        region_ids=region_ids
+        region_ids=region_ids,
     )
+
 
 def str_to_bool(v: str) -> bool:
     """
@@ -365,16 +366,14 @@ def str_to_bool(v: str) -> bool:
             return False
     raise ArgumentTypeError("Boolean value expected.")
 
+
 def check_java_exists():
     import subprocess
 
     print("Checking whether Java exists.")
-    subprocess.run(
-        ["java", "--version"],
-        shell=False,
-        stdout=subprocess.DEVNULL
-    )
-    
+    subprocess.run(["java", "--version"], shell=False, stdout=subprocess.DEVNULL)
+
+
 def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     """Creates an ArgumentParser to read the options for this script."""
     parser_topic_modeling = subparsers.add_parser(
@@ -750,8 +749,11 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         help="Enable verbose mode.",
     )
 
-    parser_topic_modeling_mallet_plot_stats = subparser_topic_modeling_mallet.add_parser(
-        "plot_stats", help="Plot evaluation statistics"
+    parser_topic_modeling_mallet_plot_stats = (
+        subparser_topic_modeling_mallet.add_parser(
+            "plot_stats",
+            help="Plot evaluation statistics",
+        )
     )
     parser_topic_modeling_mallet_plot_stats.set_defaults(
         func=run_mallet_plot_model_evaluation_stats
@@ -829,7 +831,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         choices=(True, False),
         required=False,
         default=True,
-        help="Wether to smooth the cell- or region-topic probabilities.",
+        help="Whether to smooth the cell- or region-topic probabilities.",
     )
     parser_topic_modeling_mallet_binarize.add_argument(
         "-b",
@@ -887,7 +889,8 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     )
 
     parser_topic_modeling_mallet_anndata = subparser_topic_modeling_mallet.add_parser(
-        "create_anndata", help="Generate AnnData h5ad file from mallet result."
+        "create_anndata",
+        help="Generate AnnData h5ad file from mallet result.",
     )
     parser_topic_modeling_mallet_anndata.set_defaults(
         func=run_create_anndata_from_mallet
