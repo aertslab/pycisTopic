@@ -91,6 +91,7 @@ def run_topic_modeling_with_mallet(args):
     eta = args.eta
     eta_by_topic = args.eta_by_topic
     n_iter = args.iterations
+    optimize_interval = args.optimize_interval
     n_cpu = args.parallel
     random_state = args.seed
     memory_in_gb = f"{args.memory_in_gb}G"
@@ -111,6 +112,7 @@ def run_topic_modeling_with_mallet(args):
     print(f"  - Eta:                                        {eta}")
     print(f"  - Divide eta by the number of topics:         {eta_by_topic}")
     print(f"  - Number of iterations:                       {n_iter}")
+    print(f"  - Optimize interval:                          {optimize_interval}")
     print(f"  - Number threads Mallet is allowed to use:    {n_cpu}")
     print(f"  - Seed:                                       {random_state}")
     print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}")
@@ -132,7 +134,7 @@ def run_topic_modeling_with_mallet(args):
             eta=eta,
             eta_by_topic=eta_by_topic,
             n_cpu=n_cpu,
-            optimize_interval=0,
+            optimize_interval=optimize_interval,
             iterations=n_iter,
             topic_threshold=0.0,
             random_seed=random_state,
@@ -628,6 +630,14 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=False,
         default=150,
         help="Number of iterations. Default: 150.",
+    )
+    parser_topic_modeling_mallet_run.add_argument(
+        "--optimize-interval",
+        dest="optimize_interval",
+        type=int,
+        required=False,
+        default=0,
+        help="Optimize hyperparameters every `optimize_interval` iterations. Default: 0.",
     )
     parser_topic_modeling_mallet_run.add_argument(
         "-a",
