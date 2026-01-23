@@ -92,6 +92,7 @@ def run_topic_modeling_with_mallet(args):
     eta_by_topic = args.eta_by_topic
     n_iter = args.iterations
     optimize_interval = args.optimize_interval
+    optimize_burn_in = args.optimize_burn_in
     n_cpu = args.parallel
     random_state = args.seed
     memory_in_gb = f"{args.memory_in_gb}G"
@@ -111,8 +112,9 @@ def run_topic_modeling_with_mallet(args):
     print(f"  - Divide alpha by the number of topics:       {alpha_by_topic}")
     print(f"  - Eta:                                        {eta}")
     print(f"  - Divide eta by the number of topics:         {eta_by_topic}")
-    print(f"  - Number of iterations:                       {n_iter}")
-    print(f"  - Optimize interval:                          {optimize_interval}")
+    print(f"  - Number of iterations of Gibbs sampling:     {n_iter}")
+    print(f"  - Optimize interval for hyperparameters:      {optimize_interval}")
+    print(f"  - Number of burn-in iterations:               {optimize_burn_in}")
     print(f"  - Number threads Mallet is allowed to use:    {n_cpu}")
     print(f"  - Seed:                                       {random_state}")
     print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}")
@@ -134,8 +136,9 @@ def run_topic_modeling_with_mallet(args):
             eta=eta,
             eta_by_topic=eta_by_topic,
             n_cpu=n_cpu,
-            optimize_interval=optimize_interval,
             iterations=n_iter,
+            optimize_interval=optimize_interval,
+            optimize_burn_in=optimize_burn_in,
             topic_threshold=0.0,
             random_seed=random_state,
             mallet_path=mallet_path,
@@ -629,7 +632,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=int,
         required=False,
         default=150,
-        help="Number of iterations. Default: 150.",
+        help="Number of iterations of Gibbs sampling. Default: 150.",
     )
     parser_topic_modeling_mallet_run.add_argument(
         "--optimize-interval",
@@ -637,7 +640,19 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=int,
         required=False,
         default=0,
-        help="Optimize hyperparameters every `optimize_interval` iterations. Default: 0.",
+        help="Optimize hyperparameters every `optimize_interval` iterations. "
+        "Only takes effect after running `optimize_burn_in` iterations. "
+        "Disable optimizing hyperparameters by setting this option to 0. "
+        "Default: 0.",
+    )
+    parser_topic_modeling_mallet_run.add_argument(
+        "--optimize-burn-in",
+        dest="optimize_burn_in",
+        type=int,
+        required=False,
+        default=50,
+        help="The number of iterations before starting hyperparameter optimization. "
+        "Default: 50.",
     )
     parser_topic_modeling_mallet_run.add_argument(
         "-a",
