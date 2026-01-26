@@ -564,7 +564,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=int,
         required=False,
         default=10,
-        help='Amount of memory (in GB) Mallet is allowed to use. Default: "10"',
+        help='Amount of memory (in GB) Mallet is allowed to use. Default: "10".',
     )
     parser_topic_modeling_mallet_create_corpus.add_argument(
         "-b",
@@ -710,7 +710,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=int,
         required=False,
         default=100,
-        help='Amount of memory (in GB) Mallet is allowed to use. Default: "100"',
+        help='Amount of memory (in GB) Mallet is allowed to use. Default: "100".',
     )
     parser_topic_modeling_mallet_run.add_argument(
         "-b",
@@ -779,7 +779,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet_plot_stats = (
         subparser_topic_modeling_mallet.add_parser(
             "plot_stats",
-            help="Plot evaluation statistics",
+            help="Plot evaluation statistics.",
         )
     )
     parser_topic_modeling_mallet_plot_stats.set_defaults(
@@ -811,11 +811,12 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=str,
         required=False,
         default="png",
-        help="File format of the resulting plots. Default: png",
+        help="File format of the resulting plots. Default: png.",
     )
 
     parser_topic_modeling_mallet_binarize = subparser_topic_modeling_mallet.add_parser(
-        "binarize", help="Binarize cell- or region-topic probabilities"
+        "binarize",
+        help="Binarize cell- or region-topic probabilities.",
     )
     parser_topic_modeling_mallet_binarize.set_defaults(
         func=binarize_cell_or_region_topic
