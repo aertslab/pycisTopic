@@ -80,7 +80,7 @@ class LDAMallet:
                 #   - column 2: document number (always 0).
                 #   - column 3: region IDs indices accessible in the current cell barcode.
                 mallet_corpus_txt_fh.write(
-                    f'{cell_barcode_idx}\t0\t{" ".join([str(x) for x in region_ids_idx])}\n'
+                    f"{cell_barcode_idx}\t0\t{' '.join([str(x) for x in region_ids_idx])}\n"
                 )
 
         mallet_import_file_cmd = [
@@ -337,7 +337,7 @@ class LDAMallet:
         Dictionary with Mallet LDA parameters and settings.
 
         """
-        with open(parameters_json_filename, "r") as fh:
+        with open(parameters_json_filename) as fh:
             mallet_train_topics_parameters = json.load(fh)
         return mallet_train_topics_parameters
 
