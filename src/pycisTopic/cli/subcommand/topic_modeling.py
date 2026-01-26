@@ -29,7 +29,7 @@ def run_topic_modeling_with_lda(args):
         if args.keep_intermediate_topic_models
         else None
     )
-    random_state = args.seed
+    random_seed = args.seed
     temp_dir = args.temp_dir
 
     if args.verbose:
@@ -48,7 +48,7 @@ def run_topic_modeling_with_lda(args):
     print(f"  - Divide eta by the number of topics:         {eta_by_topic}")
     print(f"  - Number of iterations:                       {n_iter}")
     print(f"  - Number of topic models to run in parallel:  {n_cpu}")
-    print(f"  - Seed:                                       {random_state}")
+    print(f"  - Seed:                                       {random_seed}")
     print(f"  - Save intermediate topic models in dir:      {save_path}")
     print(f"  - TMP dir:                                    {temp_dir}")
 
@@ -64,7 +64,7 @@ def run_topic_modeling_with_lda(args):
         n_topics=n_topics,
         n_cpu=n_cpu,
         n_iter=n_iter,
-        random_state=random_state,
+        random_state=random_seed,
         alpha=alpha,
         alpha_by_topic=alpha_by_topic,
         eta=eta,
@@ -93,8 +93,8 @@ def run_topic_modeling_with_mallet(args):
     n_iter = args.iterations
     optimize_interval = args.optimize_interval
     optimize_burn_in = args.optimize_burn_in
-    n_cpu = args.parallel
-    random_state = args.seed
+    n_threads = args.parallel
+    random_seed = args.seed
     memory_in_gb = f"{args.memory_in_gb}G"
     mallet_path = args.mallet_path
 
@@ -115,8 +115,8 @@ def run_topic_modeling_with_mallet(args):
     print(f"  - Number of iterations of Gibbs sampling:     {n_iter}")
     print(f"  - Optimize interval for hyperparameters:      {optimize_interval}")
     print(f"  - Number of burn-in iterations:               {optimize_burn_in}")
-    print(f"  - Number threads Mallet is allowed to use:    {n_cpu}")
-    print(f"  - Seed:                                       {random_state}")
+    print(f"  - Number threads Mallet is allowed to use:    {n_threads}")
+    print(f"  - Seed:                                       {random_seed}")
     print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}")
     print(f"  - Mallet binary:                              {mallet_path}")
 
@@ -135,12 +135,12 @@ def run_topic_modeling_with_mallet(args):
             alpha_by_topic=alpha_by_topic,
             eta=eta,
             eta_by_topic=eta_by_topic,
-            n_cpu=n_cpu,
+            n_threads=n_threads,
             iterations=n_iter,
             optimize_interval=optimize_interval,
             optimize_burn_in=optimize_burn_in,
             topic_threshold=0.0,
-            random_seed=random_state,
+            random_seed=random_seed,
             mallet_path=mallet_path,
         )
 
@@ -699,7 +699,9 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=int,
         required=False,
         default=555,
-        help="Seed for ensuring reproducibility. Default: 555.",
+        help="Seed for ensuring reproducibility. "
+        "To get reproducible output, Mallet also has to be run with the same number of threads. "
+        "Default: 555.",
     )
     parser_topic_modeling_mallet_run.add_argument(
         "-m",
