@@ -350,7 +350,7 @@ class LDAMallet:
         alpha_by_topic: bool = True,
         eta: float = 0.1,
         eta_by_topic: bool = False,
-        n_cpu: int = 1,
+        n_threads: int = 1,
         iterations: int = 150,
         optimize_interval: int = 0,
         optimize_burn_in: int = 50,
@@ -381,7 +381,7 @@ class LDAMallet:
         eta_by_topic
             Boolean indicating whether the scalar given in beta has to be divided by
             the number of topics. Default: False.
-        n_cpu
+        n_threads
             Number of threads that will be used for training. Default: 1.
         iterations
             Number of training iterations of Gibbs sampling. Default: 150.
@@ -435,7 +435,7 @@ class LDAMallet:
             "--optimize-burn-in",
             str(optimize_burn_in),
             "--num-threads",
-            str(n_cpu),
+            str(n_threads),
             "--num-iterations",
             str(iterations),
             "--word-topic-counts-file",
@@ -490,7 +490,7 @@ class LDAMallet:
                 "alpha_by_topic": alpha_by_topic,
                 "eta": eta,
                 "eta_by_topic": eta_by_topic,
-                "n_cpu": n_cpu,
+                "n_threads": n_threads,
                 "iterations": iterations,
                 "optimize_interval": optimize_interval,
                 "optimize_burn_in": optimize_burn_in,
@@ -559,4 +559,3 @@ class LDAMalletFilenames:
     @property
     def anndata_region_topic_filename(self):
         return f"{self.output_prefix}.{self.n_topics}_topics_region_topic_adata.h5ad"
-
