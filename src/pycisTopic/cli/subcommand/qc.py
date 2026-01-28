@@ -272,13 +272,14 @@ def qc_filter_barcodes(
         include_header=False,
     )
 
+
 def qc_plot(
     sample_id: str | Path,
     pycistopic_qc_output_dir: str | Path,
     unique_fragments_threshold: int | None = None,
     tss_enrichment_threshold: float | None = None,
     frip_threshold: float | None = None,
-    plot_file_format: str = "png"
+    plot_file_format: str = "png",
 ):
     try:
         from pycisTopic.plotting.qc_plot import plot_barcode_stats, plot_sample_stats
@@ -294,7 +295,7 @@ def qc_plot(
         unique_fragments_threshold=unique_fragments_threshold,
         tss_enrichment_threshold=tss_enrichment_threshold,
         frip_threshold=frip_threshold,
-        use_automatic_thresholds=True
+        use_automatic_thresholds=True,
     )
 
     _ = plot_sample_stats(
@@ -302,8 +303,8 @@ def qc_plot(
         pycistopic_qc_output_dir=pycistopic_qc_output_dir,
         save=os.path.join(
             pycistopic_qc_output_dir,
-            f"{sample_id}_sample_stats.{plot_file_format}"
-        )
+            f"{sample_id}_sample_stats.{plot_file_format}",
+        ),
     )
 
     _ = plot_barcode_stats(
@@ -313,9 +314,9 @@ def qc_plot(
         detailed_title=False,
         save=os.path.join(
             pycistopic_qc_output_dir,
-            f"{sample_id}_bc_stats.{plot_file_format}"
+            f"{sample_id}_bc_stats.{plot_file_format}",
         ),
-        **thresholds
+        **thresholds,
     )
 
 
@@ -347,6 +348,7 @@ def run_qc_filter_barcodes(args):
         frip_threshold=args.frip_threshold,
     )
 
+
 def run_qc_plot(args):
     qc_plot(
         sample_id=args.sample_id,
@@ -354,8 +356,9 @@ def run_qc_plot(args):
         unique_fragments_threshold=args.unique_fragments_threshold,
         tss_enrichment_threshold=args.tss_enrichment_threshold,
         frip_threshold=args.frip_threshold,
-        plot_file_format=args.plot_file_format
+        plot_file_format=args.plot_file_format,
     )
+
 
 def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
     parser_qc = subparsers.add_parser(
@@ -458,7 +461,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         required=False,
         default=2000,
         help="Flanking window around the TSS. "
-        "Used for intersecting fragments with TSS positions and keeping cut sites."
+        "Used for intersecting fragments with TSS positions and keeping cut sites. "
         "Default: 2000 (+/- 2000 bp).",
     )
 
