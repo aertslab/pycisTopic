@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import polars as pl
 
-from pycisTopic.fragments import create_pyranges_from_polars_df
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 
 # Enable Polars global string cache so all categoricals are created with the same
@@ -154,29 +153,12 @@ def get_tss_profile(
             # Add "_tss_flank" suffix for joined output that comes from the TSS
             # annotation BED file.
             regions2_suffix="_tss_flank",
+            engine=intersection_engine,
         ).rename(
             {
                 "Strand_tss_flank": "Strand",
             }
         )
-        if use_genomic_ranges
-        # Use pyranges to calculate the intersection.
-        else pl.from_pandas(
-            (
-                # Create PyRanges object from filtered fragments Polars DataFrame.
-                create_pyranges_from_polars_df(filtered_fragments_df_pl).join(
-                    # Create PyRanges object from TSS annotation Polars DataFrame
-                    # extended with flanking window.
-                    create_pyranges_from_polars_df(
-                        tss_annotation_with_flanking_window_df_pl
-                    ),
-                    # Add "_tss_flank" suffix for joined output that comes from the TSS
-                    # annotation BED file.
-                    suffix="_tss_flank",
-                    apply_strand_suffix=False,
-                )
-            ).df
-        ).rename({"Start": "Start_fragment", "End": "End_fragment"})
     )
 
     if overlap_with_tss_df_pl.shape == (0, 0):
