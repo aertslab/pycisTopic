@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, overload
 
 import polars as pl
-from ncls import NCLS
 
 if TYPE_CHECKING:
     import numpy as np
@@ -100,6 +99,8 @@ def _intersect_per_chrom_ncls(
         from Polars Dataframe 2 that have an overlap.
 
     """
+    from ncls import NCLS
+
     starts2, ends2, indexes2 = _get_start_end_and_indexes_for_chrom(
         regions2_per_chrom_dfs_pl,
         chrom=chrom,
@@ -254,6 +255,8 @@ def _overlap_per_chrom_ncls(
         Indexes for regions from Polars Dataframe 1 that had an overlap.
 
     """
+    from ncls import NCLS
+
     starts2, ends2, indexes2 = _get_start_end_and_indexes_for_chrom(
         regions2_per_chrom_dfs_pl,
         chrom=chrom,
