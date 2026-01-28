@@ -802,6 +802,7 @@ def get_insert_size_distribution(
 def get_fragments_in_peaks(
     fragments_df_pl: pl.DataFrame,
     regions_df_pl: pl.DataFrame,
+    intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
 ) -> pl.DataFrame:
     """
     Get number of total and unique fragments in peaks.
@@ -814,6 +815,10 @@ def get_fragments_in_peaks(
         Polars DataFrame with peak regions (consensus peaks or SCREEN regions).
         See :func:`pycisTopic.fragments.read_bed_to_polars_df` for a way to read a BED
         file with peak regsions.
+    intersection_engine
+        Engine to use to calculate intersections/overlaps between fragments and regions.
+        Options: ``ncls`` or ``ruranges`` (faster).
+        Default: ``ncls``.
 
     Returns
     -------
@@ -845,6 +850,7 @@ def get_fragments_in_peaks(
     >>> fragments_in_peaks_df_pl = get_fragments_in_peaks(
     ...     fragments_df_pl=fragments_cb_filtered_df_pl,
     ...     regions_df_pl=regions_df_pl,
+    ...     intersection_engine="ncls",
     ... )
 
     """
@@ -860,6 +866,7 @@ def get_fragments_in_peaks(
             regions2_coord=False,
             regions1_suffix="@1",
             regions2_suffix="@2",
+            engine=intersection_engine,
         )
         # Get all fragment file related columns.
         .select(
@@ -892,6 +899,7 @@ def create_fragment_matrix_from_fragments(
     sample_id: str | None = None,
     cb_end_to_remove: str | None = "-1",
     cb_sample_separator: str | None = "___",
+    intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
 ):
     """
     Create fragments matrix from a fragment file and BED file with regions.
@@ -914,6 +922,10 @@ def create_fragment_matrix_from_fragments(
     cb_sample_separator
         Add this string to the cell barcode if `sample_id` is specified, after removing
         `cb_end_to_remove` and before appending `sample_id`.
+    intersection_engine
+        Engine to use to calculate intersections/overlaps between fragments and regions.
+        Options: ``ncls`` or ``ruranges`` (faster).
+        Default: ``ncls``.
 
     Returns
     -------
@@ -1017,6 +1029,7 @@ def create_fragment_matrix_from_fragments(
                     regions1_df_pl=regions_df_pl,
                     regions2_df_pl=blacklist_df_pl,
                     how="first",
+                    engine=intersection_engine,
                 )
                 .lazy()
                 .select(
@@ -1048,6 +1061,7 @@ def create_fragment_matrix_from_fragments(
             regions2_coord=False,
             regions1_suffix="@1",
             regions2_suffix="@2",
+            engine=intersection_engine,
         )
         .rename({"CB@2": "CB"})
         .lazy()

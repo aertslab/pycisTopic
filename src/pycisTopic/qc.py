@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -377,10 +377,10 @@ def compute_qc_stats(
     tss_minimum_signal_window: int = 100,
     tss_window: int = 50,
     tss_min_norm: float = 0.2,
-    use_genomic_ranges: bool = True,
     min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
     no_threads: int = 8,
+    intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     """
     Compute quality check statistics from Polars DataFrame with fragments.
@@ -432,9 +432,6 @@ def compute_qc_stats(
         to normalize the TSS signal. This approach penalizes cells with fewer reads.
         Default: ``0.2``
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
-    use_genomic_ranges
-        Use genomic ranges implementation for calculating intersections, instead of
-        using pyranges.
     min_fragments_per_cb
         Minimum number of fragments needed per cell barcode to keep the fragments
         for those cell barcodes.
@@ -445,7 +442,11 @@ def compute_qc_stats(
         Number of threads to use when calculating kernel-density estimate (KDE) to get
         probability density function (PDF) values for log10 unique fragments in peaks
         vs TSS enrichment, fractions of fragments in peaks and duplication ratio.
-        Default: ``8``
+        Default: ``8``.
+    intersection_engine
+        Engine to use to calculate intersections/overlaps between fragments and regions.
+        Options: ``ncls`` or ``ruranges`` (faster).
+        Default: ``ncls``.
 
     Returns
     -------
@@ -509,10 +510,10 @@ def compute_qc_stats(
     ...     tss_minimum_signal_window=100,
     ...     tss_window=50,
     ...     tss_min_norm=0.2,
-    ...     use_genomic_ranges=True,
     ...     min_fragments_per_cb=10,
     ...     collapse_duplicates=True,
     ...     no_threads=8,
+    ...     intersection_engine="ncls",
     ... )
 
     """
@@ -610,7 +611,7 @@ def compute_qc_stats(
         minimum_signal_window=tss_minimum_signal_window,
         tss_window=tss_window,
         min_norm=tss_min_norm,
-        use_genomic_ranges=use_genomic_ranges,
+        intersection_engine=intersection_engine,
     )
 
     # Add TSS enrichment to fragments statistics per cell barcode.

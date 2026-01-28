@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import polars as pl
 
 from pycisTopic.genomic_ranges import intersection as gr_intersection
@@ -17,7 +19,7 @@ def get_tss_profile(
     minimum_signal_window: int = 100,
     tss_window: int = 50,
     min_norm: float = 0.2,
-    use_genomic_ranges: bool = True,
+    intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
 ):
     """
     Get TSS profile for Polars DataFrame with fragments filtered by cell barcodes.
@@ -56,10 +58,11 @@ def get_tss_profile(
         Minimum normalization score.
         If the average minimum signal value is below this value, this number is used
         to normalize the TSS signal. This approach penalizes cells with fewer reads.
-        Default: ``0.2``
-    use_genomic_ranges
-        Use genomic ranges implementation for calculating intersections, instead of
-        using pyranges.
+        Default: ``0.2``.
+    intersection_engine
+        Engine to use to calculate intersections/overlaps between fragments and regions.
+        Options: ``ncls`` or ``ruranges`` (faster).
+        Default: ``ncls``.
 
     Returns
     -------
@@ -89,6 +92,7 @@ def get_tss_profile(
     ...     minimum_signal_window=100,
     ...     tss_window=50,
     ...     min_norm=0.2,
+    ...     intersection_engine="ncls",
     ... )
 
     """
@@ -141,7 +145,7 @@ def get_tss_profile(
     # Get overlap between fragments and TSS positions
     # with [-flank_window, flank_window].
     overlap_with_tss_df_pl = (
-        # Use genomic_ranges to calculate the intersection.
+        # Use genomic_ranges to calculate the intersection with "ncls" or "ruranges".
         gr_intersection(
             regions1_df_pl=filtered_fragments_df_pl,
             regions2_df_pl=tss_annotation_with_flanking_window_df_pl,

@@ -24,10 +24,10 @@ def qc(
     tss_minimum_signal_window: int = 100,
     tss_window: int = 50,
     tss_min_norm: float = 0.2,
-    use_genomic_ranges: bool = True,
     min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
     no_threads: int = 8,
+    intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
     engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
 ) -> None:
     """
@@ -71,11 +71,8 @@ def qc(
         Minimum normalization score.
         If the average minimum signal value is below this value, this number is used
         to normalize the TSS signal. This approach penalizes cells with fewer reads.
-        Default: ``0.2``
+        Default: ``0.2``.
         See :func:`pycisTopic.tss_profile.get_tss_profile`.
-    use_genomic_ranges
-        Use genomic ranges implementation for calculating intersections, instead of
-        using pyranges.
     min_fragments_per_cb
         Minimum number of fragments needed per cell barcode to keep the fragments
         for those cell barcodes.
@@ -86,9 +83,13 @@ def qc(
         Number of threads to use when calculating kernel-density estimate (KDE) to get
         probability density function (PDF) values for log10 unique fragments in peaks
         vs TSS enrichment, fractions of fragments in peaks and duplication ratio.
-        Default: ``8``
+        Default: ``8``.
+    intersection_engine
+        Engine to use to calculate intersections/overlaps between fragments and regions.
+        Options: ``ncls`` or ``ruranges`` (faster).
+        Default: ``ncls``.
     engine
-        Use Polars or pyarrow to read BED and fragment files (default: `pyarrow`).
+        Use Polars or pyarrow to read BED and fragment files. Default: `pyarrow`.
 
     Returns
     -------
@@ -155,10 +156,10 @@ def qc(
         tss_minimum_signal_window=tss_minimum_signal_window,
         tss_window=tss_window,
         tss_min_norm=tss_min_norm,
-        use_genomic_ranges=use_genomic_ranges,
         min_fragments_per_cb=min_fragments_per_cb,
         collapse_duplicates=collapse_duplicates,
         no_threads=no_threads,
+        intersection_engine=intersection_engine,
     )
 
     logger.info(f'Writing "{output_prefix}.fragments_stats_per_cb.parquet".')
@@ -329,10 +330,10 @@ def run_qc_run(args):
         tss_minimum_signal_window=args.tss_minimum_signal_window,
         tss_window=args.tss_window,
         tss_min_norm=args.tss_min_norm,
-        use_genomic_ranges=args.use_genomic_ranges,
         min_fragments_per_cb=args.min_fragments_per_cb,
         collapse_duplicates=args.collapse_duplicates,
         no_threads=args.threads,
+        intersection_engine=args.intersection_engine,
         engine=args.engine,
     )
 
@@ -518,13 +519,17 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
     )
 
     group_qc_run_tss.add_argument(
-        "--use-pyranges",
-        dest="use_genomic_ranges",
-        action="store_false",
+        "--intersection_engine",
+        dest="intersection_engine",
+        action="store",
+        type=str,
+        choices=["ncls", "ruranges"],
         required=False,
+        default="ncls",
         help="""
-            Use pyranges instead of genomic ranges implementation for calculating
-            intersections.
+            Engine to use to calculate intersections/overlaps between fragments and regions.
+            Options: "ncls" or "ruranges" (faster).
+            Default: "ncls".
             """,
     )
 
