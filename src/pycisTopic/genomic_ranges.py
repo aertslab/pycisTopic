@@ -360,7 +360,7 @@ def _intersect_per_chrom_ruranges(
             "'outer', 'left', 'right'."
         )
 
-    regions1_indexes, regions2_indexes = ruranges.overlaps(
+    regions1_indexes, regions2_indexes = ruranges.overlaps_simple(
         starts=starts1,
         ends=ends1,
         starts2=starts2,
@@ -518,7 +518,7 @@ def _overlap_per_chrom_ruranges(
             "Valid values are: 'all', 'containment', 'first', 'last'."
         )
 
-    regions1_indexes, regions2_indexes = ruranges.overlaps(
+    regions1_indexes, regions2_indexes = ruranges.overlaps_simple(
         starts=starts1,
         ends=ends1,
         starts2=starts2,
