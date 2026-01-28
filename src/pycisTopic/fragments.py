@@ -11,6 +11,7 @@ import polars as pl
 import pyarrow as pa  # type: ignore[import]
 import pyarrow.csv  # type: ignore[import]
 import scipy as sp
+
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.genomic_ranges import overlap as gr_overlap
 
@@ -1283,6 +1284,7 @@ def create_fragment_matrix_from_fragments(
             engine="polars",
             min_column_count=3,
         )
+        .lazy()
         .with_columns(
             (
                 pl.col("Chromosome")
@@ -1300,18 +1302,26 @@ def create_fragment_matrix_from_fragments(
             pl.col("End"),
             pl.col("RegionID"),
         )
+        .sort(by=["Chromosome", "Start", "End", "RegionID"])
+        .collect()
     )
 
     if blacklist_bed_filename:
         # Read BED file with blacklisted regions .
-        blacklist_df_pl = read_bed_to_polars_df(
-            bed_filename=blacklist_bed_filename,
-            engine="polars",
-            min_column_count=3,
-        ).select(
-            pl.col("Chromosome"),
-            pl.col("Start"),
-            pl.col("End"),
+        blacklist_df_pl = (
+            read_bed_to_polars_df(
+                bed_filename=blacklist_bed_filename,
+                engine="polars",
+                min_column_count=3,
+            )
+            .lazy()
+            .select(
+                pl.col("Chromosome"),
+                pl.col("Start"),
+                pl.col("End"),
+            )
+            .sort(by=["Chromosome", "Start", "End"])
+            .collect()
         )
 
         # Filter out regions that overlap with blacklisted regions.
@@ -1330,6 +1340,7 @@ def create_fragment_matrix_from_fragments(
                 ),
                 on="RegionID",
                 how="anti",
+                maintain_order=True,
             )
             .select(
                 pl.col("Chromosome"),

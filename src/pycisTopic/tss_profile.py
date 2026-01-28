@@ -97,6 +97,7 @@ def get_tss_profile(
     # needed to find the overlap with fragments.
     tss_annotation_with_flanking_window_df_pl = (
         tss_annotation.clone()
+        .lazy()
         .select(
             # Only keep needed columns for faster Genomics Ranges / PyRanges join.
             pl.col("Chromosome").cast(pl.Categorical),
@@ -112,6 +113,8 @@ def get_tss_profile(
             (pl.col("Start") - flank_window).alias("Start"),
             (pl.col("Start") + flank_window + 1).alias("End"),
         )
+        .sort(by=["Chromosome", "Start", "Strand"])
+        .collect()
     )
 
     # Get all chromosome names which are found in the TSS annotation.
