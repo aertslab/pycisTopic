@@ -5,8 +5,6 @@ import os
 from typing import TYPE_CHECKING, Literal, Sequence
 
 import polars as pl
-import pyarrow as pa  # type: ignore[import]
-import pyarrow.csv  # type: ignore[import]
 import scipy as sp
 
 from pycisTopic.genomic_ranges import intersection as gr_intersection
@@ -31,7 +29,7 @@ pl.enable_string_cache()
 
 def read_bed_to_polars_df(
     bed_filename: str,
-    engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
+    engine: str | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     min_column_count: int = 3,
 ) -> pl.DataFrame:
     """
@@ -42,7 +40,12 @@ def read_bed_to_polars_df(
     bed_filename
         BED filename.
     engine
-        Use Polars or pyarrow to read the BED file (default: `pyarrow`).
+        BED parsing engine to use to read the (gzipped) BED file.
+
+        Options:
+          - ``polars_lazy`` (fastest, low memory usage): Use Polars lazy API (``pl.scan_csv``).
+          - ``polars`` (slightly slower, highest memory usage): Use Polars eager API (``pl.read_csv``).
+          - ``pyarrow`` (slowest, high memory usage): Use pyarrow CSV reader (``pa.csv.read_csv``).
     min_column_count
         Minimum number of required columns needed in BED file.
 
@@ -56,16 +59,16 @@ def read_bed_to_polars_df(
 
     Examples
     --------
-    Read BED file to Polars DataFrame with pyarrow engine.
+    Read BED file to Polars DataFrame with Polars lazy API engine.
 
-    >>> bed_df_pl = read_bed_to_polars_df("test.bed", engine="pyarrow")
+    >>> bed_df_pl = read_bed_to_polars_df("test.bed", engine="polars_lazy")
 
-    Read BED file to Polars DataFrame with pyarrow engine and require that the BED
+    Read BED file to Polars DataFrame with Polars lazy API engine and require that the BED
     file has at least 4 columns.
 
     >>> bed_with_at_least_4_columns_df_pl = read_bed_to_polars_df(
     ...     "test.bed",
-    ...     engine="pyarrow",
+    ...     engine="polars_lazy",
     ...     min_column_count=4,
     ... )
 
@@ -119,13 +122,33 @@ def read_bed_to_polars_df(
     # can be joined later, if necessary.
     pl.enable_string_cache()
 
-    if engine == "polars":
+    if engine == "polars_lazy":
+        # Read BED file with Polars.
+        bed_df_pl = pl.scan_csv(
+            bed_filename,
+            has_header=False,
+            separator="\t",
+            comment_prefix="#",
+            with_column_names=lambda cols: bed_column_names[:column_count],
+            schema_overrides={
+                bed_column: dtype
+                for bed_column, dtype in {
+                    "Chromosome": pl.Categorical,
+                    "Start": pl.Int32,
+                    "End": pl.Int32,
+                    "Name": pl.Categorical,
+                    "Strand": pl.Categorical,
+                }.items()
+                if bed_column in bed_column_names[:column_count]
+            },
+        ).collect()
+    elif engine == "polars":
         # Read BED file with Polars.
         bed_df_pl = pl.read_csv(
             bed_filename,
             has_header=False,
-            skip_rows=skip_rows,
             separator="\t",
+            comment_prefix="#",
             use_pyarrow=False,
             new_columns=bed_column_names[:column_count],
             schema_overrides={
@@ -141,6 +164,9 @@ def read_bed_to_polars_df(
             },
         )
     elif engine == "pyarrow":
+        import pyarrow as pa  # type: ignore[import]
+        import pyarrow.csv  # type: ignore[import]
+
         # Read BED file with pyarrow.
         bed_df_pl = pl.from_arrow(
             pa.csv.read_csv(
@@ -169,7 +195,7 @@ def read_bed_to_polars_df(
         )
     else:
         raise ValueError(
-            f'Unsupported engine value "{engine}" (allowed: ["polars", "pyarrow"]).'
+            f'Unsupported engine value "{engine}" (allowed: ["polars_lazy", "polars", "pyarrow"]).'
         )
 
     return bed_df_pl
@@ -177,7 +203,7 @@ def read_bed_to_polars_df(
 
 def read_fragments_to_polars_df(
     fragments_bed_filename: str,
-    engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
+    engine: str | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     sample_id: str | None = None,
     cb_end_to_remove: str | None = "-1",
     cb_sample_separator: str | None = "___",
@@ -193,7 +219,12 @@ def read_fragments_to_polars_df(
     fragments_bed_filename
         Fragments BED filename.
     engine
-        Use Polars or pyarrow to read the fragments BED file (default: `pyarrow`).
+        BED parsing engine to use to read the (gzipped) BED file.
+
+        Options:
+          - ``polars_lazy`` (fastest, low memory usage): Use Polars lazy API (``pl.scan_csv``).
+          - ``polars`` (slightly slower, highest memory usage): Use Polars eager API (``pl.read_csv``).
+          - ``pyarrow`` (slowest, high memory usage): Use pyarrow CSV reader (``pa.csv.read_csv``).
     sample_id
         Optional sample ID to append after cell barcode after removing `cb_end_to_remove`
         and appending `cb_sample_separator`.
@@ -225,12 +256,13 @@ def read_fragments_to_polars_df(
     ...     fragments_bed_filename="fragments.tsv",
     ... )
 
-    Read gzipped fragments BED file to a Polars DataFrame and add sample ID to cell
-    barcode names after removing `cb_end_to_remove` string from cell barcode and
-    appending `cb_sample_separator` to the cell barcode.
+    Read gzipped fragments BED file with Polars lazy API engine to a Polars DataFrame
+    and add sample ID to cell barcode names after removing `cb_end_to_remove` string
+    from cell barcode and appending `cb_sample_separator` to the cell barcode.
 
     >>> fragments_df_pl = read_fragments_to_polars_df(
     ...     fragments_bed_filename="fragments.tsv.gz",
+    ...     engine="polars_lazy",
     ...     sample_id="sample1",
     ...     cb_end_to_remove="-1",
     ...     cb_sample_separator="___",
