@@ -29,17 +29,18 @@ pl.enable_string_cache()
 
 def read_bed_to_polars_df(
     bed_filename: str,
-    engine: str | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
+    bed_parser_engine: str
+    | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     min_column_count: int = 3,
 ) -> pl.DataFrame:
     """
-    Read BED file to a Polars DataFrame.
+    Read (gzipped) BED file to a Polars DataFrame.
 
     Parameters
     ----------
     bed_filename
         BED filename.
-    engine
+    bed_parser_engine
         BED parsing engine to use to read the (gzipped) BED file.
 
         Options:
@@ -61,14 +62,14 @@ def read_bed_to_polars_df(
     --------
     Read BED file to Polars DataFrame with Polars lazy API engine.
 
-    >>> bed_df_pl = read_bed_to_polars_df("test.bed", engine="polars_lazy")
+    >>> bed_df_pl = read_bed_to_polars_df("test.bed", bed_parser_engine="polars_lazy")
 
     Read BED file to Polars DataFrame with Polars lazy API engine and require that the BED
     file has at least 4 columns.
 
     >>> bed_with_at_least_4_columns_df_pl = read_bed_to_polars_df(
     ...     "test.bed",
-    ...     engine="polars_lazy",
+    ...     bed_parser_engine="polars_lazy",
     ...     min_column_count=4,
     ... )
 
@@ -122,7 +123,7 @@ def read_bed_to_polars_df(
     # can be joined later, if necessary.
     pl.enable_string_cache()
 
-    if engine == "polars_lazy":
+    if bed_parser_engine == "polars_lazy":
         # Read BED file with Polars.
         bed_df_pl = pl.scan_csv(
             bed_filename,
@@ -142,7 +143,7 @@ def read_bed_to_polars_df(
                 if bed_column in bed_column_names[:column_count]
             },
         ).collect()
-    elif engine == "polars":
+    elif bed_parser_engine == "polars":
         # Read BED file with Polars.
         bed_df_pl = pl.read_csv(
             bed_filename,
@@ -163,7 +164,7 @@ def read_bed_to_polars_df(
                 if bed_column in bed_column_names[:column_count]
             },
         )
-    elif engine == "pyarrow":
+    elif bed_parser_engine == "pyarrow":
         import pyarrow as pa  # type: ignore[import]
         import pyarrow.csv  # type: ignore[import]
 
@@ -195,7 +196,7 @@ def read_bed_to_polars_df(
         )
     else:
         raise ValueError(
-            f'Unsupported engine value "{engine}" (allowed: ["polars_lazy", "polars", "pyarrow"]).'
+            f'Unsupported bed_parser_engine value "{bed_parser_engine}" (allowed: ["polars_lazy", "polars", "pyarrow"]).'
         )
 
     return bed_df_pl
@@ -203,7 +204,8 @@ def read_bed_to_polars_df(
 
 def read_fragments_to_polars_df(
     fragments_bed_filename: str,
-    engine: str | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
+    bed_parser_engine: str
+    | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     sample_id: str | None = None,
     cb_end_to_remove: str | None = "-1",
     cb_sample_separator: str | None = "___",
@@ -218,8 +220,8 @@ def read_fragments_to_polars_df(
     ----------
     fragments_bed_filename
         Fragments BED filename.
-    engine
-        BED parsing engine to use to read the (gzipped) BED file.
+    bed_parser_engine
+        BED parsing engine to use to read the (gzipped) fragments file.
 
         Options:
           - ``polars_lazy`` (fastest, low memory usage): Use Polars lazy API (``pl.scan_csv``).
@@ -262,7 +264,7 @@ def read_fragments_to_polars_df(
 
     >>> fragments_df_pl = read_fragments_to_polars_df(
     ...     fragments_bed_filename="fragments.tsv.gz",
-    ...     engine="polars_lazy",
+    ...     bed_parser_engine="polars_lazy",
     ...     sample_id="sample1",
     ...     cb_end_to_remove="-1",
     ...     cb_sample_separator="___",
@@ -271,7 +273,7 @@ def read_fragments_to_polars_df(
     """
     fragments_df_pl = read_bed_to_polars_df(
         bed_filename=fragments_bed_filename,
-        engine=engine,
+        bed_parser_engine=bed_parser_engine,
         min_column_count=4,
     ).lazy()
 
@@ -931,6 +933,8 @@ def create_fragment_matrix_from_fragments(
     sample_id: str | None = None,
     cb_end_to_remove: str | None = "-1",
     cb_sample_separator: str | None = "___",
+    bed_parser_engine: str
+    | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
 ):
     """
@@ -945,7 +949,7 @@ def create_fragment_matrix_from_fragments(
     barcodes_tsv_filename
         TSV file with selected cell barcodes after pycisTopic QC filtering.
     blacklist_bed_filename
-        BED file with blacklisted regions (Amemiya et al., 2019). Default: None.
+        BED file with blacklisted regions (Amemiya et al., 2019).
     sample_id
         Optional sample ID to append after cell barcode after removing `cb_end_to_remove`
         and appending `cb_sample_separator`.
@@ -954,10 +958,16 @@ def create_fragment_matrix_from_fragments(
     cb_sample_separator
         Add this string to the cell barcode if `sample_id` is specified, after removing
         `cb_end_to_remove` and before appending `sample_id`.
+    bed_parser_engine
+        BED parsing bed_parser_engine to use to read (gzipped) BED/fragment files.
+
+        Options:
+          - ``polars_lazy`` (fastest, low memory usage): Use Polars lazy API (``pl.scan_csv``).
+          - ``polars`` (slightly slower, highest memory usage): Use Polars eager API (``pl.read_csv``).
+          - ``pyarrow`` (slowest, high memory usage): Use pyarrow CSV reader (``pa.csv.read_csv``).
     intersection_engine
         Engine to use to calculate intersections/overlaps between fragments and regions.
         Options: ``ncls`` or ``ruranges`` (faster).
-        Default: ``ncls``.
 
     Returns
     -------
@@ -987,11 +997,10 @@ def create_fragment_matrix_from_fragments(
         cb_sample_separator=cb_sample_separator,
     )
 
-    # log.info("Reading data for " + project)
     # Read fragments file to Polars Dataframe and add sample ID to cell barcodes.
     fragments_df_pl = read_fragments_to_polars_df(
         fragments_bed_filename=fragments_bed_filename,
-        engine="pyarrow",
+        bed_parser_engine=bed_parser_engine,
         sample_id=sample_id,
         cb_end_to_remove=cb_end_to_remove,
         cb_sample_separator=cb_sample_separator,
@@ -1009,7 +1018,7 @@ def create_fragment_matrix_from_fragments(
     regions_df_pl = (
         read_bed_to_polars_df(
             bed_filename=regions_bed_filename,
-            engine="polars",
+            bed_parser_engine=bed_parser_engine,
             min_column_count=3,
         )
         .lazy()
@@ -1039,7 +1048,7 @@ def create_fragment_matrix_from_fragments(
         blacklist_df_pl = (
             read_bed_to_polars_df(
                 bed_filename=blacklist_bed_filename,
-                engine="polars",
+                bed_parser_engine=bed_parser_engine,
                 min_column_count=3,
             )
             .lazy()

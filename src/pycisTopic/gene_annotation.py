@@ -712,7 +712,7 @@ def find_most_likely_chromosome_source_in_bed(
     Examples
     --------
     >>> chrom_sizes_and_alias_hg38_df_pl = get_chrom_sizes_and_alias_mapping_from_ucsc(ucsc_assembly="hg38")
-    >>> bed_df_pl = read_bed_to_polars_df("test.bed", engine="pyarrow")
+    >>> bed_df_pl = read_bed_to_polars_df("test.bed", bed_parser_engine="polars_lazy")
     >>> best_chrom_source_name, chrom_source_stats_df_pl = find_most_likely_chromosome_source_in_bed(
     ...     chrom_sizes_and_alias_df_pl=chrom_sizes_and_alias_hg38_df_pl,
     ...     bed_df_pl=bed_df_pl,

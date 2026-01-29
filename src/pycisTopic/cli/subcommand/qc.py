@@ -27,8 +27,9 @@ def qc(
     min_fragments_per_cb: int = 10,
     collapse_duplicates: bool = True,
     no_threads: int = 8,
+    bed_parser_engine: str
+    | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
-    engine: str | Literal["polars"] | Literal["pyarrow"] = "pyarrow",
 ) -> None:
     """
     Compute quality check statistics from fragments file.
@@ -84,12 +85,18 @@ def qc(
         probability density function (PDF) values for log10 unique fragments in peaks
         vs TSS enrichment, fractions of fragments in peaks and duplication ratio.
         Default: ``8``.
+    bed_parser_engine
+        BED parsing bed_parser_engine to use to read (gzipped) BED/fragment files.
+
+        Options:
+          - ``polars_lazy`` (fastest, low memory usage): Use Polars lazy API (``pl.scan_csv``).
+          - ``polars`` (slightly slower, highest memory usage): Use Polars eager API (``pl.read_csv``).
+          - ``pyarrow`` (slowest, high memory usage): Use pyarrow CSV reader (``pa.csv.read_csv``).
+        Default: ``polars_lazy``.
     intersection_engine
         Engine to use to calculate intersections/overlaps between fragments and regions.
         Options: ``ncls`` or ``ruranges`` (faster).
         Default: ``ncls``.
-    engine
-        Use Polars or pyarrow to read BED and fragment files. Default: `pyarrow`.
 
     Returns
     -------
@@ -132,13 +139,13 @@ def qc(
     regions_df_pl = read_bed_to_polars_df(
         bed_filename=regions_bed_filename,
         min_column_count=3,
-        engine=engine,
+        bed_parser_engine=bed_parser_engine,
     )
 
     logger.info(f'Loading fragments TSV file from "{fragments_tsv_filename}".')
     fragments_df_pl = read_fragments_to_polars_df(
         fragments_tsv_filename,
-        engine=engine,
+        bed_parser_engine=bed_parser_engine,
     )
 
     logger.info("Computing QC stats.")
@@ -334,8 +341,8 @@ def run_qc_run(args):
         min_fragments_per_cb=args.min_fragments_per_cb,
         collapse_duplicates=args.collapse_duplicates,
         no_threads=args.threads,
+        bed_parser_engine=args.bed_parser_engine,
         intersection_engine=args.intersection_engine,
-        engine=args.engine,
     )
 
 
@@ -439,15 +446,19 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
     )
 
     parser_qc_run.add_argument(
-        "-e",
-        "--engine",
-        dest="engine",
+        "-b",
+        "--bed_parser_engine",
+        dest="bed_parser_engine",
         action="store",
         type=str,
-        choices=["polars", "pyarrow"],
+        choices=["polars_lazy", "polars", "pyarrow"],
         required=False,
-        default="pyarrow",
-        help="Use Polars or pyarrow to read BED and fragment files. Default: pyarrow.",
+        default="polars_lazy",
+        help="""
+            BED parsing bed_parser_engine to use to read (gzipped) BED/fragment files. 
+            Options: "polars_lazy" (fastest, low memory usage), "polars" (slightly slower, 
+            highest memory usage) or "pyarrow" (slowest, high memory usage). Default: "polars_lazy".
+            """,
     )
 
     group_qc_run_tss = parser_qc_run.add_argument_group(
