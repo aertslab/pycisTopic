@@ -497,8 +497,7 @@ def get_chrom_sizes_and_alias_mapping_from_ncbi(
         return chrom_sizes_and_alias_df_pl
     else:
         raise ValueError(
-            f"Request failed with status code: {response.status_code}.\n"
-            f"{response.text}"
+            f"Request failed with status code: {response.status_code}.\n{response.text}"
         )
 
 
@@ -939,6 +938,5 @@ def get_ncbi_assembly_accessions_for_species(species: str) -> str:
         return get_ncbi_assembly_accessions_tsv_string_io.getvalue()
     else:
         raise ValueError(
-            f"Request failed with status code: {response.status_code}.\n"
-            f"{response.text}"
+            f"Request failed with status code: {response.status_code}.\n{response.text}"
         )
