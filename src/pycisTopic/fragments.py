@@ -192,7 +192,8 @@ def read_bed_to_polars_df(
                         "Strand": pa.dictionary(pa.int32(), pa.large_string()),
                     },
                 ),
-            )
+            ),
+            rechunk=False,
         )
     else:
         raise ValueError(
