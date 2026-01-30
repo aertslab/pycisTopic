@@ -52,12 +52,14 @@ def run_macs3(
     n_cores: int
         Number of cores to use for parallel.
     """
+    print(path_to_pseudobulk_fragments)
     pseudobulk_fragment_files: dict[str, str] = {}
     for file in os.listdir(path_to_pseudobulk_fragments):
         if not file.endswith(SUFFIX):
             print(f"skipping: {file} it does not end with {SUFFIX}.")
             continue
         cell_type = file.replace(SUFFIX, "")
+        print(file)
         pseudobulk_fragment_files[cell_type] = file
 
     Parallel(n_jobs=n_cores, prefer="threads")(delayed(subprocess.run)([
