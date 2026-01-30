@@ -1232,3 +1232,76 @@ def overlap(
     )
 
     return overlap_df_pl
+
+def get_intersection_size(
+    intersect: pl.DataFrame,
+    regions1_suffix: str = "@1",
+    regions2_suffix: str = "@2", 
+) -> pl.DataFrame:
+    """
+    Calculate intersect size both in absolute terms and as a fraction of regions1 and regions2.
+
+    Parameters
+    ----------
+    intersect
+        output from intersect function with `regions1_coord=True` and `regions2_coord=True`
+    regions1_suffix
+        Suffix added to coordinate columns of first set of regions.
+    regions2_suffix
+        Suffix added to coordinate and info columns of second set of regions.
+
+    Returns
+    -------
+    Polars dataframe with:
+     - absolute intersect (nb_inter)
+     - intersect as fraction of regions1 (fr1_inter)
+     - intersect as fraction of regions2 (fr2_inter)
+
+    Examples
+    --------
+    >>> intersect
+        shape: (3, 10)
+    ┌────────────┬───────┬─────┬──────────────┬─────────┬───────┬──────────────┬─────────┬───────┬─────┐
+    │ Chromosome ┆ Start ┆ End ┆ Chromosome@1 ┆ Start@1 ┆ End@1 ┆ Chromosome@2 ┆ Start@2 ┆ End@2 ┆ ID  │
+    │ ---        ┆ ---   ┆ --- ┆ ---          ┆ ---     ┆ ---   ┆ ---          ┆ ---     ┆ ---   ┆ --- │
+    │ str        ┆ i64   ┆ i64 ┆ str          ┆ i64     ┆ i64   ┆ str          ┆ i64     ┆ i64   ┆ str │
+    ╞════════════╪═══════╪═════╪══════════════╪═════════╪═══════╪══════════════╪═════════╪═══════╪═════╡
+    │ chr1       ┆ 2     ┆ 3   ┆ chr1         ┆ 1       ┆ 3     ┆ chr1         ┆ 2       ┆ 9     ┆ a   │
+    ├╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌┼╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌┼╌╌╌╌╌┤
+    │ chr1       ┆ 2     ┆ 3   ┆ chr1         ┆ 1       ┆ 3     ┆ chr1         ┆ 2       ┆ 3     ┆ a   │
+    ├╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌┼╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌┼╌╌╌╌╌┤
+    │ chr1       ┆ 4     ┆ 9   ┆ chr1         ┆ 4       ┆ 9     ┆ chr1         ┆ 2       ┆ 9     ┆ b   │
+    └────────────┴───────┴─────┴──────────────┴─────────┴───────┴──────────────┴─────────┴───────┴─────┘
+
+    >>> get_intersection_size(intersect)
+        shape: (3, 13)
+    ┌────────────┬───────┬─────┬───────────┬───┬─────┬──────────┬───────────┬───────────┐
+    │ Chromosome ┆ Start ┆ End ┆ Chromosom ┆ … ┆ ID  ┆ nb_inter ┆ fr1_inter ┆ fr2_inter │
+    │ ---        ┆ ---   ┆ --- ┆ e@1       ┆   ┆ --- ┆ ---      ┆ ---       ┆ ---       │
+    │ str        ┆ i64   ┆ i64 ┆ ---       ┆   ┆ str ┆ i64      ┆ f64       ┆ f64       │
+    │            ┆       ┆     ┆ str       ┆   ┆     ┆          ┆           ┆           │
+    ╞════════════╪═══════╪═════╪═══════════╪═══╪═════╪══════════╪═══════════╪═══════════╡
+    │ chr1       ┆ 2     ┆ 3   ┆ chr1      ┆ … ┆ a   ┆ 1        ┆ 0.5       ┆ 0.142857  │
+    │ chr1       ┆ 2     ┆ 3   ┆ chr1      ┆ … ┆ a   ┆ 1        ┆ 0.5       ┆ 1.0       │
+    │ chr1       ┆ 4     ┆ 9   ┆ chr1      ┆ … ┆ b   ┆ 5        ┆ 1.0       ┆ 0.714286  │
+    └────────────┴───────┴─────┴───────────┴───┴─────┴──────────┴───────────┴───────────┘ 
+
+    """
+    intersect = intersect.with_columns(
+        nb_inter = (
+            pl.col("End") - pl.col("Start")
+        )
+    )
+    intersect = intersect.with_columns(
+        fr1_inter = (
+            pl.col("nb_inter") / (pl.col(f"End{regions1_suffix}") - pl.col(f"Start{regions1_suffix}"))
+        )
+    )
+    intersect = intersect.with_columns(
+        fr2_inter = (
+            pl.col("nb_inter") / (pl.col(f"End{regions2_suffix}") - pl.col(f"Start{regions2_suffix}"))
+        )
+    )
+    return intersect
+
+
