@@ -1,17 +1,57 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import numpy as np
+import numpy.typing as npt
+from ctxcore.aucell import aucell4r  # type: ignore
+from ctxcore.genesig import GeneSignature  # type: ignore
 
-import pyranges as pr
-from ctxcore.genesig import GeneSignature
-from pyscenic.aucell import aucell4r
+from pycisTopic.genomic_ranges import intersection
 
-if TYPE_CHECKING:
-    from pycisTopic.diff_features import CistopicImputedFeatures
 
-# FIXME
-from .diff_features import *
-from .utils import *
+def signature_enrichment(
+    region_topic: npt.NDArray[np.float32],
+    cell_topic: npt.NDArray[np.float32],
+    region_names: list[str],
+    signatures: dict[str, list[str]],
+    chunk_size: int,
+    normalize: bool,
+    n_cpu: int = 1
+) -> dict[str, npt.NDArray[np.float32]]:
+    """
+    Calculate enrichment of region signatures in cells using AUCell (Van de Sande et al., 2020).
+
+    Parameters
+    ----------
+    region_topic
+        Region topic matrix (regions x topics).
+    cell_topic
+        Cell topic matrix (topic x cells).
+    region_names
+        List of region names corresponding to region_topic.
+    signatures
+        Dictionary of signatures in the form {"name": ["chr:start-end"]}.
+    chunk_size
+        The number of cells to process at once.
+    normalize: bool
+        Normalize the AUC values to a maximum of 1.0 per regulon. Default: False
+    n_cpu: int
+        The number of cores to use.
+
+    Returns
+    -------
+    A dictionary of numpy arrays, one entry per signature, containing
+    AUCell values across cells.
+
+    """
+    aucell_values: dict[str, npt.NDArray[np.float32]] = {}
+
+    if len(region_names) != region_topic.shape[0]:
+        raise ValueError(
+            f"Length of the region names ({len(region_names)}) "
+            f"does not match the shape of region_topic {region_topic.shape}"
+        )
+
+    return aucell_values
 
 
 def signature_enrichment(
