@@ -27,11 +27,12 @@ def get_all_gene_annotation_ensembl_biomart_dataset_names(
     Parameters
     ----------
     biomart_host
-        BioMart host URL to use.
-          - Default: ``http://www.ensembl.org``
-          - Archived Ensembl BioMart URLs:
-            https://www.ensembl.org/info/website/archives/index.html
-            (List of currently available archives)
+        BioMart host URL to use. Ensure that the assembly version used by Ensembl
+        BioMart matches the (equivalent) assembly version you expect.
+        Table of BioMart archives with list of supported assemblies per species:
+        https://www.ensembl.org/info/website/archives/assembly.html.
+        e.g.: For mouse GRCm38 (mm10) use ``http://nov2020.archive.ensembl.org``.
+        Default: ``http://www.ensembl.org``.
     use_cache
         Whether to cache requests to Ensembl BioMart server.
 
@@ -45,11 +46,17 @@ def get_all_gene_annotation_ensembl_biomart_dataset_names(
 
     Examples
     --------
+    Latest Ensembl BioMart datasets:
+
     >>> biomart_latest_datasets = get_all_biomart_ensembl_dataset_names(
     ...    biomart_host="http://www.ensembl.org",
     ... )
-    >>> biomart_jul2022_datasets = get_all_biomart_ensembl_dataset_names(
-    ...     biomart_host="http://jul2022.archive.ensembl.org/",
+
+    Ensembl BioMart archive from November 2020 which contains mouse GRCm38 (mm10)
+    assembly:
+
+    >>> biomart_nov2020_datasets = get_tss_annotation_from_ensembl(
+    ...    biomart_host="http://nov2020.archive.ensembl.org",
     ... )
 
     """
@@ -122,11 +129,12 @@ def get_tss_annotation_from_ensembl(
         ``hsapiens_gene_ensembl``, ``mmusculus_gene_ensembl``,
         ``dmelanogaster_gene_ensembl``, ...
     biomart_host
-        BioMart host URL to use.
-          - Default: ``http://www.ensembl.org``
-          - Archived Ensembl BioMart URLs:
-            https://www.ensembl.org/info/website/archives/index.html
-            (List of currently available archives)
+        BioMart host URL to use. Ensure that the assembly version used by Ensembl
+        BioMart matches the (equivalent) assembly version you expect.
+        Table of BioMart archives with list of supported assemblies per species:
+        https://www.ensembl.org/info/website/archives/assembly.html.
+        e.g.: For mouse GRCm38 (mm10) use ``http://nov2020.archive.ensembl.org``.
+        Default: ``http://www.ensembl.org``.
     transcript_type
         Only keep list of specified transcript types (e.g.: ``["protein_coding"]``) or
         all (``None``).
@@ -145,12 +153,29 @@ def get_tss_annotation_from_ensembl(
 
     Examples
     --------
+    Latest human TSS annotation from Ensembl BioMart.
+
     >>> tss_annotation_bed_df_pl = get_tss_annotation_from_ensembl(
     ...     biomart_name="hsapiens_gene_ensembl"
     ... )
+
+    Human TSS annotation from Ensembl BioMart from July 2022.
     >>> tss_annotation_jul2022_bed_df_pl = get_tss_annotation_from_ensembl(
     ...     biomart_name="hsapiens_gene_ensembl",
     ...     biomart_host="http://jul2022.archive.ensembl.org/",
+    ... )
+
+    Latest mouse TSS annotation from Ensembl BioMart.
+
+    >>> tss_annotation_GRCm39_bed_df_pl = get_tss_annotation_from_ensembl(
+    ...    biomart_name="mmusculus_gene_ensembl",
+    ... )
+
+    GRCm38 (mm10) mouse TSS annotation from Ensembl BioMart.
+
+    >>> tss_annotation_nov2020_GRCm38_bed_df_pl = get_tss_annotation_from_ensembl(
+    ...    biomart_name="mmusculus_gene_ensembl",
+    ...    biomart_host="http://nov2020.archive.ensembl.org",
     ... )
 
     """

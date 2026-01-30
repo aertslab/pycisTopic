@@ -18,10 +18,7 @@ pl.enable_string_cache()
 def get_tss_annotation_bed_file(
     tss_annotation_bed_filename: str | Path,
     biomart_name: str,
-    to_chrom_source_name: Literal["ucsc"]
-    | Literal["refseq"]
-    | Literal["genbank"]
-    | None = None,
+    to_chrom_source_name: Literal["ucsc", "refseq", "genbank"] | None = None,
     chrom_sizes_and_alias_tsv_filename: str | Path | None = None,
     ncbi_accession_id: str | None = None,
     ucsc_assembly: str | None = None,
@@ -50,8 +47,8 @@ def get_tss_annotation_bed_file(
         ``hsapiens_gene_ensembl``, ``mmusculus_gene_ensembl``,
         ``dmelanogaster_gene_ensembl``, ...
     to_chrom_source_name
-        If defined, remap Ensembl chromosome names to UCSC ("ucsc"), RefSeq("refseq" or
-        GenBank ("genbank") chromosome names.
+        If defined, remap Ensembl chromosome names to UCSC (``ucsc``), RefSeq
+        (``refseq``) or GenBank (``genbank``) chromosome names.
     chrom_sizes_and_alias_tsv_filename
         If chromosome sizes and alias TSV file exist, read chromosme sizes and alias
         mapping from the file. If chromosome sizes and alias TSV file does not exist
@@ -63,18 +60,20 @@ def get_tss_annotation_bed_file(
         will be used to build chromosome sizes and alias mapping, which can be used to
         map Ensembl chromosome names (from TSS annotation) to UCSC, RefSeq or GenBank
         chromosome names.
-        e.g.: "GCF_000001405.40", "GCF_000001215.4", "GCF_000001215.4", ...
+        e.g.: ``GCF_000001405.40``, ``GCF_000001215.4``, ``GCF_000001215.4``, ...
     ucsc_assembly
         UCSC genome accession ID for which to retrieve chromosome sizes and alias
         mapping, which can be used to map Ensembl chromosome names (from TSS
         annotation) to UCSC, RefSeq or GenBank chromosome names.
-        e.g.: "hg38", "mm10", "dm6", ...
+        e.g.: ``hg38``, ``mm10``, ``dm6``, ...
     biomart_host
-        BioMart host URL to use.
-          - Default: ``http://www.ensembl.org``
-          - Archived Ensembl BioMart URLs:
-            https://www.ensembl.org/info/website/archives/index.html
-            (List of currently available archives)
+        BioMart host URL to use. Ensure that the assembly version used by Ensembl
+        BioMart matches the (equivalent) assembly version of the specified
+        `ncbi_accession_id` / `ucsc_assembly` / input files.
+        Table of BioMart archives with list of supported assemblies per species:
+        https://www.ensembl.org/info/website/archives/assembly.html.
+        e.g.: For mouse GRCm38 (mm10) use ``http://nov2020.archive.ensembl.org``.
+        Default: ``http://www.ensembl.org``.
     transcript_type
         Only keep list of comma separated transcript types
         (e.g.: ``["protein_coding", "pseudogene"]``) or all (``None``).
@@ -106,13 +105,26 @@ def get_tss_annotation_bed_file(
     ...    biomart_name="hsapiens_gene_ensembl",
     ... )
 
-    Get TSS annotation BED file for human from a specific version of Ensembl
-    BioMart.
+    Get TSS annotation BED file for human from a specific version of
+    Ensembl BioMart.
 
     >>> get_tss_annotation_bed_file(
     ...    tss_annotation_bed_filename="hg38.ensembl_jul20222.tss.bed",
     ...    biomart_name="hsapiens_gene_ensembl",
-    ...    biomart_host="http://jul2022.archive.ensembl.org/",
+    ...    biomart_host="http://jul2022.archive.ensembl.org",
+    ... )
+
+    Get TSS annotation BED file for GRCm38 (mm10) mouse by using a
+    specific version of Ensembl BioMart as more recent versions of
+    Ensembl BioMart use GRCm39. Therefor it is always recommended
+    to check the table of BioMart archives with list of supported
+    assemblies per species:
+    https://www.ensembl.org/info/website/archives/assembly.html.
+
+    >>> get_tss_annotation_bed_file(
+    ...    tss_annotation_bed_filename="mm10.ensembl_nov2020.tss.bed",
+    ...    biomart_name="mmusculus_gene_ensembl",
+    ...    biomart_host="http://nov2020.archive.ensembl.org",
     ... )
 
     Get TSS annotation BED file for human from Ensembl BioMart and remap Ensembl
@@ -270,11 +282,12 @@ def get_species_gene_annotation_ensembl_biomart_dataset_names(
         Filter list of all avaliable gene annotation Ensembl BioMart dataset names
         by species.
     biomart_host
-        BioMart host URL to use.
-          - Default: ``http://www.ensembl.org``
-          - Archived Ensembl BioMart URLs:
-            https://www.ensembl.org/info/website/archives/index.html
-            (List of currently available archives)
+        BioMart host URL to use. Ensure that the assembly version used by Ensembl
+        BioMart matches the (equivalent) assembly version you expect. "
+        Table of BioMart archives with list of supported assemblies per species:
+        https://www.ensembl.org/info/website/archives/assembly.html.
+        e.g.: For mouse GRCm38 (mm10) use ``http://nov2020.archive.ensembl.org``.
+        Default: ``http://www.ensembl.org``.,
     use_cache
         Whether to cache requests to Ensembl BioMart server.
 
@@ -593,10 +606,16 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         type=str,
         required=False,
         default="http://www.ensembl.org",
-        help='BioMart host URL to use. Default: "http://www.ensembl.org". '
-        "Archived Ensembl BioMart URLs: "
-        "https://www.ensembl.org/info/website/archives/index.html "
-        "(List of currently available archives).",
+        help="""
+        BioMart host URL to use.
+        Ensure that the assembly version used by Ensembl
+        BioMart matches the (equivalent) assembly version of the specified
+        ncbi_accession_id / ucsc_assembly / input files.
+        Table of BioMart archives with list of supported assemblies per species:
+        https://www.ensembl.org/info/website/archives/assembly.html.
+        e.g.: For mouse mm10 (GRCm38) use: "http://nov2020.archive.ensembl.org".
+        Default: "http://www.ensembl.org".
+        """,
     )
 
     group_tgt_biomart.add_argument(
@@ -613,7 +632,9 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
 
     group_tgt_remap_chroms = parser_tss_get_tss.add_argument_group(
         "Remap chromosomes",
-        "Remap Ensembl chromosome names in TSS file to UCSC, RefSeq or GenBank chromosome names.",
+        "Remap Ensembl chromosome names in TSS file to UCSC, RefSeq or GenBank "
+        "chromosome names. Make sure the assembly version used by Ensembl BioMart "
+        "matches the equivalent assembly in NCBI or UCSC.",
     )
 
     group_tgt_remap_chroms.add_argument(
@@ -632,7 +653,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         action="store",
         type=str,
         required=False,
-        help="Read/write chromosome sizes and alias TSV file with chromosome sizes and"
+        help="Read/write chromosome sizes and alias TSV file with chromosome sizes and "
         "alias mappings, which can be used to map Ensembl chromosome names (from TSS "
         "annotation) to UCSC, RefSeq or GenBank chromosome names. Read from chromosome "
         'sizes and alias TSV file if "--ncbi" and "--ucsc" are not specified and write '
@@ -697,10 +718,15 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         type=str,
         required=False,
         default="http://www.ensembl.org",
-        help='BioMart host URL to use. Default: "http://www.ensembl.org". '
-        "Archived Ensembl BioMart URLs: "
-        "https://www.ensembl.org/info/website/archives/index.html "
-        "(List of currently available archives).",
+        help="""
+        BioMart host URL to use.
+        Ensure that the assembly version used by Ensembl
+        BioMart matches the (equivalent) assembly version you expect.
+        Table of BioMart archives with list of supported assemblies per species:
+        https://www.ensembl.org/info/website/archives/assembly.html.
+        e.g.: For mouse GRCm38 (mm10) use: "http://nov2020.archive.ensembl.org".
+        Default: "http://www.ensembl.org".
+        """,
     )
 
     group_tgal_biomart.add_argument(
@@ -762,7 +788,8 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         required=False,
         help="Write chromosome sizes and alias TSV file with chromosome sizes and "
         "alias mapping, which can be used to map Ensembl chromosome names (from TSS "
-        "annotation) to UCSC, RefSeq or GenBank chromosome names.",
+        "annotation) to UCSC, RefSeq or GenBank chromosome names. "
+        'e.g.: "GCF_000001405.40.chrom_sizes_and_alias.tsv".',
     )
 
     parser_tss_get_ucsc_chrom_sizes_and_alias_mapping = subparser_tss.add_parser(
@@ -790,8 +817,9 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         dest="chrom_sizes_and_alias_tsv_filename",
         action="store",
         type=str,
-        required=False,
+        required=True,
         help="Write chromosome sizes and alias TSV file with chromosome sizes and "
         "alias mapping, which can be used to map Ensembl chromosome names (from TSS "
-        "annotation) to UCSC, RefSeq or GenBank chromosome names.",
+        "annotation) to UCSC, RefSeq or GenBank chromosome names. "
+        'e.g.: "hg38.chrom_sizes_and_alias.tsv".',
     )
