@@ -47,7 +47,21 @@ def run_macs3(
         cell_type = file.replace(SUFFIX, "")
         pseudobulk_fragment_files[cell_type] = file
 
-    Parallel(n_jobs=n_cores, prefer="threads")(delayed(subprocess.run)(frag) for frag in pseudobulk_fragment_files.values())
+    Parallel(n_jobs=n_cores, prefer="threads")(delayed(subprocess.run)([
+        macs3_exe,
+        'callpeak',
+        '--treatment', frag_file,
+        '--name', cell_type,
+        '--format', 'FRAG',
+        '-g', str(genome_size),
+        '-q', str(q_value_threshold),
+        '--shift', str(shift),
+        '--extsize', str(extsize),
+        'max-count','1',
+        '--nolambda',
+        '--nomodel',
+        '--call-summits'       
+        ]) for cell_type, frag_file in pseudobulk_fragment_files.items())
 
 
 def add_parser_peak_calling(subparsers):
