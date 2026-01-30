@@ -1,236 +1,118 @@
 # Configuration file for the Sphinx documentation builder.
 #
-# This file only contains a selection of the most common options. For a full
-# list see the documentation:
+# For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Path setup --------------------------------------------------------------
-
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-
-import datetime
-import inspect
-import os
-import re
 import sys
-import warnings
+import os
+from datetime import datetime
+from importlib.metadata import metadata
+from pathlib import Path
 
-import sphinx_autosummary_accessors
-
-# add polars directory
-sys.path.insert(0, os.path.abspath("../.."))
+HERE = Path(__file__).parent
+sys.path.insert(0, "../../src/pycisTopic")
 
 # -- Project information -----------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "pycisTopic"
-author = "Carmen Bravo González-Blas, Gert Hulselmans"
-copyright = f"{datetime.date.today().year}, {author}"
+info = metadata("pycisTopic")
 
+project = 'pycisTopic'
+release = info['Version']
+repository_url = "https://github.com/aertslab/pycisTopic/"
+project_name = info["Name"]
+author = "Stein Aerts Lab"
+copyright = f"{datetime.now():%Y}, {author}."
+version = info["Version"]
+urls = dict(pu.split(", ") for pu in info.get_all("Project-URL"))
+bibtex_bibfiles = ["references.bib"]
+templates_path = ["_templates"]
+nitpicky = True  # Warn about broken links
+needs_sphinx = "4.0"
 
 # -- General configuration ---------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-# Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
+# Add any Sphinx extension module names here, as strings.
+# They can be extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
+
 extensions = [
-    # ----------------------
-    # sphinx extensions
-    # ----------------------
-    "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
-    "sphinx.ext.coverage",
-    "sphinx.ext.doctest",
-    "sphinx.ext.extlinks",
-    "sphinx.ext.ifconfig",
-    "sphinx.ext.intersphinx",
-    "sphinx.ext.linkcode",
-    "sphinx.ext.mathjax",
-    "sphinx.ext.todo",
-    # ----------------------
-    # third-party extensions
-    # ----------------------
-    "nbsphinx",
-    "autodocsumm",
-    "numpydoc",
-    "sphinx_autosummary_accessors",
+    "myst_nb",
     "sphinx_copybutton",
-    "sphinx_design",
-    "sphinx_favicon",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.napoleon",
+    "sphinxcontrib.bibtex",
+    "sphinx_autodoc_typehints",
+    "sphinx.ext.mathjax",
+    "IPython.sphinxext.ipython_console_highlighting",
+    "sphinxext.opengraph",
+    *[p.stem for p in (HERE / "extensions").glob("*.py")],
 ]
 
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates", sphinx_autosummary_accessors.templates_path]
+autosummary_generate = True
+autodoc_member_order = "groupwise"
+bibtex_reference_style = "author_year"
+default_role = "literal"
+napoleon_google_docstring = False
+napoleon_numpy_docstring = True
+napoleon_include_init_with_doc = False
+napoleon_use_rtype = True  # having a separate entry generally helps readability
+napoleon_use_param = True
+myst_heading_anchors = 6  # create anchors for h1-h6
+myst_enable_extensions = [
+    "amsmath",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "html_image",
+    "html_admonition",
+]
+myst_url_schemes = ("http", "https", "mailto")
+nb_output_stderr = "remove"
+nb_execution_mode = "off"
+nb_merge_streams = True
+typehints_defaults = "braces"
+
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".ipynb": "myst-nb",
+    ".myst": "myst-nb",
+}
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "pandas": ("http://pandas.pydata.org/pandas-docs/stable/", None),
+    "polars": ("https://pola-rs.github.io/polars/py-polars/html/", None),
+    "pyarrow": ("https://arrow.apache.org/docs/", None),
+    "pyranges": ("https://pyranges.readthedocs.io/en/latest/", None),
+}
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
+
 
 
 # -- Options for HTML output -------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-
-# html_theme = "pydata_sphinx_theme"
-html_theme = "sphinx_rtd_theme"
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_theme = "sphinx_book_theme"
+html_static_path = ['_static']
 html_css_files = ["css/custom.css"]  # relative to html_static_path
 html_show_sourcelink = False
 
-# adds useful copy functionality to all the examples; also
-# strips the '>>>' and '...' prompt/continuation prefixes.
-copybutton_prompt_text = r">>> |\.\.\. "
-copybutton_prompt_is_regexp = True
+html_logo = "https://raw.githubusercontent.com/aertslab/scenicplus/development/docs/images/SCENIC%2B_Logo_v5_no_text.png"
 
-autosummary_generate = True
-numpydoc_show_class_members = False
+html_title = info["Name"]
 
 html_theme_options = {
-    "external_links": [
-        {
-            "name": "User Guide",
-            "url": "https://pola-rs.github.io/polars-book/user-guide/index.html",
-        },
-        {"name": "Powered by Xomnia", "url": "https://www.xomnia.com/"},
-    ],
-    "icon_links": [
-        {
-            "name": "GitHub",
-            "url": "https://github.com/aertslab/pycisTopic",
-            "icon": "fa-brands fa-github",
-        },
-    ],
-    "logo": {
-        "image_light": "https://raw.githubusercontent.com/aertslab/scenicplus/development/docs/images/SCENIC%2B_Logo_v5_no_text.png",
-        "image_dark": "https://raw.githubusercontent.com/aertslab/scenicplus/development/docs/images/SCENIC%2B_Logo_v5_no_text.png",
-    },
+    "repository_url": repository_url,
+    "use_repository_button": True,
+    "path_to_docs": "docs/",
+    "navigation_with_keys": False,
 }
 
-favicons = [
-    {
-        "rel": "icon",
-        "sizes": "32x32",
-        "href": "https://raw.githubusercontent.com/pola-rs/polars-static/master/icons/favicon-32x32.png",
-    },
-    {
-        "rel": "apple-touch-icon",
-        "sizes": "180x180",
-        "href": "https://raw.githubusercontent.com/pola-rs/polars-static/master/icons/touchicon-180x180.png",
-    },
-]
-
-intersphinx_mapping = {
-    "numpy": ("https://numpy.org/doc/stable/", None),
-    "pandas": ("https://pandas.pydata.org/docs/", None),
-    "polars": ("https://pola-rs.github.io/polars/py-polars/html/", None),
-    "pyarrow": ("https://arrow.apache.org/docs/", None),
-    "pyranges": ("https://pyranges.readthedocs.io/en/latest/autoapi/", None),
-    "python": ("https://docs.python.org/3", None),
-}
-
-
-def linkcode_resolve(domain, info):
-    """
-    Determine the URL corresponding to Python object.
-
-    Based on pandas equivalent:
-    https://github.com/pandas-dev/pandas/blob/main/doc/source/conf.py#L629-L686
-    """
-    if domain != "py":
-        return None
-
-    modname = info["module"]
-    fullname = info["fullname"]
-
-    submod = sys.modules.get(modname)
-    if submod is None:
-        return None
-
-    obj = submod
-    for part in fullname.split("."):
-        try:
-            with warnings.catch_warnings():
-                # Accessing deprecated objects will generate noisy warnings
-                warnings.simplefilter("ignore", FutureWarning)
-                obj = getattr(obj, part)
-        except AttributeError:
-            return None
-
-    try:
-        fn = inspect.getsourcefile(inspect.unwrap(obj))
-    except TypeError:
-        try:  # property
-            fn = inspect.getsourcefile(inspect.unwrap(obj.fget))
-        except (AttributeError, TypeError):
-            fn = None
-    if not fn:
-        return None
-
-    try:
-        source, lineno = inspect.getsourcelines(obj)
-    except TypeError:
-        try:  # property
-            source, lineno = inspect.getsourcelines(obj.fget)
-        except (AttributeError, TypeError):
-            lineno = None
-    except OSError:
-        lineno = None
-
-    linespec = f"#L{lineno}-L{lineno + len(source) - 1}" if lineno else ""
-
-    conf_dir_path = os.path.dirname(os.path.realpath(__file__))
-    polars_root = os.path.abspath(f"{conf_dir_path}/../../pycisTopic")
-
-    fn = os.path.relpath(fn, start=polars_root)
-
-    return (
-        f"https://github.com/aertslab/pycisTopic/blob/polars/pycisTopic/{fn}{linespec}"
-    )
-
-
-def _minify_classpaths(s: str) -> str:
-    # strip private polars classpaths, leaving the classname:
-    # * "pl.Expr" -> "Expr"
-    # * "polars.expr.expr.Expr" -> "Expr"
-    # * "polars.lazyframe.frame.LazyFrame" -> "LazyFrame"
-    # also:
-    # * "datetime.date" => "date"
-    s = s.replace("datetime.", "")
-    return re.sub(
-        pattern=r"""
-        ~?
-        (
-          (?:pl|
-            (?:polars\.
-              (?:_reexport|datatypes)
-            )
-          )
-          (?:\.[a-z.]+)?\.
-          ([A-Z][\w.]+)
-        )
-        """,
-        repl=r"\2",
-        string=s,
-        flags=re.VERBOSE,
-    )
-
-
-def process_signature(app, what, name, obj, opts, sig, ret):
-    #    return (
-    #        _minify_classpaths(sig) if sig else sig,
-    #        _minify_classpaths(ret) if ret else ret,
-    #    )
-    return sig, ret
-
-
-def setup(app):
-    # TODO: a handful of methods do not seem to trigger the event for
-    #  some reason (possibly @overloads?) - investigate further...
-    app.connect("autodoc-process-signature", process_signature)
