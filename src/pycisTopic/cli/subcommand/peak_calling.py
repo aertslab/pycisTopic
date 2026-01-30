@@ -71,7 +71,7 @@ def run_macs3(
         '-q', str(q_value_threshold),
         '--shift', str(shift),
         '--extsize', str(extsize),
-        'max-count','1',
+        '--max-count','1',
         '--nolambda',
         '--nomodel',
         '--call-summits'       
