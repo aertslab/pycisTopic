@@ -13,6 +13,7 @@ SUFFIX = ".fragments.tsv.gz"
 def run_macs3(
     macs3_exe: str,
     path_to_pseudobulk_fragments: str,
+    outdir: str,
     genome_size: int,
     q_value_threshold: float,
     shift: int,
@@ -53,6 +54,7 @@ def run_macs3(
         '--treatment', frag_file,
         '--name', cell_type,
         '--format', 'FRAG',
+        '--outdir', outdir,
         '-g', str(genome_size),
         '-q', str(q_value_threshold),
         '--shift', str(shift),
@@ -118,26 +120,26 @@ def add_parser_peak_calling(subparsers):
         help="Save output files into specified folder, created anew if necessary"
     )
 
-    parser_peak_calling.add_argument(
-        "--format",
-        dest="format",
-        choices=[
-            "ELAND",
-            "BED",
-            "ELANDMULTI",
-            "ELANDEXPORT",
-            "SAM",
-            "BAM",
-            "BOWTIE",
-            "BAMPE",
-            "BEDPE",
-            "FRAG",
-        ],
-        action="store",
-        type=str,
-        help="Fornat of tag file; ELAND, BED, ELANDMULTI, ELANDEXPORT, SAM, BAM, BOWTIE, BAMPE, BEDPE, or FRAG. Default FRAG",
-        default='FRAG'
-    )
+    # parser_peak_calling.add_argument(
+    #     "--format",
+    #     dest="format",
+    #     choices=[
+    #         "ELAND",
+    #         "BED",
+    #         "ELANDMULTI",
+    #         "ELANDEXPORT",
+    #         "SAM",
+    #         "BAM",
+    #         "BOWTIE",
+    #         "BAMPE",
+    #         "BEDPE",
+    #         "FRAG",
+    #     ],
+    #     action="store",
+    #     type=str,
+    #     help="Fornat of tag file; ELAND, BED, ELANDMULTI, ELANDEXPORT, SAM, BAM, BOWTIE, BAMPE, BEDPE, or FRAG. Default FRAG",
+    #     default='FRAG'
+    # )
 
     parser_peak_calling.add_argument(
         "-g",
@@ -149,14 +151,14 @@ def add_parser_peak_calling(subparsers):
         default=1368780147
     )
 
-    parser_peak_calling.add_argument(
-        "--max-count",
-        dest="max_count",
-        action="store",
-        type=int,
-        help="value 1 prevents counting fragments twice with --format FRAG, default 1",
-        default=1
-    )
+    # parser_peak_calling.add_argument(
+    #     "--max-count",
+    #     dest="max_count",
+    #     action="store",
+    #     type=int,
+    #     help="value 1 prevents counting fragments twice with --format FRAG, default 1",
+    #     default=1
+    # )
 
     parser_peak_calling.add_argument(
         "-q",
@@ -168,14 +170,14 @@ def add_parser_peak_calling(subparsers):
         default=0.05
     )
 
-    parser_peak_calling.add_argument(
-        "--nomodel",
-        dest="nomodel",
-        action="store",
-        type=bool,
-        help="While on, MACS3 will bypass building the shifting model. Also use --extsize and --shift",
-        default=True
-    )
+    # parser_peak_calling.add_argument(
+    #     "--nomodel",
+    #     dest="nomodel",
+    #     action="store",
+    #     type=bool,
+    #     help="While on, MACS3 will bypass building the shifting model. Also use --extsize and --shift",
+    #     default=True
+    # )
 
     parser_peak_calling.add_argument(
         "--shift",
@@ -195,20 +197,20 @@ def add_parser_peak_calling(subparsers):
         default=146
     )
 
-    parser_peak_calling.add_argument(
-        "--nolambda",
-        dest="nolambda",
-        action="store",
-        type=bool,
-        help="With this flag on, MACS3 will use the background lambda as local lambda.",
-        default=True
-    )
+    # parser_peak_calling.add_argument(
+    #     "--nolambda",
+    #     dest="nolambda",
+    #     action="store",
+    #     type=bool,
+    #     help="With this flag on, MACS3 will use the background lambda as local lambda.",
+    #     default=True
+    # )
 
-    parser_peak_calling.add_argument(
-        "--call-summits",
-        dest="summits",
-        action="store",
-        type=bool,
-        help="Ddeconvolve subpeaks within each peak called.",
-        default=True
-    )
+    # parser_peak_calling.add_argument(
+    #     "--call-summits",
+    #     dest="summits",
+    #     action="store",
+    #     type=bool,
+    #     help="Ddeconvolve subpeaks within each peak called.",
+    #     default=True
+    # )
