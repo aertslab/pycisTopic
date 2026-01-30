@@ -214,3 +214,7 @@ def add_parser_peak_calling(subparsers):
     #     help="Ddeconvolve subpeaks within each peak called.",
     #     default=True
     # )
+
+    parser_peak_calling.set_defaults(
+        func=run_macs3
+    )
