@@ -10,6 +10,18 @@ if TYPE_CHECKING:
 
 SUFFIX = ".fragments.tsv.gz"
 
+def run_macs_callback(args):
+    run_macs3(
+        args.macs3_exe,
+        args.path_to_pseudobulk_fragments,
+        args.outdir,
+        args.genome_size,
+        args.q_value_threshold,
+        args.shift,
+        args.extsize,
+        args.n_cores
+        )
+
 def run_macs3(
     macs3_exe: str,
     path_to_pseudobulk_fragments: str,
@@ -216,5 +228,5 @@ def add_parser_peak_calling(subparsers):
     # )
 
     parser_peak_calling.set_defaults(
-        func=run_macs3
+        func=run_macs_callback
     )
