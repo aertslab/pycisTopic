@@ -91,24 +91,23 @@ def add_parser_peak_calling(subparsers):
     )
 
     parser_peak_calling.add_argument(
-        "-t",
-        "--treatment",
+        "--bulk_path",
         dest="path_to_pseudobulk_fragments",
-        nargs='+',
+        type=str,
         action="store",
         required=True,
-        help="Alignment files (parallelized)",
+        help="Path to directory containing fragment files",
     )
 
-    parser_peak_calling.add_argument(
-        "-n",
-        "--name",
-        dest="name",
-        action="store",
-        type=str,
-        required=True,
-        help=""
-    )
+    # parser_peak_calling.add_argument(
+    #     "-n",
+    #     "--name",
+    #     dest="name",
+    #     action="store",
+    #     type=str,
+    #     required=True,
+    #     help=""
+    # )
 
     parser_peak_calling.add_argument(
         "--outdir",
