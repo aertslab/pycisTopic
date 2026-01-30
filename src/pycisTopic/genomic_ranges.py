@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, overload, Callable
+from typing import TYPE_CHECKING, Literal, overload
 
 import polars as pl
 
@@ -550,7 +550,7 @@ def _filter_intersection_output_columns(
     regions2_coord: bool,
     regions1_suffix: str,
     regions2_suffix: str,
-    add_overlap_size: bool 
+    add_overlap_size: bool,
 ) -> pl.DataFrame: ...
 
 
@@ -563,7 +563,7 @@ def _filter_intersection_output_columns(
     regions2_coord: bool,
     regions1_suffix: str,
     regions2_suffix: str,
-    add_overlap_size: bool
+    add_overlap_size: bool,
 ) -> pl.LazyFrame: ...
 
 
@@ -575,7 +575,7 @@ def _filter_intersection_output_columns(
     regions2_coord: bool,
     regions1_suffix: str,
     regions2_suffix: str,
-    add_overlap_size: bool
+    add_overlap_size: bool,
 ) -> pl.DataFrame | pl.LazyFrame:
     """
     Filter intersection output columns.
@@ -688,7 +688,7 @@ def _get_intersection_size(
     Parameters
     ----------
     intersect
-        output from intersect function with `regions1_coord=True` and `regions2_coord=True`
+        output from intersect function.
     regions1_suffix
         Suffix added to coordinate columns of first set of regions.
     regions2_suffix
@@ -697,9 +697,9 @@ def _get_intersection_size(
     Returns
     -------
     Polars dataframe with:
-     - absolute intersect (nb_inter)
-     - intersect as fraction of regions1 (fr1_inter)
-     - intersect as fraction of regions2 (fr2_inter)
+     - absolute intersect (`nb_inter`)
+     - intersect as fraction of regions1 (`fr1_inter`)
+     - intersect as fraction of regions2 (`fr2_inter`)
 
     Examples
     --------
@@ -755,7 +755,7 @@ def intersection(
     regions1_suffix: str = "@1",
     regions2_suffix: str = "@2",
     engine: Literal["ncls", "ruranges"] = "ncls",
-    add_overlap_size: bool = False
+    add_overlap_size: bool = False,
 ) -> pl.DataFrame:
     """
     Get overlapping subintervals between first set and second set of regions.
@@ -800,7 +800,7 @@ def intersection(
         Engine to use for intersection: ``"ncls"`` or ``"ruranges"``.
     add_overlap_size
         Wether to add overlap size as the absolute number of basepairs and
-        as a fraction of region1 and region2
+        as a fraction of region1 and region2.
     strandedness
         Note: Not implemented yet.
         {``None``, ``"same"``, ``"opposite"``, ``False``}, default ``None``, i.e. auto
@@ -1052,7 +1052,6 @@ def intersection(
                     regions1_suffix=regions1_suffix,
                     regions2_suffix=regions2_suffix,
                     add_overlap_size=add_overlap_size,
-
                 )
             )
 
@@ -1103,10 +1102,10 @@ def intersection(
                 ]
             )
             .pipe(
-                    function=_get_intersection_size,
-                    regions1_suffix=regions1_suffix,
-                    regions2_suffix=regions2_suffix,
-                )
+                function=_get_intersection_size,
+                regions1_suffix=regions1_suffix,
+                regions2_suffix=regions2_suffix,
+            )
             .pipe(
                 function=_filter_intersection_output_columns,
                 regions1_info=regions1_info,
