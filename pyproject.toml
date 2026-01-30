@@ -30,6 +30,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
+    "joblib>=1.5.3",
     "ncls>=0.0.70",
     "polars>=1.31.0",
     "pyarrow>=20.0.0",
