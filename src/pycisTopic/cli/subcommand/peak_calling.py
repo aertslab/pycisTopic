@@ -172,7 +172,7 @@ def add_parser_peak_calling(subparsers):
     parser_peak_calling.add_argument(
         "--nomodel",
         dest="nomodel",
-        action="store_true",
+        action="store",
         type=bool,
         help="While on, MACS3 will bypass building the shifting model. Also use --extsize and --shift",
         default=True
@@ -199,7 +199,7 @@ def add_parser_peak_calling(subparsers):
     parser_peak_calling.add_argument(
         "--nolambda",
         dest="nolambda",
-        action="store_true",
+        action="store",
         type=bool,
         help="With this flag on, MACS3 will use the background lambda as local lambda.",
         default=True
@@ -208,7 +208,7 @@ def add_parser_peak_calling(subparsers):
     parser_peak_calling.add_argument(
         "--call-summits",
         dest="summits",
-        action="store_true",
+        action="store",
         type=bool,
         help="Ddeconvolve subpeaks within each peak called.",
         default=True
