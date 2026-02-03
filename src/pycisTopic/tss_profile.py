@@ -31,8 +31,8 @@ def get_tss_profile(
         See :func:`pycisTopic.fragments.filter_fragments_by_cb`.
     tss_annotation
         TSS annotation Polars DataFrame with at least the following columns:
-        ``["Chromosome", "Start", "Strand"]``.
-        The "Start" column is 0-based like a BED file.
+        ``Chromosome``, ``TSS_start`` and ``Strand``.
+        The ``TSS_start`` column is 0-based like a BED file.
         See :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl` and
         :func:`pycisTopic.gene_annotation.change_chromosome_source_in_bed` for ways
         to get TSS annotation from Ensembl BioMart.
@@ -104,7 +104,7 @@ def get_tss_profile(
         .select(
             # Only keep needed columns for faster Genomics Ranges / PyRanges join.
             pl.col("Chromosome").cast(pl.Categorical),
-            pl.col("Start"),
+            pl.col("TSS start").alias("Start"),
             pl.col("Strand"),
         )
         # Filter out TSS annotations without strand info

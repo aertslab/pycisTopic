@@ -44,6 +44,8 @@ def qc(
     tss_annotation_bed_filename
         TSS annotation BED file.
         Used to calculate distance of fragments to TSS positions.
+        Should contain at least the following columns:
+        ``Chromosome``, ``TSS_start`` (0-based) and ``Strand``.
     output_prefix
         Output prefix to use for QC statistics parquet output files.
     tss_flank_window
@@ -417,7 +419,8 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="""
             TSS annotation BED file. Used to calculate distance of fragments to TSS
-            positions.
+            positions. Should contain at least the following columns: "Chromosome",
+            "TSS_start" (0-based) and "Strand".
             """,
     )
 

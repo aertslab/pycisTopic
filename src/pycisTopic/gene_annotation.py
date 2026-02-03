@@ -181,29 +181,60 @@ def get_tss_annotation_from_ensembl(
     """
     import pybiomart as pbm
 
+    # Check if the installed pybiomart version supports the dtypes argument.
+    #   - pybiomart 0.2.0 does not support the dtypes argument.
+    #   - "latest" git version (from 2018) does support the dtypes argument:
+    #         pip install git+https://github.com/jrderuiter/pybiomart@7802d45fe88549ab0512d6f37f815fc43b172b39
+    pybiomart_dataset_query_has_dtypes_arg = (
+        "dtypes" in pbm.Dataset.query.__code__.co_varnames
+    )
+
     dataset = pbm.Dataset(name=biomart_name, host=biomart_host, use_cache=use_cache)
+
+    ensembl_tss_annotation_dtypes = {
+        "Chromosome/scaffold name": str,
+        "Gene start (bp)": int,
+        "Gene end (bp)": int,
+        "Gene name": str,
+        "Strand": int,
+        "Transcription start site (TSS)": int,
+        "Transcript type": str,
+        "Gene stable ID": str,
+    }
 
     ensembl_tss_annotation = dataset.query(
         attributes=[
             "chromosome_name",
-            "transcription_start_site",
-            "strand",
+            "start_position",
+            "end_position",
             "external_gene_name",
+            "strand",
+            "transcription_start_site",
             "transcript_biotype",
             "ensembl_gene_id",
         ],
         filters={"transcript_biotype": transcript_type} if transcript_type else None,
-    ).astype({"Chromosome/scaffold name": str, "Gene name": str})
+        # Only include dtypes argument if supported by the installed pybiomart version.
+        **(
+            {"dtypes": ensembl_tss_annotation_dtypes}
+            if pybiomart_dataset_query_has_dtypes_arg
+            else {}
+        ),
+    )
+
+    if pybiomart_dataset_query_has_dtypes_arg:
+        # Convert columns to correct datatypes afterwards for pybiomart 0.2.0.
+        ensembl_tss_annotation = ensembl_tss_annotation.astype(
+            ensembl_tss_annotation_dtypes
+        )
 
     ensembl_tss_annotation_bed_df_pl = pl.from_pandas(ensembl_tss_annotation).select(
         [
             pl.col("Chromosome/scaffold name").alias("Chromosome"),
-            # Start coordinate of TSS in BED format.
-            (pl.col("Transcription start site (TSS)") - 1)
-            .cast(pl.Int32)
-            .alias("Start"),
-            # End coordinate of TSS in BED format.
-            pl.col("Transcription start site (TSS)").cast(pl.Int32).alias("End"),
+            # Start coordinate of gene in BED format.
+            (pl.col("Gene start (bp)") - 1).cast(pl.Int32).alias("Gene_start"),
+            # End coordinate of gene in BED format.
+            pl.col("Gene end (bp)").cast(pl.Int32).alias("Gene_end"),
             pl.col("Gene name").alias("Gene"),
             pl.lit(".").alias("Score"),
             # Convert 1, -1 and 0 to "+", "-" and "." respectively.
@@ -217,6 +248,12 @@ def get_tss_annotation_from_ensembl(
                 )
                 .alias("Strand")
             ),
+            # Start coordinate of TSS in BED format.
+            (pl.col("Transcription start site (TSS)") - 1)
+            .cast(pl.Int32)
+            .alias("TSS_start"),
+            # End coordinate of TSS in BED format.
+            pl.col("Transcription start site (TSS)").cast(pl.Int32).alias("TSS_end"),
             pl.col("Transcript type").alias("Transcript_type"),
             pl.col("Gene stable ID").alias("Ensembl_gene_id"),
         ]
@@ -241,9 +278,9 @@ def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFra
         TSS annotation BED files can be written with
         :func:`pycisTopic.gene_annotation.write_tss_annotation_to_bed`
         and will have the following header line:
-            `# Chromosome Start End Gene Score Strand Transcript_type`
+            ``# Chromosome Gene_start Gene_end Gene Score Strand TSS_start TSS_end Transcript_type Ensembl_gene_id``
         Minimum required columns for :func:`pycisTopic.tss_profile.get_tss_profile`:
-            `Chromosome, Start (0-based BED), Strand`
+            ``Chromosome``, ``TSS_start`` (0-based BED) and ``Strand``
 
     See Also
     --------
@@ -289,11 +326,13 @@ def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFra
         # Use 0-bytes as comment character so the header can start with "# Chromosome".
         comment_prefix="\0",
         schema_overrides={
-            # Convert Chromosome, Start and End column to the correct datatypes.
+            # Convert Chromosome, Gene/TSS start/end columns to the correct datatypes.
             "Chromosome": pl.Categorical,
             "# Chromosome": pl.Categorical,
-            "Start": pl.Int32,
-            "End": pl.Int32,
+            "Gene_start": pl.Int32,
+            "Gene_end": pl.Int32,
+            "TSS_start": pl.Int32,
+            "TSS_end": pl.Int32,
         },
     ).rename({"# Chromosome": "Chromosome"})
 
@@ -320,9 +359,9 @@ def write_tss_annotation_to_bed(
         TSS annotation BED files from
         :func:`pycisTopic.gene_annotation.get_tss_annotation_from_ensembl`
         will have the following header line:
-            `# Chromosome Start End Gene Score Strand Transcript_type`
+            ``# Chromosome Gene_start Gene_end Gene Score Strand TSS_start TSS_end Transcript_type Ensembl_gene_id``
         Minimum required columns for :func:`pycisTopic.tss_profile.get_tss_profile`:
-            `Chromosome, Start (0-based BED), Strand`
+            ``Chromosome``, ``TSS_start`` (0-based BED) and ``Strand``
 
     See Also
     --------
