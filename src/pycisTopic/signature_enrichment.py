@@ -1,22 +1,68 @@
 from __future__ import annotations
 
+from multiprocessing import cpu_count
+from typing import TYPE_CHECKING
+
 import numpy as np
 import numpy.typing as npt
+import pandas as pd  # type: ignore
+import polars as pl
 from ctxcore.aucell import aucell4r  # type: ignore
 from ctxcore.genesig import GeneSignature  # type: ignore
 
 from pycisTopic.genomic_ranges import intersection
+from pycisTopic.imputed_accessibility import (
+    impute_accessibility_chunked,
+    rank_imputed_accessibility,
+)
 
+if TYPE_CHECKING:
+    import logging
+
+
+def _polars_granges_to_region_names(
+    granges: pl.DataFrame,
+) -> list[str]:
+    return granges.with_columns(
+        region_names = (
+            pl.concat_str(
+                [
+                    pl.col("Chromosome"),
+                    pl.concat_str(
+                        [
+                            pl.col("Start"),
+                            pl.col("End")
+                        ],
+                        separator="-"
+                    )
+                ],
+                separator=":"
+            )
+        )
+    )["region_names"].to_list()
+
+def _region_names_to_signature(
+    region_names: list[str],
+    name: str,
+) -> GeneSignature:
+    weights = np.ones(len(region_names))
+    return GeneSignature(
+        name=name, gene2weight=dict(zip(region_names, weights))
+    )
 
 def signature_enrichment(
     region_topic: npt.NDArray[np.float32],
     cell_topic: npt.NDArray[np.float32],
-    region_names: list[str],
-    signatures: dict[str, list[str]],
+    region_topic_granges: pl.DataFrame,
+    signatures: dict[str, pl.DataFrame],
     chunk_size: int,
     normalize: bool,
-    n_cpu: int = 1
-) -> dict[str, npt.NDArray[np.float32]]:
+    min_frac_consensus: float,
+    min_frac_signature: float,
+    seed: int,
+    auc_threshold: float = 0.05,
+    log: logging.Logger | None = None,
+) -> npt.NDArray[np.float32]:
     """
     Calculate enrichment of region signatures in cells using AUCell (Van de Sande et al., 2020).
 
@@ -26,151 +72,108 @@ def signature_enrichment(
         Region topic matrix (regions x topics).
     cell_topic
         Cell topic matrix (topic x cells).
-    region_names
-        List of region names corresponding to region_topic.
+    region_topic_granges
+        Polars Dataframe with genomic ranges corresponding to region topic.
     signatures
-        Dictionary of signatures in the form {"name": ["chr:start-end"]}.
+        Dictionary of genomic ranges signatures (polars DataFrames).
     chunk_size
         The number of cells to process at once.
     normalize: bool
-        Normalize the AUC values to a maximum of 1.0 per regulon. Default: False
-    n_cpu: int
-        The number of cores to use.
+        Normalize the AUC values to a maximum of 1.0 per regulon.
+    min_frac_consensus
+        Minimal fractional overlap of signature and consensus peak
+        relative to consensus peak.
+    min_frac_signature
+        Minimal fractional overlap of signature and consensus peak
+        relative to signature.
+    seed
+        Seed used to randomly resolve tied values in imputed accessibility
+        for generatin the ranking.
+    auc_threshold: float
+        The fraction of the ranked genome to take into account for the calculation
+        of the Area Under the recovery Curve. Default: 0.05.
+    log
+        Optional logger.
 
     Returns
     -------
-    A dictionary of numpy arrays, one entry per signature, containing
-    AUCell values across cells.
+    A Numpy array with auc values across cells (cell x signature)
 
     """
-    aucell_values: dict[str, npt.NDArray[np.float32]] = {}
-
-    if len(region_names) != region_topic.shape[0]:
+    if region_topic_granges.shape[0] != region_topic.shape[0]:
         raise ValueError(
-            f"Length of the region names ({len(region_names)}) "
+            f"Length of the region names ({region_topic_granges.shape[0]}) "
             f"does not match the shape of region_topic {region_topic.shape}"
         )
+    region_names = _polars_granges_to_region_names(region_topic_granges)
 
-    return aucell_values
-
-
-def signature_enrichment(
-    rankings: CistopicImputedFeatures,
-    signatures: dict[str, pr.PyRanges] | dict[str, list],
-    enrichment_type: str = "region",
-    auc_threshold: float = 0.05,
-    normalize: bool = False,
-    n_cpu: int = 1,
-):
-    """
-    Get enrichment of a region signature in cells or topics using AUCell (Van de Sande et al., 2020).
-
-    Parameters
-    ----------
-    rankings: CistopicImputedFeatures
-        A CistopicImputedFeatures object with ranking values
-    signatures: Dictionary of pr.PyRanges (for regions) or list (for genes)
-        A dictionary containing region signatures as pr.PyRanges or gene names as list
-    enrichment_type: str
-        Whether features are genes or regions
-    auc_threshold: float
-        The fraction of the ranked genome to take into account for the calculation of the Area Under the recovery Curve. Default: 0.05
-    normalize: bool
-        Normalize the AUC values to a maximum of 1.0 per regulon. Default: False
-    num_workers: int
-        The number of cores to use. Default: 1
-
-    Return
-    ------
-        A pd.DataFrame containing signatures as columns, cells/topics as rows and AUC scores as values
-
-    References
-    ----------
-    Van de Sande, B., Flerin, C., Davie, K., De Waegeneer, M., Hulselmans, G., Aibar, S., ... & Aerts, S. (2020). A scalable SCENIC workflow for single-cell gene
-    regulatory network analysis. Nature Protocols, 15(7), 2247-2276.
-
-    """
-    # Compute rankings if needed and format input
-    rankings = pd.DataFrame(
-        rankings.mtx.transpose(),
-        columns=rankings.feature_names,
-        index=rankings.cell_names,
-    )
-    # Take regions in input
-    if enrichment_type == "region":
-        regions_in_input = pr.PyRanges(
-            region_names_to_coordinates(rankings.columns.tolist())
+    # Put signatures in coordinate frame of region topic by performing
+    # intersect and retaining regions of the region topic granges that pass
+    # the overlap thresholds (min_frac_consensus and min_frac_signatures).
+    gr_signatures_consensus: dict[str, pl.DataFrame] = {}
+    for signature, sign_granges in signatures.items():
+        gr_signatures_consensus[signature] = intersection(
+            regions1_df_pl=region_topic_granges,
+            regions2_df_pl=sign_granges,
+            regions1_coord=True,
+            add_overlap_size=True,
+            regions1_suffix="@1"
+        ).filter(
+            (pl.col("fr1_inter") >= min_frac_consensus) &
+            (pl.col("fr2_inter") >= min_frac_signature)
+        ).select(
+            pl.col("Chromosome@1"),
+            pl.col("Start@1"),
+            pl.col("End@1")
+        ).rename(
+            {
+                "Chromosome@1": "Chromosome",
+                "Start@1": "Start",
+                "End@1": "End"
+            }
         )
-        # Get signatures
-        signatures = [
-            region_set_to_signature(signatures[key], regions_in_input, key)
-            for key in signatures.keys()
-        ]
-    if enrichment_type == "gene":
-        # Get signatures
-        signatures = [
-            gene_set_to_signature(signatures[key], key) for key in signatures.keys()
-        ]
-    # Run aucell
-    auc_sig = aucell4r(
-        df_rnk=rankings,
-        signatures=signatures,
-        auc_threshold=auc_threshold,
-        noweights=False,
-        normalize=normalize,
-        num_workers=n_cpu,
+
+    # Convert granges signatures to gene signatures
+    gs_signatures_consensus: list[GeneSignature] = [
+        _region_names_to_signature(
+            region_names=_polars_granges_to_region_names(granges),
+            name=signature
+        )
+        for signature, granges in gr_signatures_consensus.items()
+    ]
+
+    # initialize aucell values
+    n_cells = region_topic.shape[0]
+    n_signatures = len(signatures)
+    aucell_values: npt.NDArray[np.float32] = np.empty(
+        (n_cells, n_signatures), dtype=np.float32
     )
-    auc_sig.columns.names = [None]
-    return auc_sig
+    for (cell_start, cell_end), imputed_acc_chunk in impute_accessibility_chunked(
+        region_topic=region_topic,
+        cell_topic=cell_topic,
+        chunk_size=chunk_size,
+        chunk_along="cell",
+        log=log,
+        return_start_end=True,
+    ):
+        if log is not None:
+            log.info("Generating ranking.")
+        ranking_chunk = rank_imputed_accessibility(
+            imputed_accessibility=imputed_acc_chunk,
+            seed=seed
+        )
+        if log is not None:
+            log.info("Calculating AUCs.")
+        aucell_values[cell_start: cell_end] = aucell4r(
+            df_rnk=pd.DataFrame(
+                ranking_chunk.T,
+                columns=region_names
+            ),
+            signatures=gs_signatures_consensus, # type: ignore
+            auc_threshold=auc_threshold,
+            noweights=False,
+            normalize=False,
+            num_workers=min(chunk_size, cpu_count()),
+        ).to_numpy()
 
-
-def region_set_to_signature(
-    query_region_set: pr.PyRanges, target_region_set: pr.PyRanges, name: str
-):
-    """
-    A helper function to intersect query regions with the input data set regions.
-
-    Parameters
-    ----------
-    query_region_set: pr.PyRanges
-        Pyranges with regions to query
-    target_region_set: pr.PyRanges
-        Pyranges with target regions
-    name: str
-        Name for the signature
-
-    Return
-    ------
-        A GeneSignature object to use with AUCell
-
-    """
-    query_in_target = query_region_set.join(target_region_set)
-    query_in_target = query_in_target.df[["Chromosome", "Start_b", "End_b"]]
-    query_in_target.columns = ["Chromosome", "Start", "End"]
-    query_in_target = coord_to_region_names(pr.PyRanges(query_in_target))
-    weights = np.ones(len(query_in_target))
-    signature = GeneSignature(
-        name=name, gene2weight=dict(zip(query_in_target, weights))
-    )
-    return signature
-
-
-def gene_set_to_signature(gene_set: list, name: str):
-    """
-    A helper function to generat gene signatures.
-
-    Parameters
-    ----------
-    gene_set: pr.PyRanges
-        List of genes
-    name: str
-        Name for the signature
-
-    Return
-    ------
-        A GeneSignature object to use with AUCell
-
-    """
-    weights = np.ones(len(gene_set))
-    signature = GeneSignature(name=name, gene2weight=dict(zip(gene_set, weights)))
-    return signature
+    return aucell_values / aucell_values.max(axis=0) if normalize else aucell_values
