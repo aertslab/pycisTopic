@@ -613,7 +613,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         ncbi_accession_id / ucsc_assembly / input files.
         Table of BioMart archives with list of supported assemblies per species:
         https://www.ensembl.org/info/website/archives/assembly.html.
-        e.g.: For mouse mm10 (GRCm38) use: "http://nov2020.archive.ensembl.org".
+        e.g.: For mouse GRCm38 (mm10) use: "http://nov2020.archive.ensembl.org".
         Default: "http://www.ensembl.org".
         """,
     )
@@ -634,7 +634,10 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         "Remap chromosomes",
         "Remap Ensembl chromosome names in TSS file to UCSC, RefSeq or GenBank "
         "chromosome names. Make sure the assembly version used by Ensembl BioMart "
-        "matches the equivalent assembly in NCBI or UCSC.",
+        'matches the (equivalent) assembly in NCBI or UCSC. The "--ncbi" and "--ucsc" '
+        "arguments below are only used to get chromosome name remapping files, and do "
+        "not force/overwrite the assembly version used by Ensembl Biomart to get the "
+        "gene annotation.",
     )
 
     group_tgt_remap_chroms.add_argument(
@@ -771,7 +774,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         dest="ncbi_accession_id",
         action="store",
         type=str,
-        required=False,
+        required=True,
         help="NCBI genome accession ID for which to retrieve NCBI sequence reports, "
         "which will be used to build chromosome sizes and alias mappings, which can "
         "be used to map Ensembl chromosome names (from TSS annotation) to UCSC, "
@@ -785,7 +788,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         dest="chrom_sizes_and_alias_tsv_filename",
         action="store",
         type=str,
-        required=False,
+        required=True,
         help="Write chromosome sizes and alias TSV file with chromosome sizes and "
         "alias mapping, which can be used to map Ensembl chromosome names (from TSS "
         "annotation) to UCSC, RefSeq or GenBank chromosome names. "
@@ -805,7 +808,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
         dest="ucsc_assembly",
         action="store",
         type=str,
-        required=False,
+        required=True,
         help="UCSC genome accession ID for which to retrieve chromosome sizes and "
         "alias mapping, which can be used to map Ensembl chromosome names (from TSS "
         "annotation) to UCSC, RefSeq or GenBank chromosome names. "
