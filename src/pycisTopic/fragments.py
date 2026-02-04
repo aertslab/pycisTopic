@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Literal, Sequence
 import polars as pl
 import scipy as sp
 
+from pycisTopic.categoricals import PycisTopicCategoricals
 from pycisTopic.genomic_ranges import intersection as gr_intersection
 from pycisTopic.genomic_ranges import overlap as gr_overlap
 
@@ -20,11 +21,6 @@ def normalise_filepath(path: str | Path, check_not_directory: bool = True) -> st
     if check_not_directory and os.path.exists(path) and os.path.isdir(path):
         raise IsADirectoryError(f"Expected a file path; {path!r} is a directory")
     return path
-
-
-# Enable Polars global string cache so all categoricals are created with the same
-# string cache.
-pl.enable_string_cache()
 
 
 def read_bed_to_polars_df(
@@ -119,10 +115,6 @@ def read_bed_to_polars_df(
             f'"{bed_filename}" contains only {column_count} columns.'
         )
 
-    # Enable global string cache so categorical columns from multiple Polars DataFrames
-    # can be joined later, if necessary.
-    pl.enable_string_cache()
-
     if bed_parser_engine == "polars_lazy":
         # Read BED file with Polars.
         bed_df_pl = pl.scan_csv(
@@ -134,11 +126,11 @@ def read_bed_to_polars_df(
             schema_overrides={
                 bed_column: dtype
                 for bed_column, dtype in {
-                    "Chromosome": pl.Categorical,
+                    "Chromosome": pl.Categorical(PycisTopicCategoricals.CHROMOSOME),
                     "Start": pl.Int32,
                     "End": pl.Int32,
-                    "Name": pl.Categorical,
-                    "Strand": pl.Categorical,
+                    "Name": pl.Categorical(PycisTopicCategoricals.NAME),
+                    "Strand": pl.Categorical(PycisTopicCategoricals.STRAND),
                 }.items()
                 if bed_column in bed_column_names[:column_count]
             },
@@ -155,11 +147,11 @@ def read_bed_to_polars_df(
             schema_overrides={
                 bed_column: dtype
                 for bed_column, dtype in {
-                    "Chromosome": pl.Categorical,
+                    "Chromosome": pl.Categorical(PycisTopicCategoricals.CHROMOSOME),
                     "Start": pl.Int32,
                     "End": pl.Int32,
-                    "Name": pl.Categorical,
-                    "Strand": pl.Categorical,
+                    "Name": pl.Categorical(PycisTopicCategoricals.NAME),
+                    "Strand": pl.Categorical(PycisTopicCategoricals.STRAND),
                 }.items()
                 if bed_column in bed_column_names[:column_count]
             },
@@ -193,6 +185,17 @@ def read_bed_to_polars_df(
                     },
                 ),
             ),
+            schema_overrides={
+                bed_column: dtype
+                for bed_column, dtype in {
+                    "Chromosome": pl.Categorical(PycisTopicCategoricals.CHROMOSOME),
+                    "Start": pl.Int32,
+                    "End": pl.Int32,
+                    "Name": pl.Categorical(PycisTopicCategoricals.NAME),
+                    "Strand": pl.Categorical(PycisTopicCategoricals.STRAND),
+                }.items()
+                if bed_column in bed_column_names[:column_count]
+            },
             rechunk=False,
         )
     else:
@@ -297,7 +300,7 @@ def read_fragments_to_polars_df(
             # Append separator and sample ID to cell barcode.
             fragments_df_pl = fragments_df_pl.with_columns(
                 (pl.col("Name").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
-                    pl.Categorical
+                    pl.Categorical(PycisTopicCategoricals.CB)
                 )
             )
         else:
@@ -336,7 +339,7 @@ def read_fragments_to_polars_df(
                     pl.col("Name").cast(pl.Utf8).str.strip_suffix(cb_end_to_remove)
                     + pl.lit(separator_and_sample_id)
                 )
-                .cast(pl.Categorical)
+                .cast(pl.Categorical(PycisTopicCategoricals.CB))
                 .alias("Name")
             )
 
@@ -408,7 +411,7 @@ def read_barcodes_file_to_polars_series(
             separator="\t",
             columns=[0],
             new_columns=["CB"],
-            schema={"CB": pl.Categorical},
+            schema={"CB": pl.Categorical(PycisTopicCategoricals.CB)},
         )
         .filter(pl.col("CB").is_not_null())
         .unique(maintain_order=True)
@@ -424,7 +427,7 @@ def read_barcodes_file_to_polars_series(
             # Append separator and sample ID to cell barcode.
             cbs = cbs.with_columns(
                 (pl.col("CB").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
-                    pl.Categorical
+                    pl.Categorical(PycisTopicCategoricals.CB)
                 )
             )
         else:
@@ -460,7 +463,7 @@ def read_barcodes_file_to_polars_series(
                     pl.col("CB").cast(pl.Utf8).str.strip_suffix(cb_end_to_remove)
                     + pl.lit(separator_and_sample_id)
                 )
-                .cast(pl.Categorical)
+                .cast(pl.Categorical(PycisTopicCategoricals.CB))
                 .alias("CB")
             )
 
@@ -641,12 +644,21 @@ def get_cbs_passing_filter(
 
     if cbs:
         if isinstance(cbs, Sequence):
-            cbs_series_pl = pl.Series("CB", cbs, dtype=pl.Categorical)
+            cbs_series_pl = pl.Series(
+                "CB", cbs, dtype=pl.Categorical(PycisTopicCategoricals.CB)
+            )
         elif isinstance(cbs, pl.Series):
             if cbs.dtype == pl.Utf8:
-                cbs_series_pl = cbs.cast(pl.Categorical).rename("CB")
+                cbs_series_pl = cbs.cast(
+                    pl.Categorical(PycisTopicCategoricals.CB)
+                ).rename("CB")
             elif cbs.dtype == pl.Categorical:
-                cbs_series_pl = cbs.rename("CB")
+                if cbs.dtype.categories == PycisTopicCategoricals.CB:
+                    cbs_series_pl = cbs.rename("CB")
+                else:
+                    cbs_series_pl = cbs.cast(
+                        pl.Categorical(PycisTopicCategoricals.CB)
+                    ).rename("CB")
         else:
             raise ValueError("Unsupported type for cell barcodes.")
 
@@ -738,7 +750,7 @@ def filter_fragments_by_cb(
     >>> cbs = pl.Series(
     ...     "CB",
     ...     ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"],
-    ...     dtype=pl.Categorical,
+    ...     dtype=pl.Categorical(PycisTopicCategoricals.CB),
     ... )
 
     Read list of cell barcodes from a file.
@@ -755,16 +767,25 @@ def filter_fragments_by_cb(
     """
     if isinstance(cbs, Sequence):
         if isinstance(cbs[0], str):
-            cbs_series_pl = pl.Series("CB", cbs, dtype=pl.Categorical)
+            cbs_series_pl = pl.Series(
+                "CB", cbs, dtype=pl.Categorical(PycisTopicCategoricals.CB)
+            )
         else:
             raise ValueError(
                 "Unsupported type for cell barcodes. First element of cell barcodes is not a string."
             )
     elif isinstance(cbs, pl.Series):
         if cbs.dtype == pl.Utf8:
-            cbs_series_pl = cbs.cast(pl.Categorical).rename("CB")
+            cbs_series_pl = cbs.cast(pl.Categorical(PycisTopicCategoricals.CB)).rename(
+                "CB"
+            )
         elif cbs.dtype == pl.Categorical:
-            cbs_series_pl = cbs.rename("CB")
+            if cbs.dtype.categories == PycisTopicCategoricals.CB:
+                cbs_series_pl = cbs.rename("CB")
+            else:
+                cbs_series_pl = cbs.cast(
+                    pl.Categorical(PycisTopicCategoricals.CB)
+                ).rename("CB")
     else:
         raise ValueError("Unsupported type for cell barcodes.")
 
@@ -1031,7 +1052,7 @@ def create_fragment_matrix_from_fragments(
                 + "-"
                 + pl.col("End").cast(pl.Utf8)
             )
-            .cast(pl.Categorical)
+            .cast(pl.Categorical(PycisTopicCategoricals.REGION_ID))
             .alias("RegionID")
         )
         .select(

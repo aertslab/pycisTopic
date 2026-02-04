@@ -4,11 +4,8 @@ from typing import Literal
 
 import polars as pl
 
+from pycisTopic.categoricals import PycisTopicCategoricals
 from pycisTopic.genomic_ranges import intersection as gr_intersection
-
-# Enable Polars global string cache so all categoricals are created with the same
-# string cache.
-pl.enable_string_cache()
 
 
 def get_tss_profile(
@@ -102,8 +99,8 @@ def get_tss_profile(
         tss_annotation.clone()
         .lazy()
         .select(
-            # Only keep needed columns for faster Genomics Ranges / PyRanges join.
-            pl.col("Chromosome").cast(pl.Categorical),
+            # Only keep needed columns for faster Genomics Ranges join.
+            pl.col("Chromosome").cast(PycisTopicCategoricals.CHROMOSOME),
             pl.col("TSS start").alias("Start"),
             pl.col("Strand"),
         )
@@ -246,7 +243,7 @@ def get_tss_profile(
                         pl.Series(
                             "CB",
                             ["no_CB"] * (flank_window * 2 + 1),
-                            dtype=pl.Categorical,
+                            dtype=pl.Categorical(PycisTopicCategoricals.CB),
                         ),
                     ]
                 ),
@@ -401,7 +398,7 @@ def get_tss_profile(
         .drop("position_from_tss")
         .select(pl.all().mean())
         .transpose(include_header=True, header_name="CB")
-        .with_columns(pl.col("CB").cast(pl.Categorical))
+        .with_columns(pl.col("CB").cast(pl.Categorical(PycisTopicCategoricals.CB)))
         .rename({"column_0": "tss_enrichment"})
     )
 

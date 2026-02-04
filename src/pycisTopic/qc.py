@@ -28,10 +28,6 @@ except ImportError:
 if TYPE_CHECKING:
     import numpy.typing as npt
 
-# Enable Polars global string cache so all categoricals are created with the same
-# string cache.
-pl.enable_string_cache()
-
 
 def get_barcodes_passing_qc_for_sample(
     sample_id: str,

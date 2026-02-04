@@ -9,12 +9,10 @@ from typing import TYPE_CHECKING, Sequence
 import polars as pl
 import requests
 
+from pycisTopic.categoricals import PycisTopicCategoricals
+
 if TYPE_CHECKING:
     import pandas as pd
-
-# Enable Polars global string cache so all categoricals are created with the same
-# string cache.
-pl.enable_string_cache()
 
 
 def get_all_gene_annotation_ensembl_biomart_dataset_names(
@@ -327,8 +325,8 @@ def read_tss_annotation_from_bed(tss_annotation_bed_filename: str) -> pl.DataFra
         comment_prefix="\0",
         schema_overrides={
             # Convert Chromosome, Gene/TSS start/end columns to the correct datatypes.
-            "Chromosome": pl.Categorical,
-            "# Chromosome": pl.Categorical,
+            "Chromosome": pl.Categorical(PycisTopicCategoricals.CHROMOSOME),
+            "# Chromosome": pl.Categorical(PycisTopicCategoricals.CHROMOSOME),
             "Gene_start": pl.Int32,
             "Gene_end": pl.Int32,
             "TSS_start": pl.Int32,
@@ -888,7 +886,7 @@ def change_chromosome_source_in_bed(
             pl.when(pl.col(to_chrom_source_name).is_null())
             .then(pl.col("Chromosome"))
             .otherwise(pl.col(to_chrom_source_name))
-            .cast(pl.Categorical)
+            .cast(pl.Categorical(PycisTopicCategoricals.CHROMOSOME))
             .alias("Chromosome")
         )
         .drop(to_chrom_source_name)

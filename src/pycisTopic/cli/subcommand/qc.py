@@ -9,10 +9,6 @@ if TYPE_CHECKING:
     from argparse import ArgumentParser, _SubParsersAction
     from pathlib import Path
 
-# Enable Polars global string cache so all categoricals are created with the same
-# string cache.
-pl.enable_string_cache()
-
 
 def qc(
     fragments_tsv_filename: str | Path,
