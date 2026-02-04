@@ -283,8 +283,8 @@ def read_fragments_to_polars_df(
     """
     Read fragments BED file to a Polars DataFrame.
 
-    If fragments don't have a Score column, a Score columns is created by counting
-    the number of fragments with the same chromosome, start, end and CB.
+    If fragments don't have a ``CB_count`` column, a ``CB_count`` column is created by
+    counting the number of fragments with the same chromosome, start, end and CB.
 
     Parameters
     ----------
@@ -341,20 +341,27 @@ def read_fragments_to_polars_df(
     ... )
 
     """
-    fragments_df_pl = read_bed_to_polars_df(
-        bed_filename=fragments_bed_filename,
-        bed_parser_engine=bed_parser_engine,
-        min_column_count=4,
-    ).lazy()
+    fragments_df_pl = (
+        read_bed_to_polars_df(
+            bed_filename=fragments_bed_filename,
+            bed_parser_engine=bed_parser_engine,
+            min_column_count=4,
+        )
+        .lazy()
+        .rename({"Name": "CB", "Score": "CB_count"})
+    )
 
-    # If no score is provided or score column is ".", generate a score column with the
-    # number of fragments which have the same chromosome, start, end and CB.
-    if fragments_df_pl.collect_schema().get("Score") in (None, pl.Utf8):
+    # If no "CB_count" is provided or "CB_count" column is ".", generate a
+    # CB_count column with the number of fragments which have the same
+    # chromosome, start, end and CB.
+    if fragments_df_pl.collect_schema().get("CB_count") in (None, pl.Utf8):
         fragments_df_pl = fragments_df_pl.group_by(
-            ["Chromosome", "Start", "End", "Name"]
-        ).agg(pl.len().cast(pl.Int32()).alias("Score"))
+            ["Chromosome", "Start", "End", "CB"]
+        ).agg(pl.len().cast(pl.Int32()).alias("CB_count"))
     else:
-        fragments_df_pl = fragments_df_pl.with_columns(pl.col("Score").cast(pl.Int32()))
+        fragments_df_pl = fragments_df_pl.with_columns(
+            pl.col("CB_count").cast(pl.Int32())
+        )
 
     # Modify cell barcode if sample ID is specified or an empty string.
     if sample_id or sample_id == "":
@@ -365,14 +372,14 @@ def read_fragments_to_polars_df(
         if not cb_end_to_remove:
             # Append separator and sample ID to cell barcode.
             fragments_df_pl = fragments_df_pl.with_columns(
-                (pl.col("Name").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
+                (pl.col("CB").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
                     pl.Categorical(PycisTopicCategoricals.CB)
                 )
             )
         else:
             fraction_of_CBs_with_end_to_remove = (
                 fragments_df_pl.select(
-                    pl.col("Name").unique().alias("CB"),
+                    pl.col("CB").unique(),
                 )
                 .select(
                     pl.col("CB")
@@ -402,11 +409,11 @@ def read_fragments_to_polars_df(
             # separator and sample ID to cell barcode.
             fragments_df_pl = fragments_df_pl.with_columns(
                 (
-                    pl.col("Name").cast(pl.Utf8).str.strip_suffix(cb_end_to_remove)
+                    pl.col("CB").cast(pl.Utf8).str.strip_suffix(cb_end_to_remove)
                     + pl.lit(separator_and_sample_id)
                 )
                 .cast(pl.Categorical(PycisTopicCategoricals.CB))
-                .alias("Name")
+                .alias("CB")
             )
 
     fragments_df_pl = fragments_df_pl.collect()
@@ -492,9 +499,9 @@ def read_barcodes_file_to_polars_series(
         if not cb_end_to_remove:
             # Append separator and sample ID to cell barcode.
             cbs = cbs.with_columns(
-                (pl.col("CB").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
-                    pl.Categorical(PycisTopicCategoricals.CB)
-                )
+                (pl.col("CB").cast(pl.Utf8) + pl.lit(separator_and_sample_id))
+                .cast(pl.Categorical(PycisTopicCategoricals.CB))
+                .alias("CB")
             )
         else:
             # Check fraction of cell barcodes which have the `cb_end_to_remove` string at the end.
@@ -588,7 +595,6 @@ def get_fragments_per_cb(
 
     fragments_stats_per_cb_df_pl = (
         fragments_df_pl.lazy()
-        .rename({"Name": "CB"})
         .with_columns((pl.col("End") - pl.col("Start")).alias("fragment_length"))
         .with_columns(
             pl.col("fragment_length").lt(147).alias("nucleosome_free"),
@@ -597,7 +603,7 @@ def get_fragments_per_cb(
         .group_by("CB", maintain_order=True)
         .agg(
             [
-                pl.col("Score").sum().cast(pl.UInt32).alias("total_fragments_count"),
+                pl.col("CB_count").sum().cast(pl.UInt32).alias("total_fragments_count"),
                 pl.len().cast(pl.UInt32).alias("unique_fragments_count"),
                 (
                     pl.col("mononucleosome").sum() / pl.col("nucleosome_free").sum()
@@ -818,8 +824,7 @@ def filter_fragments_by_cb(
 
     fragments_cb_filtered_df_pl = fragments_df_pl.join(
         other=cbs_series_pl.to_frame(),
-        left_on="Name",
-        right_on="CB",
+        on="CB",
         how="inner",
     )
 
@@ -956,13 +961,13 @@ def get_fragments_in_peaks(
             pl.col("Chromosome"),
             pl.col("Start@1").alias("Start"),
             pl.col("End@1").alias("End"),
-            pl.col("Name").alias("CB"),
-            pl.col("Score"),
+            pl.col("CB"),
+            pl.col("CB_count"),
         )
         .group_by("CB", maintain_order=True)
         .agg(
             [
-                pl.col("Score")
+                pl.col("CB_count")
                 .sum()
                 .cast(pl.UInt32)
                 .alias("total_fragments_in_peaks_count"),
@@ -1059,7 +1064,7 @@ def create_fragment_matrix_from_fragments(
     fragments_cb_filtered_df_pl = filter_fragments_by_cb(
         fragments_df_pl=fragments_df_pl,
         cbs=cbs,
-    ).rename({"Name": "CB", "Score": "CB_count"})
+    )
 
     del fragments_df_pl
 

@@ -135,7 +135,7 @@ def get_tss_profile(
         )
         .select(
             # Only keep chromosomal position and CB.
-            pl.col(["Chromosome", "Start", "End", "Name"])
+            pl.col(["Chromosome", "Start", "End", "CB"])
         )
     )
 
@@ -210,7 +210,7 @@ def get_tss_profile(
         .select(
             pl.col("rel_start"),
             pl.col("rel_end"),
-            pl.col("Name").alias("CB"),
+            pl.col("CB"),
         )
     )
 
