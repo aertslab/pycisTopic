@@ -306,11 +306,11 @@ def read_fragments_to_polars_df(
         else:
             fraction_of_CBs_with_end_to_remove = (
                 fragments_df_pl.select(
-                    pl.col("Name").cat.get_categories().alias("CB"),
+                    pl.col("Name").unique().alias("CB"),
                 )
                 .select(
                     pl.col("CB")
-                    .str.ends_with(cb_end_to_remove)
+                    .cat.ends_with(cb_end_to_remove)
                     .sum()
                     .alias("CBs_with_end_to_remove"),
                     pl.col("CB").count().alias("CB_count"),
