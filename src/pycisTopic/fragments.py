@@ -23,6 +23,72 @@ def normalise_filepath(path: str | Path, check_not_directory: bool = True) -> st
     return path
 
 
+def cbs_to_cbs_series_pl(
+    cbs: Sequence[str] | pl.Series,
+) -> pl.Series:
+    """
+    Convert cell barcodes to a ``PycisTopicCategoricals.CB`` Series.
+
+    Parameters
+    ----------
+    cbs
+        List or Polars Series with cell barcodes.
+
+    Returns
+    -------
+    `PycisTopicCategoricals.CB`` Series with cell barcodes.
+
+    Examples
+    --------
+    Convert list of cell barcodes to a ``PycisTopicCategoricals.CB`` Series.
+
+    >>> cbs_list = ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"]
+    >>> cbs_series_pl = cbs_to_cbs_series_pl(cbs_list)
+
+    Convert Polars Utf8/Categorical Series with cell barcodes to a
+    ``PycisTopicCategoricals.CB`` Series.
+
+    >>> cbs_series_pl_utf8 = pl.Series(
+    ...     "CB",
+    ...     ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"],
+    ...     dtype=pl.Utf8,
+    ... )
+    >>> cbs_series_pl = cbs_to_cbs_series_pl(cbs_series_pl_utf8)
+    >>> cbs_series_pl_cat = pl.Series(
+    ...     "CB",
+    ...     ["GGACATAAGGGCCACT-1", "ACCTTCATCTTTGAGA-1"],
+    ...     dtype=pl.Categorical,
+    ... )
+    >>> cbs_series_pl = cbs_to_cbs_series_pl(cbs_series_pl_cat)
+
+    """
+    if isinstance(cbs, Sequence):
+        if isinstance(cbs[0], str):
+            cbs_series_pl = pl.Series(
+                "CB", cbs, dtype=pl.Categorical(PycisTopicCategoricals.CB)
+            )
+        else:
+            raise ValueError(
+                "Unsupported type for cell barcodes. First element of cell barcodes is not a string."
+            )
+    elif isinstance(cbs, pl.Series):
+        if cbs.dtype == pl.Utf8:
+            cbs_series_pl = cbs.cast(pl.Categorical(PycisTopicCategoricals.CB)).rename(
+                "CB"
+            )
+        elif cbs.dtype == pl.Categorical:
+            if cbs.dtype.categories == PycisTopicCategoricals.CB:
+                cbs_series_pl = cbs.rename("CB")
+            else:
+                cbs_series_pl = cbs.cast(
+                    pl.Categorical(PycisTopicCategoricals.CB)
+                ).rename("CB")
+    else:
+        raise ValueError("Unsupported type for cell barcodes.")
+
+    return cbs_series_pl
+
+
 def read_bed_to_polars_df(
     bed_filename: str,
     bed_parser_engine: str
@@ -643,24 +709,7 @@ def get_cbs_passing_filter(
     )
 
     if cbs:
-        if isinstance(cbs, Sequence):
-            cbs_series_pl = pl.Series(
-                "CB", cbs, dtype=pl.Categorical(PycisTopicCategoricals.CB)
-            )
-        elif isinstance(cbs, pl.Series):
-            if cbs.dtype == pl.Utf8:
-                cbs_series_pl = cbs.cast(
-                    pl.Categorical(PycisTopicCategoricals.CB)
-                ).rename("CB")
-            elif cbs.dtype == pl.Categorical:
-                if cbs.dtype.categories == PycisTopicCategoricals.CB:
-                    cbs_series_pl = cbs.rename("CB")
-                else:
-                    cbs_series_pl = cbs.cast(
-                        pl.Categorical(PycisTopicCategoricals.CB)
-                    ).rename("CB")
-        else:
-            raise ValueError("Unsupported type for cell barcodes.")
+        cbs_series_pl = cbs_to_cbs_series_pl(cbs)
 
         fragments_stats_per_cb_filtered_df_pl = fragments_stats_per_cb_df_pl.join(
             other=cbs_series_pl.to_frame(),
@@ -765,29 +814,7 @@ def filter_fragments_by_cb(
     ... )
 
     """
-    if isinstance(cbs, Sequence):
-        if isinstance(cbs[0], str):
-            cbs_series_pl = pl.Series(
-                "CB", cbs, dtype=pl.Categorical(PycisTopicCategoricals.CB)
-            )
-        else:
-            raise ValueError(
-                "Unsupported type for cell barcodes. First element of cell barcodes is not a string."
-            )
-    elif isinstance(cbs, pl.Series):
-        if cbs.dtype == pl.Utf8:
-            cbs_series_pl = cbs.cast(pl.Categorical(PycisTopicCategoricals.CB)).rename(
-                "CB"
-            )
-        elif cbs.dtype == pl.Categorical:
-            if cbs.dtype.categories == PycisTopicCategoricals.CB:
-                cbs_series_pl = cbs.rename("CB")
-            else:
-                cbs_series_pl = cbs.cast(
-                    pl.Categorical(PycisTopicCategoricals.CB)
-                ).rename("CB")
-    else:
-        raise ValueError("Unsupported type for cell barcodes.")
+    cbs_series_pl = cbs_to_cbs_series_pl(cbs)
 
     fragments_cb_filtered_df_pl = fragments_df_pl.join(
         other=cbs_series_pl.to_frame(),
