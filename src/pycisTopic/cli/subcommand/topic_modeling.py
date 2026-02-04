@@ -12,72 +12,6 @@ if TYPE_CHECKING:
     from argparse import ArgumentParser, _SubParsersAction
 
 
-def run_topic_modeling_with_lda(args):
-    from pycisTopic.topic_modeling.lda_models import run_cgs_models
-
-    input_filename = args.input
-    output_filename = args.output
-    n_topics = args.topics
-    alpha = args.alpha
-    alpha_by_topic = args.alpha_by_topic
-    eta = args.eta
-    eta_by_topic = args.eta_by_topic
-    n_iter = args.iterations
-    n_cpu = args.parallel
-    save_path = (
-        (output_filename[:-4] if output_filename.endswith(".pkl") else output_filename)
-        if args.keep_intermediate_topic_models
-        else None
-    )
-    random_seed = args.seed
-    temp_dir = args.temp_dir
-
-    if args.verbose:
-        level = logging.INFO
-        log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
-        handlers = [logging.StreamHandler(stream=sys.stdout)]
-        logging.basicConfig(level=level, format=log_format, handlers=handlers)
-
-    print("Run topic modeling with lda with the following settings:")
-    print(f"  - Input cisTopic object filename:             {input_filename}")
-    print(f"  - Topic modeling output filename:             {output_filename}")
-    print(f"  - Number of topics to run topic modeling for: {n_topics}")
-    print(f"  - Alpha:                                      {alpha}")
-    print(f"  - Divide alpha by the number of topics:       {alpha_by_topic}")
-    print(f"  - Eta:                                        {eta}")
-    print(f"  - Divide eta by the number of topics:         {eta_by_topic}")
-    print(f"  - Number of iterations:                       {n_iter}")
-    print(f"  - Number of topic models to run in parallel:  {n_cpu}")
-    print(f"  - Seed:                                       {random_seed}")
-    print(f"  - Save intermediate topic models in dir:      {save_path}")
-    print(f"  - TMP dir:                                    {temp_dir}")
-
-    print(f'\nLoading cisTopic object from "{input_filename}"...\n')
-    with open(input_filename, "rb") as fh:
-        cistopic_obj = pickle.load(fh)
-
-    # Run models
-    print("Running models")
-    print("--------------")
-    models = run_cgs_models(
-        cistopic_obj,
-        n_topics=n_topics,
-        n_cpu=n_cpu,
-        n_iter=n_iter,
-        random_state=random_seed,
-        alpha=alpha,
-        alpha_by_topic=alpha_by_topic,
-        eta=eta,
-        eta_by_topic=eta_by_topic,
-        save_path=save_path,
-        _temp_dir=temp_dir,
-    )
-
-    print(f'\nWriting topic modeling output to "{output_filename}"...')
-    with open(output_filename, "wb") as fh:
-        pickle.dump(models, fh)
-
-
 def run_topic_modeling_with_mallet(args):
     from pycisTopic.topic_modeling.mallet_models import LDAMallet
 
@@ -393,141 +327,14 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     )
     subparser_topic_modeling.required = True
 
-    parser_topic_modeling_lda = subparser_topic_modeling.add_parser(
-        "lda",
-        help='Run LDA topic modeling with "lda" package.',
-    )
-    parser_topic_modeling_lda.set_defaults(func=run_topic_modeling_with_lda)
-
-    parser_topic_modeling_lda.add_argument(
-        "-i",
-        "--input",
-        dest="input",
-        action="store",
-        type=str,
-        required=True,
-        help="cisTopic object pickle input filename.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-o",
-        "--output",
-        dest="output",
-        action="store",
-        type=str,
-        required=True,
-        help="Topic model list pickle output filename.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-t",
-        "--topics",
-        dest="topics",
-        type=int,
-        required=True,
-        nargs="+",
-        help="Number(s) of topics to create during topic modeling.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-p",
-        "--parallel",
-        dest="parallel",
-        type=int,
-        required=True,
-        help="Number of topic models to run in parallel.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-n",
-        "--iterations",
-        dest="iterations",
-        type=int,
-        required=False,
-        default=150,
-        help="Number of iterations. Default: 150.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-a",
-        "--alpha",
-        dest="alpha",
-        type=int,
-        required=False,
-        default=50,
-        help="Alpha value. Default: 50.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-A",
-        "--alpha_by_topic",
-        dest="alpha_by_topic",
-        type=str_to_bool,
-        choices=(True, False),
-        required=False,
-        default=True,
-        help="Whether the alpha value should by divided by the number of topics. Default: True.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-e",
-        "--eta",
-        dest="eta",
-        type=float,
-        required=False,
-        default=0.1,
-        help="Eta value. Default: 0.1.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-E",
-        "--eta_by_topic",
-        dest="eta_by_topic",
-        type=str_to_bool,
-        choices=(True, False),
-        required=False,
-        default=False,
-        help="Whether the eta value should by divided by the number of topics. Default: False.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-k",
-        "--keep",
-        dest="keep_intermediate_topic_models",
-        type=str_to_bool,
-        choices=(True, False),
-        required=False,
-        default=False,
-        help="Whether intermediate topic models should be kept. "
-        "Useful to enable if running with a lot of topic numbers, to not lose finished topic model runs. "
-        "Default: False.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-s",
-        "--seed",
-        dest="seed",
-        type=int,
-        required=False,
-        default=555,
-        help="Seed for ensuring reproducibility. Default: 555.",
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-T",
-        "--temp_dir",
-        dest="temp_dir",
-        type=str,
-        required=False,
-        default=None,
-        help=f'TMP directory to use instead of the default ("{tempfile.gettempdir()}").',
-    )
-    parser_topic_modeling_lda.add_argument(
-        "-v",
-        "--verbose",
-        dest="verbose",
-        action="store_true",
-        required=False,
-        help="Enable verbose mode.",
-    )
-
     parser_topic_modeling_mallet = subparser_topic_modeling.add_parser(
-        "mallet", help='Run LDA topic modeling with "Mallet".'
+        "mallet", help="Run LDA topic modeling with Mallet."
     )
 
     subparser_topic_modeling_mallet = parser_topic_modeling_mallet.add_subparsers(
-        title='Topic modeling with "Mallet"',
+        title="Topic modeling with Mallet",
         dest="mallet",
-        help='List of "Mallet" topic modeling subcommands.',
+        help="List of Mallet topic modeling subcommands.",
     )
     subparser_topic_modeling_mallet.required = True
 
@@ -586,7 +393,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
 
     parser_topic_modeling_mallet_run = subparser_topic_modeling_mallet.add_parser(
         "run",
-        help='Run LDA topic modeling with "Mallet".',
+        help="Run LDA topic modeling with Mallet.",
     )
     parser_topic_modeling_mallet_run.set_defaults(func=run_topic_modeling_with_mallet)
 
@@ -918,7 +725,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
 
     parser_topic_modeling_mallet_anndata = subparser_topic_modeling_mallet.add_parser(
         "create_anndata",
-        help="Generate AnnData h5ad file from mallet result.",
+        help="Generate AnnData h5ad file from Mallet result.",
     )
     parser_topic_modeling_mallet_anndata.set_defaults(
         func=run_create_anndata_from_mallet
