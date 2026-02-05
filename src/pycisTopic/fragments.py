@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gzip
 import os
-from typing import TYPE_CHECKING, Literal, Sequence
+from typing import TYPE_CHECKING, Literal, Sequence, overload
 
 import polars as pl
 import scipy as sp
@@ -89,6 +89,125 @@ def cbs_to_cbs_series_pl(
     return cbs_series_pl
 
 
+def region_ids_to_bed_df_pl(region_ids: Sequence[str] | pl.Series) -> pl.DataFrame:
+    """
+    Convert region IDs to a BED Polars DataFrame.
+
+    Parameters
+    ----------
+    region_ids
+        List of region IDs in the format ``Chromosome:Start-End``.
+
+    Returns
+    -------
+    Polars DataFrame with BED entries (``Chromosome``, ``Start``, ``End``
+    and ``RegionID``).
+
+    See Also
+    --------
+    pycisTopic.fragments.add_region_ids_to_bed_df_pl
+
+    Examples
+    --------
+    Convert list of region IDs to a BED Polars DataFrame.
+
+    >>> region_ids = ["chr1:1000-2000", "chr2:1500-2500"]
+    >>> bed_df_pl = region_ids_to_bed_df_pl(region_ids)
+
+    >>> region_ids = pl.Series(["chr1:1000-2000", "chr2:1500-2500"])
+    >>> bed_df_pl = region_ids_to_bed_df_pl(region_ids)
+
+    """
+    bed_df_pl = (
+        pl.DataFrame(
+            region_ids,
+            schema={"RegionID": pl.Categorical(PycisTopicCategoricals.REGION_ID)},
+        )
+        .lazy()
+        .select(
+            pl.col("RegionID")
+            .cast(pl.Utf8)
+            .str.extract_groups(
+                r"""^(?<Chromosome>[^:]+):(?<Start>[0-9]+)-(?<End>[0-9]+)$"""
+            )
+            .alias("ChromStartEnd"),
+            pl.col("RegionID"),
+        )
+        .unnest("ChromStartEnd")
+        .with_columns(
+            pl.col("Chromosome").cast(
+                pl.Categorical(PycisTopicCategoricals.CHROMOSOME)
+            ),
+            pl.col("Start").cast(pl.Int32),
+            pl.col("End").cast(pl.Int32),
+        )
+        .collect()
+    )
+
+    return bed_df_pl
+
+
+@overload
+def add_region_ids_to_bed_df_pl(
+    bed_df_pl: pl.DataFrame,
+) -> pl.DataFrame: ...
+
+
+@overload
+def add_region_ids_to_bed_df_pl(
+    bed_df_pl: pl.LazyFrame,
+) -> pl.LazyFrame: ...
+
+
+def add_region_ids_to_bed_df_pl(
+    bed_df_pl: pl.DataFrame | pl.LazyFrame,
+) -> pl.DataFrame | pl.LazyFrame:
+    """
+    Add ``RegionID`` column to BED Polars DataFrame.
+
+    Parameters
+    ----------
+    bed_df_pl
+        Polars DataFrame with BED entries with at least the following columns:
+        ``Chromosome``, ``Start`` and ``End``.
+
+    Returns
+    -------
+    Polars DataFrame with original BED entries and ``RegionID`` column.
+
+    See Also
+    --------
+    pycisTopic.fragments.read_bed_to_polars_df
+    pycisTopic.fragments.region_ids_to_bed_df_pl
+
+    Examples
+    --------
+    Read BED file to Polars DataFrame and add ``RegionID`` column.
+
+    >>> bed_df_pl = read_bed_to_polars_df("test.bed")
+    >>> bed_df_pl = add_region_ids_to_bed_df_pl(bed_df_pl)
+
+    Read BED file to Polars DataFrame and add ``RegionID`` column using the ``pipe``
+    method.
+
+    >>> bed_df_pl = read_bed_to_polars_df("test.bed").pipe(add_region_ids_to_bed_df_pl)
+
+    """
+    bed_df_pl = bed_df_pl.with_columns(
+        (
+            pl.col("Chromosome").cast(pl.Utf8)
+            + ":"
+            + pl.col("Start").cast(pl.Utf8)
+            + "-"
+            + pl.col("End").cast(pl.Utf8)
+        )
+        .cast(pl.Categorical(PycisTopicCategoricals.REGION_ID))
+        .alias("RegionID")
+    )
+
+    return bed_df_pl
+
+
 def read_bed_to_polars_df(
     bed_filename: str,
     bed_parser_engine: str
@@ -118,6 +237,7 @@ def read_bed_to_polars_df(
 
     See Also
     --------
+    pycisTopic.fragments.add_region_ids_to_bed_df_pl
     pycisTopic.fragments.read_fragments_to_polars_df
 
     Examples
@@ -126,8 +246,8 @@ def read_bed_to_polars_df(
 
     >>> bed_df_pl = read_bed_to_polars_df("test.bed", bed_parser_engine="polars_lazy")
 
-    Read BED file to Polars DataFrame with Polars lazy API engine and require that the BED
-    file has at least 4 columns.
+    Read BED file to Polars DataFrame with Polars lazy API engine and require that the
+    BED file has at least 4 columns.
 
     >>> bed_with_at_least_4_columns_df_pl = read_bed_to_polars_df(
     ...     "test.bed",
@@ -1076,17 +1196,7 @@ def create_fragment_matrix_from_fragments(
             min_column_count=3,
         )
         .lazy()
-        .with_columns(
-            (
-                pl.col("Chromosome")
-                + ":"
-                + pl.col("Start").cast(pl.Utf8)
-                + "-"
-                + pl.col("End").cast(pl.Utf8)
-            )
-            .cast(pl.Categorical(PycisTopicCategoricals.REGION_ID))
-            .alias("RegionID")
-        )
+        .pipe(add_region_ids_to_bed_df_pl)
         .select(
             pl.col("Chromosome"),
             pl.col("Start"),
