@@ -101,7 +101,7 @@ def get_tss_profile(
         .select(
             # Only keep needed columns for faster Genomics Ranges join.
             pl.col("Chromosome").cast(PycisTopicCategoricals.CHROMOSOME),
-            pl.col("TSS start").alias("Start"),
+            pl.col("TSS_start").alias("Start"),
             pl.col("Strand"),
         )
         # Filter out TSS annotations without strand info
