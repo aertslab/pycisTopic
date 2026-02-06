@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import sys
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -260,116 +260,131 @@ class CistopicImputedFeatures:
 
 
 def rank_imputed_accessibility(
-    self, seed=123, method: str = "polars"
-) -> CistopicImputedFeatures:
+    imputed_acc: npt.NDArray[np.float32],
+    seed: int = 123,
+    engine: Literal["numpy", "polars"] = "polars",
+) -> npt.NDArray[np.int32]:
     """
-    A function to generate rankings per cell based on the imputed accessibility scores per region.
+    Generate rankings per cell based on the imputed accessibility scores per region.
 
     Parameters
     ----------
+    imputed_acc
+        Imputed accessibility matrix (regions x cells).
     seed
-        Random seed to ensure reproducibility of the rankings when there are ties
-    method
-        Method to use for the ranking implementation.
-        Options are "numpy" (same rankings as with older versions of pycisTopic)
-        or "polars" (fastest). Default: "polars".
+        Random seed to ensure reproducibility of the rankings when there are ties.
+        Results are only reproducible when both the same seed and the same method
+        are used.
+    engine
+        Engine to use to calculate rankings of imputed accessibility scores per cell.
+        Options are ``numpy`` (same rankings as with older versions of pycisTopic)
+        or ``polars`` (fastest).
 
-    Return
-    ------
-       CistopicImputedFeatures
-        A :class:`CistopicImputedFeatures` containing with ranking values rather than scores.
+    Returns
+    -------
+    Numpy array (regions x cells) containing rankings per cell based on the imputed
+    accessibility scores per region (regions x cells).
 
     """
-    if method != "numpy" and method != "polars":
+    if engine != "numpy" and engine != "polars":
         raise ValueError(
-            f'Invalid method ("{method}") for ranking implementation. Use "numpy" or "polars".'
+            f'Invalid engine ("{engine}") for ranking implementation. Use "numpy" or "polars".'
         )
 
-    # Initialize random number generator, for handling ties.
+    # Initialize random number generator, for handling ties in the imputed accessibility
+    # scores in a reproducible way. This ensures that the same random rankings will be
+    # assigned for tied scores per cell each time this function is ran with the same
+    # seed and engine.
     rng = np.random.default_rng(seed=seed)
 
     # Function to make rankings per array.
     def rank_scores_and_assign_random_ranking_in_range_for_ties_with_numpy(
-        scores_with_ties_for_motif_or_track_numpy: npt.NDarray,
-    ) -> npt.NDarray:
-        #
-        # Create random permutation so tied scores will have a different ranking each time.
+        imputed_acc_scores_for_cell_with_ties_numpy: npt.NDArray[np.float32],
+    ) -> npt.NDArray[np.int32]:
+        # Rank all imputed accessibility scores per cell and assign a random ranking in
+        # range for regions with the same imputed accessibility score.
+        #   - Create a random permutation of the indexes of the input array.
+        #   - Create an empty array for the rankings.
+        #   - Use argsort on the negative imputed accessibility scores to get the
+        #     ranking order (highest score gets rank 0).
+        #   - Use the random permutation to break ties in the scores, so that regions
+        #     with the same score get a random ranking in the range of their scores
+        #     instead of depending on the order in which they appear in the input array.
         random_permutations_to_break_ties_numpy = rng.permutation(
-            scores_with_ties_for_motif_or_track_numpy.shape[0]
+            imputed_acc_scores_for_cell_with_ties_numpy.shape[0]
         )
-        ranking_with_broken_ties_for_motif_or_track_numpy = np.empty(
-            scores_with_ties_for_motif_or_track_numpy.shape[0],
-            dtype=imputed_acc_obj_ranking_db_dtype,
+        imputed_acc_rankings_with_broken_ties_for_cell_numpy = np.empty(
+            imputed_acc_scores_for_cell_with_ties_numpy.shape[0],
+            dtype=np.int32,
         )
-        ranking_with_broken_ties_for_motif_or_track_numpy[
+        imputed_acc_rankings_with_broken_ties_for_cell_numpy[
             random_permutations_to_break_ties_numpy[
-                (-scores_with_ties_for_motif_or_track_numpy)[
+                (-imputed_acc_scores_for_cell_with_ties_numpy)[
                     random_permutations_to_break_ties_numpy
                 ].argsort()
             ]
         ] = np.arange(
-            scores_with_ties_for_motif_or_track_numpy.shape[0],
-            dtype=imputed_acc_obj_ranking_db_dtype,
+            imputed_acc_scores_for_cell_with_ties_numpy.shape[0],
+            dtype=np.int32,
         )
 
-        return ranking_with_broken_ties_for_motif_or_track_numpy
+        return imputed_acc_rankings_with_broken_ties_for_cell_numpy
 
     def rank_scores_and_assign_random_ranking_in_range_for_ties_with_polars(
-        scores_with_ties_for_motif_or_track_numpy: npt.NDArray,
+        imputed_acc_scores_for_cell_with_ties_numpy: npt.NDArray[np.float32],
         seed: int,
-    ) -> npt.NDarray:
-        # Rank scores and assign a random ranking in range for regions/genes with
-        # the same score.
+    ) -> npt.NDArray[np.int32]:
+        # Rank all imputed accessibility scores per cell and assign a random ranking in
+        # range for regions with the same imputed accessibility score.
         #   - Convert numpy array to Polars Series.
         #   - Replace NaN values with the minimum value of the dtype, so NaNs are
         #     ranked last.
-        #   - Use the `rank` method from Polars to assign ranks, using the "random"
-        #     method to break ties so that regions/genes with the same score get a
-        #     random ranking in the range of their scores instead of depending on
-        #     the order in which they appear in the input array.
+        #   - Use the `rank` engine from Polars to assign ranks, using the "random"
+        #     engine to break ties so that regions with the same score get a random
+        #     ranking in the range of their scores instead of depending on the order
+        #     in which they appear in the input array.
         #   - Subtract 1 from the ranks to make them zero-based.
         return (
-            pl.Series(scores_with_ties_for_motif_or_track_numpy)
-            .fill_nan(np.finfo(scores_with_ties_for_motif_or_track_numpy.dtype).min)
-            .rank(method="random", descending=True, seed=seed)
-            - 1
-        ).to_numpy()
+            (
+                pl.Series(imputed_acc_scores_for_cell_with_ties_numpy)
+                .fill_nan(
+                    float(
+                        np.finfo(imputed_acc_scores_for_cell_with_ties_numpy.dtype).min
+                    )
+                )
+                .rank(method="random", descending=True, seed=seed)
+                - 1
+            )
+            .cast(pl.Int32)
+            .to_numpy()
+        )
 
-    # Create zeroed imputed object rankings database.
-    imputed_acc_ranking = CistopicImputedFeatures(
-        np.zeros((len(self.feature_names), len(self.cell_names)), dtype=np.int32),
-        self.feature_names,
-        self.cell_names,
-        self.project,
-    )
+    n_regions, n_cells = imputed_acc.shape
 
-    # Get dtype of the scores
-    imputed_acc_obj_ranking_db_dtype = "uint32"
+    # Create zeroed imputed accessibility rankings database.
+    imputed_acc_rankings = np.zeros((n_regions, n_cells), dtype=np.int32)
 
-    # Convert to csc
-    if sparse.issparse(self.mtx):
-        mtx = self.mtx.tocsc()
-    else:
-        mtx = self.mtx
-
-    # Rank all scores per motif/track and assign a random ranking in range for regions/genes with the same score.
-    if method == "numpy":
-        for col_idx in range(len(imputed_acc_ranking.cell_names)):
-            imputed_acc_ranking.mtx[:, col_idx] = (
+    # Rank all imputed accessibility scores per cell and assign a random ranking in
+    # range for regions with the same imputed accessibility score.
+    if engine == "numpy":
+        for cell_idx in range(n_cells):
+            imputed_acc_rankings[:, cell_idx] = (
                 rank_scores_and_assign_random_ranking_in_range_for_ties_with_numpy(
-                    mtx[:, col_idx].toarray().flatten()
+                    imputed_acc[:, cell_idx]
                 )
             )
     else:
-        for col_idx in range(len(imputed_acc_ranking.cell_names)):
-            imputed_acc_ranking.mtx[:, col_idx] = (
+        ranking_seeds = rng.integers(np.iinfo(np.int64).max, size=n_cells)
+
+        for cell_idx, ranking_seed in enumerate(ranking_seeds):
+            imputed_acc_rankings[:, cell_idx] = (
                 rank_scores_and_assign_random_ranking_in_range_for_ties_with_polars(
-                    mtx[:, col_idx].toarray().flatten(),
-                    seed=rng.integers(2**64 - 1),
+                    imputed_acc[:, cell_idx],
+                    seed=ranking_seed,
                 )
             )
 
-    return imputed_acc_ranking
+    return imputed_acc_rankings
 
 
 @numba.njit(parallel=False, error_model="numpy")
