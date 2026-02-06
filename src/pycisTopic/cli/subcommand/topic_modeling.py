@@ -147,9 +147,10 @@ def run_mallet_calculate_model_evaluation_stats(args):
 def run_mallet_plot_model_evaluation_stats(args):
     from pycisTopic.topic_modeling.plot_stats import plot_stats
 
+    n_topics_list = [args.n_topics] if isinstance(args.n_topics, int) else args.n_topics
     plot_stats(
         output_prefix=args.output_prefix,
-        n_topics=args.n_topics,
+        n_topics=n_topics_list,
         plot_file_format=args.plot_file_format,
     )
 
