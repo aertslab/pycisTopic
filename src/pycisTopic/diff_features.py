@@ -20,7 +20,6 @@ from pycisTopic.utils import (
     get_nonzero_row_indices,
     get_position_index,
     non_zero_rows,
-    subset_list,
 )
 
 
@@ -472,10 +471,9 @@ def calculate_per_region_mean_and_dispersion_on_normalized_imputed_acc(
     region_topic = region_topic[region_idx_to_keep]
 
     # Get all region names that need to be kept.
-    region_names_to_keep = subset_list(
-        region_names,
-        region_idx_to_keep,
-    )
+    region_names_to_keep = [
+        region_names[region_idx] for region_idx in region_idx_to_keep
+    ]
 
     # Preallocate arrays for mean and dispersion of normalized imputed accessibility per
     # region.
@@ -743,12 +741,13 @@ def impute_accessibility(
             # the whole row is not completely zero.
             region_idx_to_keep_chunk = non_zero_rows(imputed_acc_chunk)
 
-            # Get all region names that need to be kept for this chunk
+            # Get all region names that need to be kept for this chunk.
+            region_names_in_chunk = region_names[input_chunk_start:input_chunk_end]
             region_names_to_keep.extend(
-                subset_list(
-                    region_names[input_chunk_start:input_chunk_end],
-                    region_idx_to_keep_chunk,
-                )
+                [
+                    region_names_in_chunk[region_idx_in_chunk]
+                    for region_idx_in_chunk in region_idx_to_keep_chunk
+                ]
             )
 
             # Set correct output chunk end position by taking into account
