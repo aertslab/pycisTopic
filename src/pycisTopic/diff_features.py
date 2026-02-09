@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 from pycisTopic.utils import (
     get_nonzero_row_indices,
-    get_position_index,
     non_zero_rows,
 )
 
@@ -1045,15 +1044,17 @@ def get_marker_regions_for_contrast(
     log = logging.getLogger("cisTopic")
 
     # Get subset of region names index positions.
-    selected_region_names_idx = get_position_index(
-        highly_variable_regions, region_names
-    )
+    region_name_to_idx = {region: idx for idx, region in enumerate(region_names)}
+    selected_region_names_idx = [
+        region_name_to_idx[region] for region in highly_variable_regions
+    ]
 
     # Get subset of cell names index positions for foreground and background cells.
-    selected_foreground_and_background_cell_names_idx = get_position_index(
-        selected_foreground_cells + selected_background_cells,
-        cell_names,
-    )
+    cell_name_to_idx = {cell: idx for idx, cell in enumerate(cell_names)}
+    selected_foreground_and_background_cell_names_idx = [
+        cell_name_to_idx[cell]
+        for cell in selected_foreground_cells + selected_background_cells
+    ]
 
     # Get number of foreground cells as it will be used later to divide the imputed
     # accessibility chunk back in a foreground and background part.
