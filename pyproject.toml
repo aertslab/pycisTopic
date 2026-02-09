@@ -56,6 +56,7 @@ plot = [
     "matplotlib>=3.10.3",
 ]
 
+convert = ["lda", "ray", "scikit-learn", "numba"]
 [project.urls]
 Homepage = "https://github.com/aertslab/pycisTopic"
 Documentation = "https://pycistopic.readthedocs.io/"
