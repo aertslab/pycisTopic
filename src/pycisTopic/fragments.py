@@ -1242,7 +1242,7 @@ def create_fragment_matrix_from_fragments(
                 ),
                 on="RegionID",
                 how="anti",
-                maintain_order=True,
+                maintain_order="left",
             )
             .select(
                 pl.col("Chromosome"),
