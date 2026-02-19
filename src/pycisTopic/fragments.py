@@ -72,11 +72,11 @@ def cbs_to_cbs_series_pl(
                 "Unsupported type for cell barcodes. First element of cell barcodes is not a string."
             )
     elif isinstance(cbs, pl.Series):
-        if cbs.dtype == pl.Utf8:
+        if isinstance(cbs.dtype, pl.Utf8):
             cbs_series_pl = cbs.cast(pl.Categorical(PycisTopicCategoricals.CB)).rename(
                 "CB"
             )
-        elif cbs.dtype == pl.Categorical:
+        elif isinstance(cbs.dtype, pl.Categorical):
             if cbs.dtype.categories == PycisTopicCategoricals.CB:
                 cbs_series_pl = cbs.rename("CB")
             else:
