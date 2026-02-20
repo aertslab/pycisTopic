@@ -1,0 +1,4 @@
+#!/usr/bin/env python
+from scatac_toolkit_utils import main
+
+main()
