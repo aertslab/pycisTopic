@@ -220,7 +220,7 @@ def get_tss_annotation_from_ensembl(
         ),
     )
 
-    if pybiomart_dataset_query_has_dtypes_arg:
+    if not pybiomart_dataset_query_has_dtypes_arg:
         # Convert columns to correct datatypes afterwards for pybiomart 0.2.0.
         ensembl_tss_annotation = ensembl_tss_annotation.astype(
             ensembl_tss_annotation_dtypes
