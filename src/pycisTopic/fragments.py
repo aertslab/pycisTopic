@@ -492,8 +492,8 @@ def read_fragments_to_polars_df(
         if not cb_end_to_remove:
             # Append separator and sample ID to cell barcode.
             fragments_df_pl = fragments_df_pl.with_columns(
-                (pl.col("CB").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).cast(
-                    pl.Categorical(PycisTopicCategoricals.CB)
+                (pl.col("CB").cast(pl.Utf8) + pl.lit(separator_and_sample_id)).alias(
+                    "CB"
                 )
             )
         else:
@@ -531,12 +531,12 @@ def read_fragments_to_polars_df(
                 (
                     pl.col("CB").cast(pl.Utf8).str.strip_suffix(cb_end_to_remove)
                     + pl.lit(separator_and_sample_id)
-                )
-                .cast(pl.Categorical(PycisTopicCategoricals.CB))
-                .alias("CB")
+                ).alias("CB")
             )
 
-    fragments_df_pl = fragments_df_pl.collect()
+    fragments_df_pl = fragments_df_pl.with_columns(
+        pl.col("CB").cast(pl.Categorical(PycisTopicCategoricals.CB))
+    ).collect()
 
     return fragments_df_pl
 
