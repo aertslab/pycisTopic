@@ -100,7 +100,9 @@ def get_tss_profile(
         .lazy()
         .select(
             # Only keep needed columns for faster Genomics Ranges join.
-            pl.col("Chromosome").cast(PycisTopicCategoricals.CHROMOSOME),
+            pl.col("Chromosome").cast(
+                pl.Categorical(PycisTopicCategoricals.CHROMOSOME)
+            ),
             pl.col("TSS_start").alias("Start"),
             pl.col("Strand"),
         )
