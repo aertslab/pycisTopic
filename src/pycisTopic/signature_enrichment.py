@@ -143,7 +143,7 @@ def signature_enrichment(
     ]
 
     # initialize aucell values
-    n_cells = region_topic.shape[0]
+    n_cells = cell_topic.shape[1]
     n_signatures = len(signatures)
     aucell_values: npt.NDArray[np.float32] = np.empty(
         (n_cells, n_signatures), dtype=np.float32
