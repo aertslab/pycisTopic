@@ -66,6 +66,12 @@ def impute_accessibility_chunked(
     ------
     Numpy array with imputed accessibility of chunk.
 
+    .. warning::
+        The yielded array is a reused in-place buffer. Each call to ``next()``
+        overwrites its contents. Do not hold references to previously yielded
+        arrays across iterations — copy the array (e.g. ``chunk.copy()``) if
+        you need to retain the data.
+
     """
     if region_topic.shape[1] != cell_topic.shape[0]:
         raise ValueError(
@@ -97,12 +103,6 @@ def impute_accessibility_chunked(
     for chunk_start in range(0, n_total, chunk_size):
         chunk_end = chunk_start + chunk_size
 
-        if log is not None:
-            log.info(
-                "Calculate partial imputed accessibility "
-                f"{chunk_start}-{chunk_end} (out of {n_total})."
-            )
-
         # get current chunk of regions or cells
         if chunk_along == "region":
             _cell_topic = cell_topic
@@ -123,6 +123,13 @@ def impute_accessibility_chunked(
                 chunk_size=current_chunk_size,
                 chunk_along=chunk_along,
                 log=log
+            )
+            chunk_end = chunk_start + current_chunk_size
+
+        if log is not None:
+            log.info(
+                "Calculate partial imputed accessibility "
+                f"{chunk_start}-{chunk_end} (out of {n_total})."
             )
 
         np.matmul(_region_topic, _cell_topic, out=imputed_acc_chunk)
