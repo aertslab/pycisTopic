@@ -536,13 +536,13 @@ class MACSCallPeak:
         if self.nolambda is True:
             cmd = (
                 self.macs_path
-                + " callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s "
+                + " callpeak --treatment \"%s\" --name \"%s\"  --outdir \"%s\" --format %s --gsize %s "
                 "--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits --nolambda"
             )
         else:
             cmd = (
                 self.macs_path
-                + " callpeak --treatment %s --name %s  --outdir %s --format %s --gsize %s "
+                + " callpeak --treatment \"%s\" --name \"%s\"  --outdir \"%s\" --format %s --gsize %s "
                 "--qvalue %s --nomodel --shift %s --extsize %s --keep-dup %s --call-summits"
             )
 
