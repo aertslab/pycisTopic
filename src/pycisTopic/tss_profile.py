@@ -316,7 +316,7 @@ def get_tss_profile(
         pl.col("position_from_tss"),
         pl.all()
         .exclude("position_from_tss")
-        .rolling_mean(window_size=smoothing_rolling_window, min_periods=0),
+        .rolling_mean(window_size=smoothing_rolling_window, min_samples=0),
     )
 
     # Remove raw TSS matrix.
