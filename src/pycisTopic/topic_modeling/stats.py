@@ -4,8 +4,8 @@ from itertools import chain
 
 import numpy as np
 import scipy
-import tmtoolkit
 
+import pycisTopic.topic_modeling.tmtoolkit_lite as tmtoolkit_lite
 from pycisTopic.topic_modeling.mallet_models import LDAMallet, LDAMalletFilenames
 
 
@@ -51,6 +51,7 @@ def loglikelihood(nzw, ndz, alpha, eta):
 
     ll = doc_ll - const_prior + topic_ll - const_ll
     return ll
+
 
 def calculate_model_evaluation_stats(
     binary_accessibility_matrix: scipy.sparse.csr_matrix,
@@ -120,15 +121,15 @@ def calculate_model_evaluation_stats(
 
     # Model evaluation
     cell_cov = np.asarray(binary_accessibility_matrix.sum(axis=0)).astype(float)
-    arun_2010 = tmtoolkit.topicmod.evaluate.metric_arun_2010(
+    arun_2010 = tmtoolkit_lite.topicmod.evaluate.metric_arun_2010(
         topic_word_distrib=topic_word_distrib,
         doc_topic_distrib=doc_topic_distrib,
         doc_lengths=cell_cov,
     )
-    cao_juan_2009 = tmtoolkit.topicmod.evaluate.metric_cao_juan_2009(
+    cao_juan_2009 = tmtoolkit_lite.topicmod.evaluate.metric_cao_juan_2009(
         topic_word_distrib=topic_word_distrib
     )
-    mimno_2011 = tmtoolkit.topicmod.evaluate.metric_coherence_mimno_2011(
+    mimno_2011 = tmtoolkit_lite.topicmod.evaluate.metric_coherence_mimno_2011(
         topic_word_distrib=topic_word_distrib,
         dtm=binary_accessibility_matrix.transpose(),
         top_n=20,
@@ -140,7 +141,7 @@ def calculate_model_evaluation_stats(
     doc_topic_counts = (doc_topic_distrib.T * (cell_cov)).T
     ll = loglikelihood(topic_word_counts, doc_topic_counts, ll_alpha, ll_eta)
 
-    marg_topic = tmtoolkit.topicmod.model_stats.marginal_topic_distrib(
+    marg_topic = tmtoolkit_lite.topicmod.model_stats.marginal_topic_distrib(
         doc_topic_distrib=doc_topic_distrib, doc_lengths=cell_cov
     )
 
