@@ -31,9 +31,11 @@ def metric_cao_juan_2009(topic_word_distrib):
     """
     # pdist will calculate the pair-wise cosine distance between all topics in the topic-word distribution
     # then calculate the mean of cosine similarity (1 - cosine_distance)
-    cos_sim = 1 - pdist(topic_word_distrib, metric='cosine')
+    cos_sim = 1 - pdist(topic_word_distrib, metric="cosine")
     return np.mean(cos_sim)
-metric_cao_juan_2009.direction = 'minimize'
+
+
+metric_cao_juan_2009.direction = "minimize"
 
 
 def metric_arun_2010(topic_word_distrib, doc_topic_distrib, doc_lengths):
@@ -55,24 +57,33 @@ def metric_arun_2010(topic_word_distrib, doc_topic_distrib, doc_lengths):
 
     # CM1 – sing. value decomp. of topic-word distrib.
     cm1 = np.linalg.svd(topic_word_distrib, compute_uv=False)
-    cm1 /= np.sum(cm1)     # normalize
+    cm1 /= np.sum(cm1)  # normalize
 
     # CM2 – topics scaled by document lengths
     doc_lengths = np.asarray(doc_lengths).flatten()
     cm2 = doc_lengths @ doc_topic_distrib
-    cm2 = -np.sort(-cm2)   # sort in desc. order (just like cm1 is already sorted in desc. order)
-    cm2 /= np.sum(cm2)     # normalize
+    cm2 = -np.sort(
+        -cm2
+    )  # sort in desc. order (just like cm1 is already sorted in desc. order)
+    cm2 /= np.sum(cm2)  # normalize
 
     # symmetric Kullback-Leibler divergence KL(cm1||cm2) + KL(cm2||cm1)
     # note: using log(x/y) instead of log(x) - log(y) here because values in cm vectors are not small
     return np.sum(cm1 * (np.log(cm1 / cm2))) + np.sum(cm2 * (np.log(cm2 / cm1)))
-metric_arun_2010.direction = 'minimize'
 
 
+metric_arun_2010.direction = "minimize"
 
 
-def metric_coherence_mimno_2011(topic_word_distrib, dtm, top_n=20, eps=1, include_prob=False, normalize=False,
-                                return_mean=False):
+def metric_coherence_mimno_2011(
+    topic_word_distrib,
+    dtm,
+    top_n=20,
+    eps=1,
+    include_prob=False,
+    normalize=False,
+    return_mean=False,
+):
     """
     Calculate coherence metric according to [Mimno2011]_. You need to provide a topic word distribution as
     `topic_word_distrib` and a document-term-matrix `dtm` (can be sparse). `top_n` controls how many most probable
@@ -98,36 +109,46 @@ def metric_coherence_mimno_2011(topic_word_distrib, dtm, top_n=20, eps=1, includ
     n_topics, n_vocab = topic_word_distrib.shape
 
     if n_vocab != dtm.shape[1]:
-        raise ValueError('shapes of provided `topic_word_distrib` and `dtm` do not match (vocab sizes differ)')
+        raise ValueError(
+            "shapes of provided `topic_word_distrib` and `dtm` do not match (vocab sizes differ)"
+        )
 
     if top_n > n_vocab:
-        raise ValueError('`top_n=%d` is larger than the vocabulary size of %d words'
-                         % (top_n, topic_word_distrib.shape[1]))
+        raise ValueError(
+            "`top_n=%d` is larger than the vocabulary size of %d words"
+            % (top_n, topic_word_distrib.shape[1])
+        )
 
     if include_prob:
-        top_words, top_prob = top_words_for_topics(topic_word_distrib, top_n, return_prob=True)   # V
+        top_words, top_prob = top_words_for_topics(
+            topic_word_distrib, top_n, return_prob=True
+        )  # V
     else:
-        top_words = top_words_for_topics(topic_word_distrib, top_n, return_prob=False)            # V
+        top_words = top_words_for_topics(
+            topic_word_distrib, top_n, return_prob=False
+        )  # V
         top_prob = None
 
-    if issparse(dtm) and dtm.format != 'csc':
+    if issparse(dtm) and dtm.format != "csc":
         dtm = dtm.tocsc()
 
     coh = []
     for t in range(n_topics):
         # calc. coherence for topic t
-        v = top_words[t]     # V_t
-        p = None if top_prob is None else top_prob[t]    # prob. of words in V_t
+        v = top_words[t]  # V_t
+        p = None if top_prob is None else top_prob[t]  # prob. of words in V_t
         top_dtm = dtm[:, v]  # occurrences for top words V_t; shape (n_docs, top_n)
-        df = doc_frequencies(top_dtm)      # for D(v)
+        df = doc_frequencies(top_dtm)  # for D(v)
         codf = codoc_frequencies(top_dtm)  # for D(v, v')
 
         c_t = 0
         for m in range(1, top_n):
             for l in range(m):
-                if p is None:   # include_prob is False: sum(log((D(v_m, v_l) + eps) / D(v_l)))
+                if p is None:
+                    # include_prob is False: sum(log((D(v_m, v_l) + eps) / D(v_l)))
                     c_t += np.log((codf[m, l] + eps) / df[l])
-                else:           # include_prob is True: sum(log(p_m * p_l * (D(v_m, v_l) + eps) / D(v_l)))
+                else:
+                    # include_prob is True: sum(log(p_m * p_l * (D(v_m, v_l) + eps) / D(v_l)))
                     c_t += np.log(p[m] * p[l] * (codf[m, l] + eps) / df[l])
 
         coh.append(c_t)
@@ -135,7 +156,7 @@ def metric_coherence_mimno_2011(topic_word_distrib, dtm, top_n=20, eps=1, includ
     coh = np.array(coh)
 
     if normalize:
-        coh *= 2 / (top_n * (top_n-1))
+        coh *= 2 / (top_n * (top_n - 1))
 
     if return_mean:
         return coh.mean()

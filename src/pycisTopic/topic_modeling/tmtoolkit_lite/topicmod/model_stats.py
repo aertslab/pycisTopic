@@ -4,7 +4,7 @@ Common statistics and tools for topic models.
 
 import numpy as np
 
-#%% Common statistics from topic-word or document-topic distribution
+# %% Common statistics from topic-word or document-topic distribution
 
 
 def marginal_topic_distrib(doc_topic_distrib, doc_lengths):
@@ -36,20 +36,22 @@ def top_words_for_topics(topic_word_distrib, top_n=None, vocab=None, return_prob
              each topic is returned
     """
     if not isinstance(topic_word_distrib, np.ndarray) or topic_word_distrib.ndim != 2:
-        raise ValueError('`topic_word_distrib` must be a 2D NumPy array')
+        raise ValueError("`topic_word_distrib` must be a 2D NumPy array")
 
     if len(topic_word_distrib) == 0:
-        raise ValueError('`topic_word_distrib` cannot be empty')
+        raise ValueError("`topic_word_distrib` cannot be empty")
 
     if vocab is not None:
         if not isinstance(vocab, np.ndarray) or vocab.ndim != 1:
-            raise ValueError('`vocab` must be a 1D NumPy array')
+            raise ValueError("`vocab` must be a 1D NumPy array")
 
         if len(vocab) == 0:
-            raise ValueError('`vocab` cannot be empty')
+            raise ValueError("`vocab` cannot be empty")
 
         if topic_word_distrib.shape[1] != len(vocab):
-            raise ValueError('shapes of provided `topic_word_distrib` and `vocab` do not match (vocab sizes differ)')
+            raise ValueError(
+                "shapes of provided `topic_word_distrib` and `vocab` do not match (vocab sizes differ)"
+            )
 
     n_vocab = topic_word_distrib.shape[1]
 
@@ -57,16 +59,16 @@ def top_words_for_topics(topic_word_distrib, top_n=None, vocab=None, return_prob
         top_n = n_vocab
 
     if top_n < 1:
-        raise ValueError('`top_n` must be at least 1')
+        raise ValueError("`top_n` must be at least 1")
     elif top_n > n_vocab:
-        raise ValueError('`top_n` cannot be larger than vocab size')
+        raise ValueError("`top_n` cannot be larger than vocab size")
 
     topic_words = []
     topic_probs = []
 
     for topic in topic_word_distrib:
         sorter_arr = np.argsort(topic)
-        sorter_slice = slice(None, -(top_n+1), -1) if top_n < n_vocab else slice(None)
+        sorter_slice = slice(None, -(top_n + 1), -1) if top_n < n_vocab else slice(None)
 
         if vocab is None:
             topic_words.append(sorter_arr[sorter_slice])

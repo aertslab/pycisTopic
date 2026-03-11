@@ -20,7 +20,7 @@ def doc_frequencies(dtm, min_val=1, proportions=0):
     :return: NumPy array of size M (vocab size) indicating how often each term occurs at least `min_val` times.
     """
     if dtm.ndim != 2:
-        raise ValueError('`dtm` must be a 2D array/matrix')
+        raise ValueError("`dtm` must be a 2D array/matrix")
 
     doc_freq = np.sum(dtm >= min_val, axis=0)
 
@@ -52,12 +52,12 @@ def codoc_frequencies(dtm, min_val=1, proportions=0):
     :return: co-document frequency (aka word co-occurrence) matrix with shape (vocab size, vocab size)
     """
     if dtm.ndim != 2:
-        raise ValueError('`dtm` must be a 2D array/matrix')
+        raise ValueError("`dtm` must be a 2D array/matrix")
 
     if dtm.shape[1] < 2:
-        raise ValueError('`dtm` must have at least two columns')
+        raise ValueError("`dtm` must have at least two columns")
 
-    if issparse(dtm) and dtm.format != 'csc':
+    if issparse(dtm) and dtm.format != "csc":
         dtm = dtm.tocsc()
 
     bin_dtm = (dtm >= min_val).astype(int)
