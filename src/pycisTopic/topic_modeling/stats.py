@@ -9,7 +9,7 @@ import pycisTopic.topic_modeling.tmtoolkit_lite as tmtoolkit_lite
 from pycisTopic.topic_modeling.mallet_models import LDAMallet, LDAMalletFilenames
 
 
-class JsonNPEncode(json.JSONEncoder):
+class JsonNumpyEncode(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
@@ -18,6 +18,7 @@ class JsonNPEncode(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return super().default(obj)
+
 
 def loglikelihood(nzw, ndz, alpha, eta):
     D = ndz.shape[0]
@@ -127,7 +128,7 @@ def calculate_model_evaluation_stats(
         doc_lengths=cell_cov,
     )
     cao_juan_2009 = tmtoolkit_lite.topicmod.evaluate.metric_cao_juan_2009(
-        topic_word_distrib=topic_word_distrib
+        topic_word_distrib=topic_word_distrib,
     )
     mimno_2011 = tmtoolkit_lite.topicmod.evaluate.metric_coherence_mimno_2011(
         topic_word_distrib=topic_word_distrib,
@@ -142,7 +143,8 @@ def calculate_model_evaluation_stats(
     ll = loglikelihood(topic_word_counts, doc_topic_counts, ll_alpha, ll_eta)
 
     marg_topic = tmtoolkit_lite.topicmod.model_stats.marginal_topic_distrib(
-        doc_topic_distrib=doc_topic_distrib, doc_lengths=cell_cov
+        doc_topic_distrib=doc_topic_distrib,
+        doc_lengths=cell_cov,
     )
 
     topic_ass = list(chain.from_iterable(topic_word_counts.sum(axis=1)[:, None]))
@@ -150,23 +152,24 @@ def calculate_model_evaluation_stats(
     metrics = {
         "Arun_2010": arun_2010,
         "Cao_Juan_2009": cao_juan_2009,
-        "Mimno_2011": np.mean(mimno_2011) \
-            if len(mimno_2011) <= top_topics_coh \
-            else \
-            np.mean(
+        "Mimno_2011": (
+            np.mean(mimno_2011)
+            if len(mimno_2011) <= top_topics_coh
+            else np.mean(
                 mimno_2011[
                     np.argpartition(mimno_2011, -top_topics_coh)[-top_topics_coh:]
                 ]
-            ),
+            )
+        ),
         "loglikelihood": ll,
         "coherence": mimno_2011,
         "marg_topic": marg_topic,
-        "assignments": topic_ass
+        "assignments": topic_ass,
     }
 
-    with open(lda_mallet_filenames.model_stats_filename, "w") as outf:
+    with open(lda_mallet_filenames.model_stats_filename, "w") as fh:
         json.dump(
             metrics,
-            outf,
-            cls=JsonNPEncode
+            fh,
+            cls=JsonNumpyEncode,
         )
