@@ -217,38 +217,16 @@ def get_tss_profile(
     )
 
     # Get TSS matrix:
-    #   - columns: cut site positions relative to TSS (TSS = 0).
-    #   - rows: CBs
+    #   - columns: CBs
+    #   - rows: cut site positions relative to TSS (TSS = 0).
     #   - values: number of times a cut site position was found for a certain CB.
-    tss_matrix_tmp = (
+    tss_matrix = (
         # Get all cut site positions which fall in [-flank_window, flank_window]
         # (size: flank_window * 2 + 1):
         #   - Some fragments will have both cut sites in this interval.
         #   - Some fragments have only one cut site in this interval (start or end).
         pl.concat(
             [
-                pl.DataFrame(
-                    [
-                        # Create [-flank_window, flank_window] range for all possible
-                        # cut site positions.
-                        pl.arange(
-                            start=-flank_window,
-                            end=flank_window + 1,
-                            step=1,
-                            eager=True,
-                            dtype=pl.Int32,
-                        ).alias("position_from_tss"),
-                        # Create a CB column with all "no_CB" values.
-                        # Needed temporarily so during the pivot operation all cut site
-                        # position values ([-flank_window, flank_window] range) are
-                        # kept even if there are no cut sites for certain positions.
-                        pl.Series(
-                            "CB",
-                            ["no_CB"] * (flank_window * 2 + 1),
-                            dtype=pl.Categorical(PycisTopicCategoricals.CB),
-                        ),
-                    ]
-                ),
                 # Get all cut sites for the relative start that pass the filter.
                 cut_sites_tss_start_end.filter(
                     pl.col("rel_start").abs() <= flank_window
@@ -269,28 +247,24 @@ def get_tss_profile(
         )
         # Count number of cut sites with the same CB and same position per CB.
         .pivot(
+            on="position_from_tss",
+            on_columns=pl.arange(
+                start=-flank_window,
+                end=flank_window + 1,
+                step=1,
+                eager=True,
+                dtype=pl.Int32,
+            ),
             values="position_from_tss",
             index="CB",
-            columns="position_from_tss",
             aggregate_function="len",
         )
-        # Remove "no_CB" cell barcode (was only needed for the pivot).
-        .filter(pl.col("CB") != "no_CB")
         .with_columns(
+            pl.col("CB").cast(pl.Utf8),
             # Fill in 0, for non-observed values in the pivot table after casting
             # column from UInt32 (`polars`) or UInt64 (`polars-u64-idx`) to Int32.
             pl.col(pl.get_index_type()).cast(pl.Int32).fill_null(0),
         )
-    )
-
-    # Get TSS matrix:
-    #   - columns: CBs
-    #   - rows: cut site positions relative to TSS.
-    #   - values: number of times a cut site position was found for a certain CB.
-    tss_matrix = (
-        tss_matrix_tmp.clone()
-        # Remove "CB" column, so numeric values of the TSS matrix can be transposed.
-        .drop("CB")
         # Transpose TSS matrix:
         #    - columns: CBs
         #    - rows: cut site positions relative to TSS.
@@ -299,17 +273,14 @@ def get_tss_profile(
             # column.
             include_header=True,
             header_name="position_from_tss",
-            # Add old "CB" column as column names.
-            column_names=tss_matrix_tmp.get_column("CB"),
+            # Add "CB" column as column names.
+            column_names="CB",
         )
         .with_columns(
             # Convert "position_from_tss" column from pl.Utf8 to pl.Int32.
             pl.col("position_from_tss").cast(pl.Int32)
         )
     )
-
-    # Remove raw non-transposed TSS matrix.
-    del tss_matrix_tmp
 
     # Smooth TSS matrix per CB by a rolling window.
     tss_smoothed_matrix_per_cb = tss_matrix.with_columns(
