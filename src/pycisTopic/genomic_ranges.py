@@ -596,6 +596,8 @@ def _filter_intersection_output_columns(
         Suffix added to coordinate columns of first set of regions.
     regions2_suffix
         Suffix added to coordinate and info columns of second set of regions.
+    add_overlap_size
+        Add columns with absolute and relative overlap size to output of intersection.
 
     Returns
     -------
@@ -666,16 +668,16 @@ def _get_intersection_size(
     intersect: pl.LazyFrame,
     regions1_suffix: str,
     regions2_suffix: str,
-) -> pl.LazyFrame:
-    ...
+) -> pl.LazyFrame: ...
+
 
 @overload
 def _get_intersection_size(
     intersect: pl.DataFrame,
     regions1_suffix: str,
     regions2_suffix: str,
-) -> pl.DataFrame:
-    ...
+) -> pl.DataFrame: ...
+
 
 def _get_intersection_size(
     intersect: pl.LazyFrame | pl.DataFrame,
@@ -717,7 +719,7 @@ def _get_intersection_size(
     │ chr1       ┆ 4     ┆ 9   ┆ chr1         ┆ 4       ┆ 9     ┆ chr1         ┆ 2       ┆ 9     ┆ b   │
     └────────────┴───────┴─────┴──────────────┴─────────┴───────┴──────────────┴─────────┴───────┴─────┘
 
-    >>> get_intersection_size(intersect)
+    >>> _get_intersection_size(intersect)
         shape: (3, 13)
     ┌────────────┬───────┬─────┬───────────┬───┬─────┬──────────┬───────────┬───────────┐
     │ Chromosome ┆ Start ┆ End ┆ Chromosom ┆ … ┆ ID  ┆ nb_inter ┆ fr1_inter ┆ fr2_inter │
@@ -728,20 +730,23 @@ def _get_intersection_size(
     │ chr1       ┆ 2     ┆ 3   ┆ chr1      ┆ … ┆ a   ┆ 1        ┆ 0.5       ┆ 0.142857  │
     │ chr1       ┆ 2     ┆ 3   ┆ chr1      ┆ … ┆ a   ┆ 1        ┆ 0.5       ┆ 1.0       │
     │ chr1       ┆ 4     ┆ 9   ┆ chr1      ┆ … ┆ b   ┆ 5        ┆ 1.0       ┆ 0.714286  │
-    └────────────┴───────┴─────┴───────────┴───┴─────┴──────────┴───────────┴───────────┘ 
+    └────────────┴───────┴─────┴───────────┴───┴─────┴──────────┴───────────┴───────────┘
 
     """
     intersect = intersect.with_columns(
-        nb_inter = pl.col("End") - pl.col("Start")
+        (pl.col("End") - pl.col("Start")).alias("nb_inter"),
     )
 
     return intersect.with_columns(
-        fr1_inter = pl.col("nb_inter")
-            / (pl.col(f"End{regions1_suffix}") - pl.col(f"Start{regions1_suffix}")),
-        fr2_inter = pl.col("nb_inter")
-            / (pl.col(f"End{regions2_suffix}") - pl.col(f"Start{regions2_suffix}")),
+        (
+            pl.col("nb_inter")
+            / (pl.col(f"End{regions1_suffix}") - pl.col(f"Start{regions1_suffix}"))
+        ).alias("fr1_inter"),
+        (
+            pl.col("nb_inter")
+            / (pl.col(f"End{regions2_suffix}") - pl.col(f"Start{regions2_suffix}"))
+        ).alias("fr2_inter"),
     )
-
 
 
 def intersection(
