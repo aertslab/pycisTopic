@@ -209,7 +209,7 @@ def add_region_ids_to_bed_df_pl(
 
 
 def read_bed_to_polars_df(
-    bed_filename: str,
+    bed_filename: str | Path,
     bed_parser_engine: str
     | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     min_column_count: int = 3,
@@ -343,8 +343,8 @@ def read_bed_to_polars_df(
             },
         )
     elif bed_parser_engine == "pyarrow":
-        import pyarrow as pa  # type: ignore[import]
-        import pyarrow.csv  # type: ignore[import]
+        import pyarrow as pa
+        import pyarrow.csv
 
         # Read BED file with pyarrow.
         bed_df_pl = pl.from_arrow(
@@ -393,7 +393,7 @@ def read_bed_to_polars_df(
 
 
 def read_fragments_to_polars_df(
-    fragments_bed_filename: str,
+    fragments_bed_filename: str | Path,
     bed_parser_engine: str
     | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     sample_id: str | None = None,
@@ -542,7 +542,7 @@ def read_fragments_to_polars_df(
 
 
 def read_barcodes_file_to_polars_series(
-    barcodes_tsv_filename: str,
+    barcodes_tsv_filename: str | Path,
     sample_id: str | None = None,
     cb_end_to_remove: str | None = "-1",
     cb_sample_separator: str | None = "___",
@@ -763,7 +763,7 @@ def get_cbs_passing_filter(
     min_fragments_per_cb: int | None = None,
     keep_top_x_cbs: int | None = None,
     collapse_duplicates: bool | None = True,
-) -> (pl.Series, pl.DataFrame):
+) -> tuple[pl.Series, pl.DataFrame]:
     """
     Get cell barcodes passing the filter.
 
