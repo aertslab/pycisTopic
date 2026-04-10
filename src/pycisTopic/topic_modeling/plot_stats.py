@@ -1,14 +1,21 @@
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pycisTopic.topic_modeling.mallet_models import LDAMalletFilenames
+from pycisTopic.topic_modeling.topic_models import TopicModelFilenames, load_topic_model_backend
 
 
-def scale(X: np.ndarray) -> np.ndarray:
-    return (X - X.min()) / (X.max() - X.min())
+def scale(values: np.ndarray) -> np.ndarray:
+    min_value = values.min()
+    max_value = values.max()
+    if min_value == max_value:
+        return np.ones_like(values, dtype=np.float64)
+    return (values - min_value) / (max_value - min_value)
+
 
 @dataclass
 class TopicModelMetrics:
@@ -45,54 +52,40 @@ def plot_stats(
     """
     metrics_per_topic: dict[int, TopicModelMetrics] = {}
     for n_topic in n_topics:
-        lda_mallet_filenames = LDAMalletFilenames(
-            output_prefix=output_prefix, n_topics=n_topic
-        )
-        with open(lda_mallet_filenames.model_stats_filename) as infile:
-            metrics_per_topic[n_topic] = TopicModelMetrics(
-                **json.load(infile)
-            )
+        load_topic_model_backend(output_prefix=output_prefix, n_topics=n_topic)
+        filenames = TopicModelFilenames(output_prefix=output_prefix, n_topics=n_topic)
+        with open(filenames.model_stats_filename, encoding="utf-8") as infile:
+            metrics_per_topic[n_topic] = TopicModelMetrics(**json.load(infile))
 
+    sorted_topics = sorted(n_topics)
     metrics = {
         "Inv_Arun_2010": scale(
-            -np.array([
-                metrics_per_topic[t].Arun_2010
-                for t in sorted(n_topics)
-            ])
+            -np.asarray([metrics_per_topic[t].Arun_2010 for t in sorted_topics])
         ),
         "Inv_Cao_Juan_2009": scale(
-            -np.array([
-                metrics_per_topic[t].Cao_Juan_2009
-                for t in sorted(n_topics)
-            ])
+            -np.asarray([metrics_per_topic[t].Cao_Juan_2009 for t in sorted_topics])
         ),
         "Mimno_2011": scale(
-            np.array([
-                metrics_per_topic[t].Mimno_2011
-                for t in sorted(n_topics)
-            ])
+            np.asarray([metrics_per_topic[t].Mimno_2011 for t in sorted_topics])
         ),
         "Loglikelihood": scale(
-            np.array([
-                metrics_per_topic[t].loglikelihood
-                for t in sorted(n_topics)
-            ])
-        )
+            np.asarray([metrics_per_topic[t].loglikelihood for t in sorted_topics])
+        ),
     }
 
-    fig, ax = plt.subplots(figsize = (8, 8))
+    figure, axis = plt.subplots(figsize=(8, 8))
     for metric, values in metrics.items():
-        _ = ax.plot(
-            sorted(n_topics),
+        axis.plot(
+            sorted_topics,
             values,
             linestyle="--",
             marker="o",
-            label=metric
+            label=metric,
         )
-    ax.grid(True)
-    ax.set_axisbelow(True)
-    _ = ax.set_xlabel("Number of topics")
-    _ = ax.set_ylabel("Scaled metric")
-    _ = ax.legend()
-    fig.tight_layout()
-    fig.savefig(f"{output_prefix}.model_evaluation_stats.{plot_file_format}")
+    axis.grid(True)
+    axis.set_axisbelow(True)
+    axis.set_xlabel("Number of topics")
+    axis.set_ylabel("Scaled metric")
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(f"{output_prefix}.model_evaluation_stats.{plot_file_format}")
