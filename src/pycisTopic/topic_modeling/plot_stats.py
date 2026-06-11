@@ -8,6 +8,10 @@ from pycisTopic.topic_modeling.mallet_models import LDAMalletFilenames
 
 
 def scale(X: np.ndarray) -> np.ndarray:
+    max_X = np.max(X)
+    min_X = np.min(X)
+    if max_X == min_X:
+        raise ValueError("scale got array with all the same values.")
     return (X - X.min()) / (X.max() - X.min())
 
 
