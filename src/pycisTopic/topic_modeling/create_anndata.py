@@ -8,7 +8,7 @@ def create_anndata_from_mallet(
     output_prefix: str,
     n_topics: int,
     cell_barcodes: list[str],
-    region_ids: list[str]
+    region_ids: list[str],
 ):
     """
     Create an AnnData object from mallet topic modeling results.
@@ -46,25 +46,21 @@ def create_anndata_from_mallet(
     cell_topic = pd.DataFrame.from_records(
         doc_topic_distrib,
         index=cell_barcodes,
-        columns=["Topic" + str(i) for i in range(1, n_topics + 1)],
+        columns=[f"Topic{i}" for i in range(1, n_topics + 1)],
     )
 
     region_topic = pd.DataFrame.from_records(
-        topic_word_distrib,
-        columns=region_ids,
-        index=["Topic" + str(i) for i in range(1, n_topics + 1)],
-    ).transpose()
+        topic_word_distrib.T,
+        index=region_ids,
+        columns=[f"Topic{i}" for i in range(1, n_topics + 1)],
+    )
 
     print("Generating cell_topic AnnData object")
-    adata_cell_topic = anndata.AnnData(
-        X=cell_topic
-    )
+    adata_cell_topic = anndata.AnnData(X=cell_topic)
     print(f"Done, shape is: {adata_cell_topic.shape}")
 
     print("Generating region topic AnnData object")
-    adata_region_topic = anndata.AnnData(
-        X=region_topic
-    )
+    adata_region_topic = anndata.AnnData(X=region_topic)
     print(f"Done, shape is: {adata_region_topic.shape}")
 
     print(f"Writing to: {lda_mallet_filenames.anndata_cell_topic_filename}")
