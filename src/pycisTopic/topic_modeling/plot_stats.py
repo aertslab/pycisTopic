@@ -10,6 +10,7 @@ from pycisTopic.topic_modeling.mallet_models import LDAMalletFilenames
 def scale(X: np.ndarray) -> np.ndarray:
     return (X - X.min()) / (X.max() - X.min())
 
+
 @dataclass
 class TopicModelMetrics:
     Arun_2010: float
@@ -38,56 +39,44 @@ def plot_stats(
     plot_file_format
         The file format of the plot, default is png.
 
-    Retrun
+    Return
     ------
     None
 
     """
     metrics_per_topic: dict[int, TopicModelMetrics] = {}
-    for n_topic in n_topics:
+    n_topics = sorted(n_topics)
+
+    for t in n_topics:
         lda_mallet_filenames = LDAMalletFilenames(
-            output_prefix=output_prefix, n_topics=n_topic
+            output_prefix=output_prefix, n_topics=t
         )
         with open(lda_mallet_filenames.model_stats_filename) as infile:
-            metrics_per_topic[n_topic] = TopicModelMetrics(
-                **json.load(infile)
-            )
+            metrics_per_topic[t] = TopicModelMetrics(**json.load(infile))
 
     metrics = {
         "Inv_Arun_2010": scale(
-            -np.array([
-                metrics_per_topic[t].Arun_2010
-                for t in sorted(n_topics)
-            ])
+            -np.array([metrics_per_topic[t].Arun_2010 for t in n_topics])
         ),
         "Inv_Cao_Juan_2009": scale(
-            -np.array([
-                metrics_per_topic[t].Cao_Juan_2009
-                for t in sorted(n_topics)
-            ])
+            -np.array([metrics_per_topic[t].Cao_Juan_2009 for t in n_topics])
         ),
         "Mimno_2011": scale(
-            np.array([
-                metrics_per_topic[t].Mimno_2011
-                for t in sorted(n_topics)
-            ])
+            np.array([metrics_per_topic[t].Mimno_2011 for t in n_topics])
         ),
         "Loglikelihood": scale(
-            np.array([
-                metrics_per_topic[t].loglikelihood
-                for t in sorted(n_topics)
-            ])
-        )
+            np.array([metrics_per_topic[t].loglikelihood for t in n_topics])
+        ),
     }
 
-    fig, ax = plt.subplots(figsize = (8, 8))
+    fig, ax = plt.subplots(figsize=(8, 8))
     for metric, values in metrics.items():
         _ = ax.plot(
-            sorted(n_topics),
+            n_topics,
             values,
             linestyle="--",
             marker="o",
-            label=metric
+            label=metric,
         )
     ax.grid(True)
     ax.set_axisbelow(True)
