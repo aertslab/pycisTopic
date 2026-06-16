@@ -86,7 +86,7 @@ def run_topic_modeling_with_mallet(args):
         )
 
 
-def run_convert_binary_matrix_to_mallet_corpus_file(args):
+def run_convert_binary_matrix_to_mallet_corpus_file_with_mallet(args):
     import scipy
 
     from pycisTopic.topic_modeling.mallet_models import LDAMallet
@@ -114,10 +114,40 @@ def run_convert_binary_matrix_to_mallet_corpus_file(args):
     print(
         f'Convert binary accessibility matrix to Mallet serialized corpus file "{mallet_corpus_filename}".'
     )
-    LDAMallet.convert_binary_matrix_to_mallet_corpus_file(
+    LDAMallet.convert_binary_matrix_to_mallet_corpus_file_with_mallet(
         binary_accessibility_matrix=binary_accessibility_matrix,
         mallet_corpus_filename=mallet_corpus_filename,
         mallet_path=mallet_path,
+    )
+
+
+def run_convert_binary_matrix_to_mallet_corpus_file_with_malletjson(args):
+    import scipy
+
+    from pycisTopic.topic_modeling.mallet_models import LDAMallet
+
+    binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
+    mallet_corpus_filename = args.mallet_corpus_filename
+    malletjson_jar = args.malletjson_jar
+
+    if args.verbose:
+        level = logging.INFO
+        log_format = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+        handlers = [logging.StreamHandler(stream=sys.stdout)]
+        logging.basicConfig(level=level, format=log_format, handlers=handlers)
+
+    print(
+        f'Read binary accessibility matrix from "{binary_accessibility_matrix_filename}" Matrix Market file.'
+    )
+    binary_accessibility_matrix = scipy.io.mmread(binary_accessibility_matrix_filename)
+
+    print(
+        f'Convert binary accessibility matrix to Mallet serialized corpus file "{mallet_corpus_filename}" with MalletJSON.'
+    )
+    LDAMallet.convert_binary_matrix_to_mallet_corpus_file_with_malletjson(
+        binary_accessibility_matrix=binary_accessibility_matrix,
+        mallet_corpus_filename=mallet_corpus_filename,
+        malletjson_jar=malletjson_jar,
     )
 
 
@@ -342,15 +372,15 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     )
     subparser_topic_modeling_mallet.required = True
 
-    parser_topic_modeling_mallet_create_corpus = subparser_topic_modeling_mallet.add_parser(
-        "create_corpus",
-        help="Convert binary accessibility matrix to Mallet serialized corpus file.",
+    parser_topic_modeling_mallet_create_corpus_with_mallet = subparser_topic_modeling_mallet.add_parser(
+        "create_corpus_with_mallet",
+        help="Convert binary accessibility matrix to Mallet serialized corpus file using Mallet `import-file`.",
     )
-    parser_topic_modeling_mallet_create_corpus.set_defaults(
-        func=run_convert_binary_matrix_to_mallet_corpus_file
+    parser_topic_modeling_mallet_create_corpus_with_mallet.set_defaults(
+        func=run_convert_binary_matrix_to_mallet_corpus_file_with_mallet
     )
 
-    parser_topic_modeling_mallet_create_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus_with_mallet.add_argument(
         "-i",
         "--input",
         dest="binary_accessibility_matrix_filename",
@@ -359,7 +389,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Binary accessibility matrix (region IDs vs cell barcodes) in Matrix Market format.",
     )
-    parser_topic_modeling_mallet_create_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus_with_mallet.add_argument(
         "-o",
         "--output",
         dest="mallet_corpus_filename",
@@ -368,7 +398,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         required=True,
         help="Mallet serialized corpus filename.",
     )
-    parser_topic_modeling_mallet_create_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus_with_mallet.add_argument(
         "-m",
         "--memory",
         dest="memory_in_gb",
@@ -377,7 +407,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=10,
         help='Amount of memory (in GB) Mallet is allowed to use. Default: "10".',
     )
-    parser_topic_modeling_mallet_create_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus_with_mallet.add_argument(
         "-b",
         "--mallet_path",
         dest="mallet_path",
@@ -386,7 +416,54 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default="mallet",
         help='Path to Mallet binary (e.g. "/xxx/Mallet/bin/mallet"). Default: "mallet".',
     )
-    parser_topic_modeling_mallet_create_corpus.add_argument(
+    parser_topic_modeling_mallet_create_corpus_with_mallet.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        required=False,
+        help="Enable verbose mode.",
+    )
+
+    parser_topic_modeling_mallet_create_corpus_with_malletjson = subparser_topic_modeling_mallet.add_parser(
+        "create_corpus_with_malletjson",
+        help="Convert binary accessibility matrix to Mallet serialized corpus file using MalletJSON.",
+    )
+    parser_topic_modeling_mallet_create_corpus_with_malletjson.set_defaults(
+        func=run_convert_binary_matrix_to_mallet_corpus_file_with_malletjson
+    )
+
+    parser_topic_modeling_mallet_create_corpus_with_malletjson.add_argument(
+        "-i",
+        "--input",
+        dest="binary_accessibility_matrix_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Binary accessibility matrix (region IDs vs cell barcodes) in Matrix Market format.",
+    )
+    parser_topic_modeling_mallet_create_corpus_with_malletjson.add_argument(
+        "-o",
+        "--output",
+        dest="mallet_corpus_filename",
+        action="store",
+        type=str,
+        required=True,
+        help="Mallet serialized corpus filename.",
+    )
+    parser_topic_modeling_mallet_create_corpus_with_malletjson.add_argument(
+        "-j",
+        "--malletjson_jar",
+        dest="malletjson_jar",
+        type=str,
+        required=False,
+        default="mallet-json-1.0.0-fat-21.jar",
+        help="Path to the MalletJSON fat JAR "
+        "(https://github.com/mimno/MalletJSON/). "
+        "Precompiled JAR: https://resources.aertslab.org/software/MalletJSON/mallet-json-1.0.0-fat-21.jar. "
+        'Default: "mallet-json-1.0.0-fat-21.jar".',
+    )
+    parser_topic_modeling_mallet_create_corpus_with_malletjson.add_argument(
         "-v",
         "--verbose",
         dest="verbose",

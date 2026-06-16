@@ -14,13 +14,199 @@ class LDAMallet:
     """Class for running LDA models with Mallet."""
 
     @staticmethod
-    def convert_binary_matrix_to_mallet_corpus_file(
+    def convert_binary_matrix_to_mallet_corpus_file_with_malletjson(
+        binary_accessibility_matrix: scipy.sparse.csr,
+        mallet_corpus_filename: str,
+        malletjson_jar: str = "mallet-json-1.0.0-fat-21.jar",
+    ) -> None:
+        """
+        Convert binary matrix to Mallet serialized corpus file via JSON with MalletJSON.
+
+        Writes a JSON representation of the corpus understood by the
+        `MalletJSON` (https://github.com/mimno/MalletJSON/) tool and then calls:
+
+            java -jar <malletjson_jar> from-json -i <corpus>.json -o <corpus>
+
+        to produce the binary Mallet corpus file used by Mallet.
+
+        Parameters
+        ----------
+        binary_accessibility_matrix
+            Binary accessibility matrix (region IDs vs cell barcodes).
+        mallet_corpus_filename
+            Mallet serialized corpus filename (output path, no `.json` suffix).
+        malletjson_jar
+            Path to the `MalletJSON` fat JAR.
+            Compile your own version: https://github.com/mimno/MalletJSON/
+            Or download precompiled JAR: https://resources.aertslab.org/software/MalletJSON/mallet-json-1.0.0-fat-21.jar
+            Default: `mallet-json-1.0.0-fat-21.jar`.
+
+        Returns
+        -------
+        None.
+
+        """
+        logger = logging.getLogger("LDAMallet")
+
+        # Convert binary accessibility matrix to compressed sparse column matrix format
+        # and eliminate zeros as we assume later that for each found index, the
+        # associated value is 1.
+        binary_accessibility_matrix_csc = binary_accessibility_matrix.tocsc()
+        binary_accessibility_matrix_csc.eliminate_zeros()
+
+        mallet_corpus_json_filename = f"{mallet_corpus_filename}.json"
+
+        logger.info(
+            f'Serializing binary accessibility matrix to Mallet JSON corpus to "{mallet_corpus_json_filename}".'
+        )
+
+        if binary_accessibility_matrix_csc.shape[0] == 0:
+            raise ValueError(
+                "Binary accessibility matrix does not contain any cell barcodes."
+            )
+
+        if binary_accessibility_matrix_csc.shape[1] == 0:
+            raise ValueError(
+                "Binary accessibility matrix does not contain any regions."
+            )
+
+        with open(mallet_corpus_json_filename, "w") as mallet_corpus_json_fh:
+            mallet_corpus_json_fh.write(
+                """
+                {
+                  "version" : "1.0",
+                  "alphabets" : {
+                    "data" : {
+                      "id" : "d9bbde82-97b8-4dfd-aaba-d0540969eb21",
+                      "entryClass" : "java.lang.String",
+                      "growthStopped" : false,
+                      "entries" : [ 
+                """
+            )
+            mallet_corpus_json_fh.write(
+                ", ".join(
+                    [
+                        f'"{i}"'
+                        for i in range(1, binary_accessibility_matrix_csc.shape[0] + 1)
+                    ]
+                )
+                + " ],\n",
+            )
+            mallet_corpus_json_fh.write(
+                """
+                      "isLabelAlphabet" : false
+                  },
+                  "target" : {
+                    "id" : "0cbb13d0-5097-48d9-acd3-ba5a11f02164",
+                    "entryClass" : "java.lang.String",
+                    "growthStopped" : false,
+                    "entries" : [ "0" ],
+                    "isLabelAlphabet" : true
+                  }
+                },
+                "pipe" : {
+                  "className" : "cc.mallet.pipe.SerialPipes",
+                  "id" : "c1404dd5-e832-4fc0-984c-0f637f2548fb",
+                  "dataAlphabetRef" : "d9bbde82-97b8-4dfd-aaba-d0540969eb21",
+                  "targetAlphabetRef" : "0cbb13d0-5097-48d9-acd3-ba5a11f02164",
+                  "targetProcessing" : true,
+                  "children" : [ {
+                    "className" : "cc.mallet.pipe.Target2Label",
+                    "id" : "3d2c51fd-27ac-47a6-952d-795084e8fff6",
+                    "targetAlphabetRef" : "0cbb13d0-5097-48d9-acd3-ba5a11f02164",
+                    "targetProcessing" : true
+                  }, {
+                    "className" : "cc.mallet.pipe.CharSequence2TokenSequence",
+                    "id" : "ad960491-0d8b-45cd-abf0-cf565b0eadea",
+                    "targetAlphabetRef" : "0cbb13d0-5097-48d9-acd3-ba5a11f02164",
+                    "targetProcessing" : true
+                  }, {
+                    "className" : "cc.mallet.pipe.TokenSequence2FeatureSequence",
+                    "id" : "6cc486ce-05bf-4115-b88f-48cd8f97c160",
+                    "dataAlphabetRef" : "d9bbde82-97b8-4dfd-aaba-d0540969eb21",
+                    "targetAlphabetRef" : "0cbb13d0-5097-48d9-acd3-ba5a11f02164",
+                    "targetProcessing" : true
+                  } ]
+                },
+                "instances" : [
+                """
+            )
+
+            # Iterate over each column (cell barcode index) of the sparse binary
+            # accessibility matrix in compressed sparse column matrix format and get
+            # all index positions (region IDs indices) for that cell barcode index.
+            for cell_barcode_idx, (indptr_start, indptr_end) in enumerate(
+                zip(
+                    binary_accessibility_matrix_csc.indptr,
+                    binary_accessibility_matrix_csc.indptr[1:],
+                )
+            ):
+                # Get all region ID indices (assume all have an associated value of 1)
+                # for the current cell barcode index.
+                region_ids_idx = binary_accessibility_matrix_csc.indices[
+                    indptr_start:indptr_end
+                ]
+
+                mallet_corpus_json_fh.write(
+                    "{\n"
+                    f'    "name" : "{cell_barcode_idx + 1}",\n'
+                    '    "data" : {\n'
+                    '      "type" : "FeatureSequence",\n'
+                    '      "alphabetRef" : "d9bbde82-97b8-4dfd-aaba-d0540969eb21",\n'
+                    f'      "features" : [ {", ".join([str(x) for x in region_ids_idx])} ],\n'
+                    f'      "length" : {len(region_ids_idx)}\n'
+                    "    },\n"
+                    '    "target" : {\n'
+                    '      "type" : "Label",\n'
+                    '      "alphabetRef" : "0cbb13d0-5097-48d9-acd3-ba5a11f02164",\n'
+                    '      "index" : 0,\n'
+                    '      "entry" : "0"\n'
+                    "    },\n"
+                    '    "locked" : true\n'
+                    + (
+                        "  }, "
+                        if cell_barcode_idx
+                        < binary_accessibility_matrix_csc.shape[1] - 1
+                        else '  } ],\n  "instanceWeights" : { }\n}\n'
+                    )
+                )
+
+        mallet_json_import_cmd = [
+            "java",
+            "-jar",
+            malletjson_jar,
+            "from-json",
+            "-i",
+            mallet_corpus_json_filename,
+            "-o",
+            mallet_corpus_filename,
+        ]
+
+        logger.info(
+            f"Converting Mallet JSON corpus to Mallet serialised corpus with: {' '.join(mallet_json_import_cmd)}"
+        )
+
+        try:
+            subprocess.check_output(
+                args=mallet_json_import_cmd, shell=False, stderr=subprocess.STDOUT
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
+            )
+
+        # Remove Mallet JSON corpus as only Mallet serialised corpus file is needed.
+        if os.path.exists(mallet_corpus_json_filename):
+            os.remove(mallet_corpus_json_filename)
+
+    @staticmethod
+    def convert_binary_matrix_to_mallet_corpus_file_with_mallet(
         binary_accessibility_matrix: scipy.sparse.csr,
         mallet_corpus_filename: str,
         mallet_path: str = "mallet",
     ) -> None:
         """
-        Convert binary matrix to Mallet serialized corpus file.
+        Convert binary matrix to Mallet serialized corpus file with Mallet `import-file`.
 
         Parameters
         ----------
