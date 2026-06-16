@@ -2,6 +2,7 @@ import glob
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 
@@ -527,6 +528,58 @@ class LDAMallet:
         return mallet_train_topics_parameters
 
     @staticmethod
+    def _rename_resumed_model_checkpoint_files(
+        output_model_prefix: str, logger: logging.Logger
+    ) -> None:
+        """
+        Normalize resumed Mallet model checkpoint filenames.
+
+        Resumed runs with model checkpoints write files as:
+          `<output_model_prefix>.resumed_from_iteration_<resumed_iteration>.<current_iteration>`
+        This helper renames those to:
+          `<output_model_prefix>.<resumed_iteration + current_iteration>`
+        """
+        resumed_checkpoint_pattern = (
+            f"{output_model_prefix}.resumed_from_iteration_[0-9]*.[0-9]*"
+        )
+        for resumed_mallet_model_checkpoint_file in glob.glob(
+            resumed_checkpoint_pattern
+        ):
+            checkpoint_suffix = resumed_mallet_model_checkpoint_file[
+                len(output_model_prefix) + 1 :
+            ]
+            checkpoint_match = re.fullmatch(
+                r"resumed_from_iteration_([0-9]+)\.([0-9]+)",
+                checkpoint_suffix,
+            )
+            if checkpoint_match is None:
+                continue
+
+            resumed_from_iteration = int(checkpoint_match.group(1))
+            current_iteration = int(checkpoint_match.group(2))
+            absolute_iteration = resumed_from_iteration + current_iteration
+            normalized_mallet_model_checkpoint_file = (
+                f"{output_model_prefix}.{absolute_iteration}"
+            )
+
+            if os.path.exists(normalized_mallet_model_checkpoint_file):
+                logger.warning(
+                    f'Resumed Mallet model checkpoint "{resumed_mallet_model_checkpoint_file}" could '
+                    f'not be renamed to "{normalized_mallet_model_checkpoint_file}" because this '
+                    f"checkpoint already exists. Keeping existing checkpoint."
+                )
+                continue
+
+            os.rename(
+                resumed_mallet_model_checkpoint_file,
+                normalized_mallet_model_checkpoint_file,
+            )
+            logger.info(
+                f'Renamed resumed Mallet model checkpoint "{resumed_mallet_model_checkpoint_file}" to '
+                f'"{normalized_mallet_model_checkpoint_file}".'
+            )
+
+    @staticmethod
     def run_mallet_topic_modeling(
         mallet_corpus_filename: str,
         output_prefix: str,
@@ -545,7 +598,7 @@ class LDAMallet:
         mallet_path: str = "mallet",
     ):
         """
-        Run Mallet LDA.
+        Run LDA topic modeling with Mallet `train-topics` command.
 
         Parameters
         ----------
@@ -617,7 +670,24 @@ class LDAMallet:
                 f'Mallet corpus file "{mallet_corpus_filename}" does not exist.'
             )
 
+        # Mallet output model prefix: `<output_prefix>.<n_topics>_topics.model`.
         output_model_prefix = lda_mallet_filenames.model_filename_prefix
+
+        # If a previous resumed run was interrupted before Mallet model checkpoint
+        # file renaming happened, normalize those resumed Mallet model checkpoint
+        # filenames first so resume detection can pick them up with the corrected
+        # absolute iteration count.
+        #
+        # Rename:
+        #   `<output_prefix>.<n_topics>_topics.model.resumed_from_iteration_<resumed_iteration>.<current_iteration>`
+        # to:
+        #   `<output_prefix>.<n_topics>_topics.model.<absolute_iteration>`
+        # where `absolute_iteration` is the sum of `resumed_iteration` and
+        # `current_iteration`.
+        LDAMallet._rename_resumed_model_checkpoint_files(
+            output_model_prefix=output_model_prefix,
+            logger=logger,
+        )
 
         # Detect if Mallet ran before with the same (output_prefix, n_topics)
         # combination by looking for existing model checkpoint files:
@@ -669,6 +739,17 @@ class LDAMallet:
                 f"(original: {optimize_burn_in})."
             )
 
+        model_output_prefix_for_run = output_model_prefix
+        if resumed_from_iteration > 0 and output_model_interval > 0:
+            # As Mallet sees remaining iterations, it also writes Mallet model
+            # checkpoint files with a relative iteration count, so we use a different
+            # model output prefix that includes from which iteration the run was
+            # resumed, so we can rename those Mallet model checkpoint filenames
+            # later with `LDAMallet._rename_resumed_model_checkpoint_files`.
+            model_output_prefix_for_run = (
+                f"{output_model_prefix}.resumed_from_iteration_{resumed_from_iteration}"
+            )
+
         cmd = [
             mallet_path,
             "train-topics",
@@ -697,7 +778,7 @@ class LDAMallet:
             "--random-seed",
             str(random_seed),
             "--output-model",
-            output_model_prefix,
+            model_output_prefix_for_run,
         ]
 
         # When output_model_interval > 0, also pass `--output-model-interval` so that:
@@ -726,6 +807,12 @@ class LDAMallet:
                 f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
             )
 
+        if resumed_from_iteration > 0:
+            LDAMallet._rename_resumed_model_checkpoint_files(
+                output_model_prefix=output_model_prefix,
+                logger=logger,
+            )
+
         # When output_model_interval == 0, we omit `--output-model-interval` entirely:
         #   - Mallet then writes a single Mallet model file at:
         #       `<output_prefix>.<n_topics>_topics.model` (no iteration suffix)
@@ -735,10 +822,13 @@ class LDAMallet:
         #     works correctly.
         if output_model_interval == 0:
             final_mallet_model_checkpoint_file = f"{output_model_prefix}.{iterations}"
-            if os.path.exists(output_model_prefix):
-                os.rename(output_model_prefix, final_mallet_model_checkpoint_file)
+            if os.path.exists(model_output_prefix_for_run):
+                os.rename(
+                    model_output_prefix_for_run,
+                    final_mallet_model_checkpoint_file,
+                )
                 logger.info(
-                    f'Renamed final Mallet model file "{output_model_prefix}" to '
+                    f'Renamed final Mallet model file "{model_output_prefix_for_run}" to '
                     f'"{final_mallet_model_checkpoint_file}".'
                 )
 
