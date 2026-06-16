@@ -1,3 +1,4 @@
+import glob
 import json
 import logging
 import os
@@ -354,6 +355,7 @@ class LDAMallet:
         iterations: int = 150,
         optimize_interval: int = 0,
         optimize_burn_in: int = 50,
+        output_model_interval: int = 0,
         topic_threshold: float = 0.0,
         random_seed: int = 555,
         mallet_path: str = "mallet",
@@ -393,6 +395,18 @@ class LDAMallet:
         optimize_burn_in
             The number of iterations before hyperparameter optimization begins.
             Default: 50.
+        output_model_interval
+            Save the Mallet model every `output_model_interval` iterations of Gibbs
+            sampling to `<output_prefix>.<n_topics>_topics.model.<iteration>`.
+            When set to 0 (default), the model is saved only once at the very end of
+            training as `<output_prefix>.<n_topics>_topics.model.<iterations>`.
+            These Mallet output model files are used to resume an interrupted run from
+            the saved state in the Mallet output model file with the highest iteration
+            number. Training resumes from that checkpoint and the `iterations` /
+            `optimize_burn_in` values that are actually passed to Mallet are adjusted
+            (as Mallet sees them as the number of iterations to run from the loaded
+            checkpoint, not as the total number of iterations to run).
+            Default: 0.
         topic_threshold
             Threshold of the probability above which we consider a topic. Default: 0.0.
         random_seed
@@ -419,6 +433,58 @@ class LDAMallet:
                 f'Mallet corpus file "{mallet_corpus_filename}" does not exist.'
             )
 
+        output_model_prefix = lda_mallet_filenames.model_filename_prefix
+
+        # Detect if Mallet ran before with the same (output_prefix, n_topics)
+        # combination by looking for existing model checkpoint files:
+        #   `<output_prefix>.<n_topics>_topics.model.<iteration>`
+        #
+        # If there are existing model checkpoint files, resume from the one with the
+        # highest iteration number and adjust the number of iterations to run and
+        # optimize_burn_in accordingly.
+        # This allows to automatically resume an interrupted run from the latest
+        # checkpoint without needing to specify the checkpoint file to resume from.
+        resumed_from_iteration = 0
+        found_mallet_model_checkpoint_files = glob.glob(f"{output_model_prefix}.[0-9]*")
+        found_mallet_model_checkpoint_iterations = []
+        for mallet_model_checkpoint_file in found_mallet_model_checkpoint_files:
+            # Get number of topics from model checkpoint filename.
+            n_topics_suffix = mallet_model_checkpoint_file[
+                len(output_model_prefix) + 1 :
+            ]
+            if n_topics_suffix.isdigit():
+                found_mallet_model_checkpoint_iterations.append(int(n_topics_suffix))
+
+        if found_mallet_model_checkpoint_iterations:
+            resumed_from_iteration = max(found_mallet_model_checkpoint_iterations)
+            logger.info(
+                f"Found existing Mallet model checkpoint at iteration "
+                f'{resumed_from_iteration} ("{output_model_prefix}.{resumed_from_iteration}"). '
+                f"Resuming from this Mallet model checkpoint."
+            )
+
+        # Compute remaining iterations and adjusted burn-in as Mallet sees it as the
+        # number of iterations to run from the loaded checkpoint, not as the total
+        # number of iterations to run from the original start.
+        remaining_iterations = iterations - resumed_from_iteration
+        if remaining_iterations <= 0:
+            logger.info(
+                f"Requested {iterations} iterations but a Mallet model checkpoint "
+                f"already exists at iteration {resumed_from_iteration}. Skip running Mallet."
+            )
+            return
+
+        # Subtract already-completed iterations from `optimize_burn_in` (floor at 0).
+        adjusted_burn_in = max(0, optimize_burn_in - resumed_from_iteration)
+
+        if resumed_from_iteration > 0:
+            logger.info(
+                f"Adjusted remaining_iterations: {remaining_iterations} "
+                f"(original: {iterations}), "
+                f"adjusted optimize_burn_in: {adjusted_burn_in} "
+                f"(original: {optimize_burn_in})."
+            )
+
         cmd = [
             mallet_path,
             "train-topics",
@@ -433,11 +499,11 @@ class LDAMallet:
             "--optimize-interval",
             str(optimize_interval),
             "--optimize-burn-in",
-            str(optimize_burn_in),
+            str(adjusted_burn_in),
             "--num-threads",
             str(n_threads),
             "--num-iterations",
-            str(iterations),
+            str(remaining_iterations),
             "--word-topic-counts-file",
             lda_mallet_filenames.region_topic_counts_txt_filename,
             "--output-doc-topics",
@@ -446,7 +512,26 @@ class LDAMallet:
             str(topic_threshold),
             "--random-seed",
             str(random_seed),
+            "--output-model",
+            output_model_prefix,
         ]
+
+        # When output_model_interval > 0, also pass `--output-model-interval` so that:
+        #   - Mallet writes intermediate Mallet model checkpoints as:
+        #       `<output_prefix>.<n_topics>_topics.model.<iteration>`
+        # When output_model_interval == 0, we omit `--output-model-interval` entirely:
+        #   - Mallet then writes a single Mallet model file at:
+        #       `<output_prefix>.<n_topics>_topics.model` (no iteration suffix)
+        #   - After training completes, we rename it to:
+        #       `<output_prefix>.<n_topics>_topics.model.<iterations>`
+        if output_model_interval > 0:
+            cmd += ["--output-model-interval", str(output_model_interval)]
+
+        # If resuming from a checkpoint, insert `--input-model` right after
+        # `"train-topics"`.
+        if resumed_from_iteration > 0:
+            input_model_path = f"{output_model_prefix}.{resumed_from_iteration}"
+            cmd = cmd[:2] + ["--input-model", input_model_path] + cmd[2:]
 
         start_time = time.time()
         logger.info(f"Train topics with Mallet LDA: {' '.join(cmd)}")
@@ -456,6 +541,22 @@ class LDAMallet:
             raise RuntimeError(  # noqa: B904
                 f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
             )
+
+        # When output_model_interval == 0, we omit `--output-model-interval` entirely:
+        #   - Mallet then writes a single Mallet model file at:
+        #       `<output_prefix>.<n_topics>_topics.model` (no iteration suffix)
+        #   - After training completes, we rename it to:
+        #       `<output_prefix>.<n_topics>_topics.model.<iterations>`
+        #     so the naming is consistent with checkpointed runs and resume detection
+        #     works correctly.
+        if output_model_interval == 0:
+            final_mallet_model_checkpoint_file = f"{output_model_prefix}.{iterations}"
+            if os.path.exists(output_model_prefix):
+                os.rename(output_model_prefix, final_mallet_model_checkpoint_file)
+                logger.info(
+                    f'Renamed final Mallet model file "{output_model_prefix}" to '
+                    f'"{final_mallet_model_checkpoint_file}".'
+                )
 
         # Convert cell-topic probabilities text version to parquet.
         logger.info(
@@ -494,6 +595,8 @@ class LDAMallet:
                 "iterations": iterations,
                 "optimize_interval": optimize_interval,
                 "optimize_burn_in": optimize_burn_in,
+                "output_model_interval": output_model_interval,
+                "resumed_from_iteration": resumed_from_iteration,
                 "random_seed": random_seed,
                 "mallet_path": mallet_path,
                 "time": total_time,
@@ -547,6 +650,17 @@ class LDAMalletFilenames:
         return (
             f"{self.output_prefix}.{self.n_topics}_topics.region_topic_counts.parquet"
         )
+
+    @property
+    def model_filename_prefix(self):
+        """
+        Prefix for Mallet serialised model checkpoints.
+
+        Mallet appends ``.<iteration>`` to this prefix when writing intermediate
+        checkpoints (``--output-model-interval``) and ``.<iterations>`` for the
+        final model.
+        """
+        return f"{self.output_prefix}.{self.n_topics}_topics.model"
 
     @property
     def model_stats_filename(self):

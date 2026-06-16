@@ -27,6 +27,7 @@ def run_topic_modeling_with_mallet(args):
     n_iter = args.iterations
     optimize_interval = args.optimize_interval
     optimize_burn_in = args.optimize_burn_in
+    output_model_interval = args.output_model_interval
     n_threads = args.parallel
     random_seed = args.seed
     memory_in_gb = f"{args.memory_in_gb}G"
@@ -49,6 +50,7 @@ def run_topic_modeling_with_mallet(args):
     print(f"  - Number of iterations of Gibbs sampling:     {n_iter}")
     print(f"  - Optimize interval for hyperparameters:      {optimize_interval}")
     print(f"  - Number of burn-in iterations:               {optimize_burn_in}")
+    print(f"  - Save model every N iterations (0=end only): {output_model_interval}")
     print(f"  - Number threads Mallet is allowed to use:    {n_threads}")
     print(f"  - Seed:                                       {random_seed}")
     print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}")
@@ -73,6 +75,7 @@ def run_topic_modeling_with_mallet(args):
             iterations=n_iter,
             optimize_interval=optimize_interval,
             optimize_burn_in=optimize_burn_in,
+            output_model_interval=output_model_interval,
             topic_threshold=0.0,
             random_seed=random_seed,
             mallet_path=mallet_path,
@@ -461,6 +464,24 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         default=50,
         help="The number of iterations before starting hyperparameter optimization. "
         "Default: 50.",
+    )
+    parser_topic_modeling_mallet_run.add_argument(
+        "--output-model-interval",
+        dest="output_model_interval",
+        type=int,
+        required=False,
+        default=0,
+        help="Save the Mallet model every `output_model_interval` iterations of Gibbs "
+        "sampling to `<output_prefix>.<n_topics>_topics.model.<iteration>`. "
+        "When set to 0 (default), the model is saved only once at the very end of "
+        "training as `<output_prefix>.<n_topics>_topics.model.<iterations>`. "
+        "These Mallet output model files are used to resume an interrupted run "
+        "from the saved state in the Mallet output model file with the highest "
+        "iteration number. Training resumes from that checkpoint and the "
+        "`iterations` / `optimize_burn_in` values that are actually passed to Mallet "
+        "are adjusted (as Mallet sees them as the number of iterations to run "
+        "from the loaded checkpoint, not as the total number of iterations to run). "
+        "Default: 0.",
     )
     parser_topic_modeling_mallet_run.add_argument(
         "-a",
