@@ -537,6 +537,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
     parser_tss = subparsers.add_parser(
         "tss",
         help="Get TSS gene annotation from Ensembl BioMart.",
+        description="Get TSS gene annotation from Ensembl BioMart.",
     )
 
     subparser_tss = parser_tss.add_subparsers(
@@ -549,6 +550,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
     parser_tss_get_tss = subparser_tss.add_parser(
         "get_tss",
         help="Get TSS gene annotation from Ensembl BioMart.",
+        description="Get TSS gene annotation from Ensembl BioMart.",
     )
     parser_tss_get_tss.set_defaults(func=run_tss_get_tss_annotation)
 
@@ -692,6 +694,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
     parser_tss_gene_annotation_list = subparser_tss.add_parser(
         "gene_annotation_list",
         help="Get list of all Ensembl BioMart gene annotation names.",
+        description="Get list of all Ensembl BioMart gene annotation names.",
     )
     parser_tss_gene_annotation_list.set_defaults(func=run_tss_gene_annotation_list)
 
@@ -743,6 +746,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
     parser_tss_get_ncbi_acc = subparser_tss.add_parser(
         "get_ncbi_acc",
         help="Get NCBI assembly accession numbers and assembly names for a certain species.",
+        description="Get assembly accession numbers and assembly names for a certain species.",
     )
     parser_tss_get_ncbi_acc.set_defaults(func=run_tss_get_ncbi_acc)
 
@@ -760,6 +764,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
     parser_tss_get_ncbi_chrom_sizes_and_alias_mapping = subparser_tss.add_parser(
         "get_ncbi_chrom_sizes_and_alias_mapping",
         help="Get chromosome sizes and alias mapping from NCBI sequence reports.",
+        description="Get chromosome sizes and alias mapping from NCBI sequence reports.",
     )
     parser_tss_get_ncbi_chrom_sizes_and_alias_mapping.set_defaults(
         func=run_tss_get_ncbi_chrom_sizes_and_alias_mapping
@@ -794,6 +799,7 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
     parser_tss_get_ucsc_chrom_sizes_and_alias_mapping = subparser_tss.add_parser(
         "get_ucsc_chrom_sizes_and_alias_mapping",
         help="Get chromosome sizes and alias mapping from UCSC.",
+        description="Get chromosome sizes and alias mapping from UCSC.",
     )
     parser_tss_get_ucsc_chrom_sizes_and_alias_mapping.set_defaults(
         func=run_tss_get_ucsc_chrom_sizes_and_alias_mapping

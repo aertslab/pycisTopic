@@ -375,6 +375,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet_create_corpus_with_mallet = subparser_topic_modeling_mallet.add_parser(
         "create_corpus_with_mallet",
         help="Convert binary accessibility matrix to Mallet serialized corpus file using Mallet `import-file`.",
+        description="Convert binary accessibility matrix to Mallet serialized corpus file using Mallet `import-file`. Slower than `create_corpus_with_malletjson`.",
     )
     parser_topic_modeling_mallet_create_corpus_with_mallet.set_defaults(
         func=run_convert_binary_matrix_to_mallet_corpus_file_with_mallet
@@ -428,6 +429,8 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet_create_corpus_with_malletjson = subparser_topic_modeling_mallet.add_parser(
         "create_corpus_with_malletjson",
         help="Convert binary accessibility matrix to Mallet serialized corpus file using MalletJSON.",
+        description="Convert binary accessibility matrix to Mallet serialized corpus file using MalletJSON "
+        "(https://github.com/mimno/MalletJSON/). Faster than `create_corpus_with_mallet`.",
     )
     parser_topic_modeling_mallet_create_corpus_with_malletjson.set_defaults(
         func=run_convert_binary_matrix_to_mallet_corpus_file_with_malletjson
@@ -474,7 +477,8 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
 
     parser_topic_modeling_mallet_run = subparser_topic_modeling_mallet.add_parser(
         "run",
-        help="Run LDA topic modeling with Mallet.",
+        help="Run LDA topic modeling with Mallet `train-topics` command.",
+        description="Run LDA topic modeling with Mallet `train-topics` command.",
     )
     parser_topic_modeling_mallet_run.set_defaults(func=run_topic_modeling_with_mallet)
 
@@ -640,6 +644,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         subparser_topic_modeling_mallet.add_parser(
             "stats",
             help="Calculate model evaluation statistics.",
+            description="Calculate model evaluation statistics.",
         )
     )
     parser_topic_modeling_mallet_calculate_stats.set_defaults(
@@ -686,6 +691,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         subparser_topic_modeling_mallet.add_parser(
             "plot_stats",
             help="Plot evaluation statistics.",
+            description="Plot evaluation statistics.",
         )
     )
     parser_topic_modeling_mallet_plot_stats.set_defaults(
@@ -723,6 +729,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet_binarize = subparser_topic_modeling_mallet.add_parser(
         "binarize",
         help="Binarize cell- or region-topic probabilities.",
+        description="Binarize cell- or region-topic probabilities.",
     )
     parser_topic_modeling_mallet_binarize.set_defaults(
         func=binarize_cell_or_region_topic
@@ -825,6 +832,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet_anndata = subparser_topic_modeling_mallet.add_parser(
         "create_anndata",
         help="Generate AnnData h5ad file from Mallet result.",
+        description="Generate AnnData h5ad file from Mallet result.",
     )
     parser_topic_modeling_mallet_anndata.set_defaults(
         func=run_create_anndata_from_mallet

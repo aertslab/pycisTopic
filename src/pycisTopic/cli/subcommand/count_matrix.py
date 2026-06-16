@@ -123,11 +123,13 @@ def run_create_count_matrix(args):
         for region in region_names:
             _ = f.write(f"{region}\n")
 
+
 def add_parser_count_matrix(subparsers):
     """Creates an ArgumentParser to read the options for this script."""
     parser_count_matrix = subparsers.add_parser(
         "count_matrix",
-        help="Generate binary fragment count matrix for multiple samples."
+        help="Generate binary fragment count matrix for multiple samples.",
+        description="Generate binary fragment count matrix for multiple samples.",
     )
 
     parser_count_matrix.add_argument(

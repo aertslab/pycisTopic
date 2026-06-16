@@ -369,6 +369,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
     parser_qc = subparsers.add_parser(
         "qc",
         help="Run QC statistics on fragment file.",
+        description="Run QC statistics on fragment file.",
     )
     subparser_qc = parser_qc.add_subparsers(
         title="QC",
@@ -380,6 +381,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
     parser_qc_run = subparser_qc.add_parser(
         "run",
         help="Run QC statistics on fragment file.",
+        description="Run QC statistics on fragment file.",
     )
     parser_qc_run.set_defaults(func=run_qc_run)
 
@@ -575,6 +577,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
     parser_qc_filter_barcodes = subparser_qc.add_parser(
         "filter",
         help="Filter cell barcodes based on QC statistics.",
+        description="Filter cell barcodes based on QC statistics.",
     )
     parser_qc_filter_barcodes.set_defaults(func=run_qc_filter_barcodes)
 
@@ -634,6 +637,7 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
     parser_qc_plot = subparser_qc.add_parser(
         "plot",
         help="Plot QC metrics.",
+        description="Plot QC metrics.",
     )
     parser_qc_plot.set_defaults(func=run_qc_plot)
 
