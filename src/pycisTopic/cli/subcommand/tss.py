@@ -270,12 +270,12 @@ def get_species_gene_annotation_ensembl_biomart_dataset_names(
     use_cache: bool = True,
 ) -> None:
     """
-    Get all avaliable gene annotation Ensembl BioMart dataset names, optionally filtered by species.
+    Get all available gene annotation Ensembl BioMart dataset names, optionally filtered by species.
 
     Parameters
     ----------
     species
-        Filter list of all avaliable gene annotation Ensembl BioMart dataset names
+        Filter list of all available gene annotation Ensembl BioMart dataset names
         by species.
     biomart_host
         BioMart host URL to use. Ensure that the assembly version used by Ensembl

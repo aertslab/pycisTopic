@@ -20,7 +20,7 @@ def get_all_gene_annotation_ensembl_biomart_dataset_names(
     use_cache: bool = True,
 ) -> pd.DataFrame:
     """
-    Get all avaliable gene annotation Ensembl BioMart dataset names.
+    Get all available gene annotation Ensembl BioMart dataset names.
 
     Parameters
     ----------
