@@ -461,9 +461,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=str,
         required=False,
         default="mallet-json-1.0.0-fat-21.jar",
-        help="Path to the MalletJSON fat JAR "
-        "(https://github.com/mimno/MalletJSON/). "
-        "Precompiled JAR: https://resources.aertslab.org/software/MalletJSON/mallet-json-1.0.0-fat-21.jar. "
+        help="Path to the MalletJSON fat JAR (https://github.com/mimno/MalletJSON/releases/latest). "
         'Default: "mallet-json-1.0.0-fat-21.jar".',
     )
     parser_topic_modeling_mallet_create_corpus_with_malletjson.add_argument(

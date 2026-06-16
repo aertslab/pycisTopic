@@ -36,9 +36,7 @@ class LDAMallet:
         mallet_corpus_filename
             Mallet serialized corpus filename (output path, no `.json` suffix).
         malletjson_jar
-            Path to the `MalletJSON` fat JAR.
-            Compile your own version: https://github.com/mimno/MalletJSON/
-            Or download precompiled JAR: https://resources.aertslab.org/software/MalletJSON/mallet-json-1.0.0-fat-21.jar
+            Path to the `MalletJSON` fat JAR (https://github.com/mimno/MalletJSON/releases/latest).
             Default: `mallet-json-1.0.0-fat-21.jar`.
 
         Returns
