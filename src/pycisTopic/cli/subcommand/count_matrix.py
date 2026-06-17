@@ -78,7 +78,7 @@ def run_create_count_matrix(args):
     region_names: list[str] = []
     for sample_id, path_to_fragments in sample_to_fragment_file.items():
         print(f"\t{sample_id}\t{path_to_fragments}")
-        count_matrix, cbs, region_ids = create_fragment_matrix_from_fragments(
+        fragment_matrix, cbs, region_ids = create_fragment_matrix_from_fragments(
             fragments_bed_filename=path_to_fragments,
             regions_bed_filename=args.region_ids_filename,
             barcodes_tsv_filename=sample_to_barcode_file[sample_id],
@@ -86,18 +86,15 @@ def run_create_count_matrix(args):
             sample_id=sample_id,
             cb_end_to_remove=args.cb_end_to_remove,
             cb_sample_separator=args.cb_sample_separator,
+            fragment_matrix_type=args.fragment_matrix_type,
         )
-        print(f"Generated matrix with shape: {count_matrix.shape}")
-        fragment_matrices.append(count_matrix)
+        print(f"Generated fragment matrix with shape: {fragment_matrix.shape}")
+        fragment_matrices.append(fragment_matrix)
         cell_names.extend(cbs)
         region_names = region_ids
 
-    print("Merging fragment matrix and binarizing")
-    binary_matrix_merged = sparse.hstack(
-        fragment_matrices
-    )
-
-    binary_matrix_merged.data.fill(1)
+    print("Merging fragment matrix...")
+    fragment_matrix_merged = sparse.hstack(fragment_matrices)
 
     region_out = args.out_region_names
     cbs_out = args.out_cell_barcodes
@@ -205,8 +202,19 @@ def add_parser_count_matrix(subparsers):
         required=False,
         type=str,
         action="store",
-        help="Separator to place between cell barcode and sample id.",
+        help='Separator to place between cell barcode and sample id (written to `out_cell_barcodes`). Default: "___".',
         default="___",
+    )
+    parser_count_matrix.add_argument(
+        "-t",
+        "--fragment_matrix_type",
+        dest="fragment_matrix_type",
+        action="store",
+        type=str,
+        choices=["binary", "count"],
+        required=False,
+        default="binary",
+        help='Create "binary" or "count" fragment matrix. Default: "binary".',
     )
     parser_count_matrix.set_defaults(
         func=run_create_count_matrix,
