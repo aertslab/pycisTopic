@@ -1,21 +1,16 @@
-
 import polars as pl
 from scipy import io as sp_io
 from scipy import sparse
 
 from pycisTopic.fragments import create_fragment_matrix_from_fragments
 
-COL_NAME_SAMPLE         =   "sample"
-COL_NAME_PATH_FRAGMENTS =   "path_to_fragment_file"
-COL_NAME_PATH_TO_CBS    =   "barcode"
-FIELD_SEP               =   "\t"
+COL_NAME_SAMPLE = "sample"
+COL_NAME_PATH_FRAGMENTS = "path_to_fragment_file"
+COL_NAME_PATH_TO_CBS = "barcode"
+FIELD_SEP = "\t"
 
-def read_mapping(
-        filename: str,
-        key: str,
-        value: str,
-        separator: str
-    ) -> dict[str, str]:
+
+def read_mapping(filename: str, key: str, value: str, separator: str) -> dict[str, str]:
     """
     Reads file containing key value pairs.
 
@@ -38,13 +33,8 @@ def read_mapping(
     # check headers of definition files, by reading the first line
     with open(filename) as f:
         header = f.readline().strip().split(separator)
-        if not (
-            key in header
-            and value in header
-        ):
-            raise KeyError(
-                f"{filename} must have columns {key} and {value}"
-            )
+        if not (key in header and value in header):
+            raise KeyError(f"{filename} must have columns {key} and {value}")
     # read sample to fragment file
     key_value: dict[str, str] = {}
     d_key_value = pl.read_csv(
@@ -56,30 +46,31 @@ def read_mapping(
         d_key_value[value],
     ):
         if k in key_value:
-            raise ValueError(
-                f"Duplicate {k} in {filename}"
-            )
+            raise ValueError(f"Duplicate {k} in {filename}")
         key_value[k] = v
     return key_value
+
 
 def run_create_count_matrix(args):
     sample_to_fragment_file = read_mapping(
         filename=args.sample_to_fragment,
         key=COL_NAME_SAMPLE,
         value=COL_NAME_PATH_FRAGMENTS,
-        separator=FIELD_SEP
+        separator=FIELD_SEP,
     )
     sample_to_barcode_file = read_mapping(
         filename=args.sample_to_cell_barcodes,
         key=COL_NAME_SAMPLE,
         value=COL_NAME_PATH_TO_CBS,
-        separator=FIELD_SEP
+        separator=FIELD_SEP,
     )
     print("Fragment matrix will be generated for following samples: ")
     for sample in sample_to_fragment_file:
         print(f"\t{sample}")
         if sample not in sample_to_barcode_file:
-            raise ValueError(f"{sample} was not present in {args.sample_to_cell_barcodes} aborting.")
+            raise ValueError(
+                f"{sample} was not present in {args.sample_to_cell_barcodes} aborting."
+            )
 
     print("Reading fragments files and creating count matrix")
     fragment_matrices: list[sparse.csr_matrix] = []
@@ -94,7 +85,7 @@ def run_create_count_matrix(args):
             blacklist_bed_filename=args.blacklist,
             sample_id=sample_id,
             cb_end_to_remove=args.cb_end_to_remove,
-            cb_sample_separator=args.cb_sample_separator
+            cb_sample_separator=args.cb_sample_separator,
         )
         print(f"Generated matrix with shape: {count_matrix.shape}")
         fragment_matrices.append(count_matrix)
@@ -139,7 +130,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to sample_to_fragment tsv file, containing mapping between sample ids and fragment files (tab-separated)."
+        help="Path to sample_to_fragment tsv file, containing mapping between sample ids and fragment files (tab-separated).",
     )
     parser_count_matrix.add_argument(
         "-c",
@@ -157,7 +148,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to bed file containing regions to generate count matrix on."
+        help="Path to bed file containing regions to generate count matrix on.",
     )
     parser_count_matrix.add_argument(
         "--out_region_names",
@@ -165,7 +156,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to output region names .txt file."
+        help="Path to output region names .txt file.",
     )
     parser_count_matrix.add_argument(
         "--out_cell_barcodes",
@@ -173,7 +164,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to output cell barcodes names .txt file."
+        help="Path to output cell barcodes names .txt file.",
     )
     parser_count_matrix.add_argument(
         "--out_matrix",
@@ -181,7 +172,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to output matrix .mtx file."
+        help="Path to output matrix .mtx file.",
     )
     parser_count_matrix.add_argument(
         "-b",
@@ -191,7 +182,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         required=False,
         help="Path to blacklist bed file.",
-        default=None
+        default=None,
     )
     parser_count_matrix.add_argument(
         "-d",
@@ -201,7 +192,7 @@ def add_parser_count_matrix(subparsers):
         type=str,
         action="store",
         help="Barcode suffix to remove (e.g., -1)",
-        default=None
+        default=None,
     )
     parser_count_matrix.add_argument(
         "-s",
@@ -211,9 +202,8 @@ def add_parser_count_matrix(subparsers):
         type=str,
         action="store",
         help="Separator to place between cell barcode and sample id.",
-        default="___"
+        default="___",
     )
     parser_count_matrix.set_defaults(
-        func=run_create_count_matrix
+        func=run_create_count_matrix,
     )
-
