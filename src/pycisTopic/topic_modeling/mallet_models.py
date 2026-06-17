@@ -813,24 +813,20 @@ class LDAMallet:
                 logger=logger,
             )
 
-        # When output_model_interval == 0, we omit `--output-model-interval` entirely:
-        #   - Mallet then writes a single Mallet model file at:
-        #       `<output_prefix>.<n_topics>_topics.model` (no iteration suffix)
-        #   - After training completes, we rename it to:
-        #       `<output_prefix>.<n_topics>_topics.model.<iterations>`
-        #     so the naming is consistent with checkpointed runs and resume detection
-        #     works correctly.
-        if output_model_interval == 0:
-            final_mallet_model_checkpoint_file = f"{output_model_prefix}.{iterations}"
-            if os.path.exists(model_output_prefix_for_run):
-                os.rename(
-                    model_output_prefix_for_run,
-                    final_mallet_model_checkpoint_file,
-                )
-                logger.info(
-                    f'Renamed final Mallet model file "{model_output_prefix_for_run}" to '
-                    f'"{final_mallet_model_checkpoint_file}".'
-                )
+        # Rename final Mallet model checkpoint file to:
+        #   `<output_prefix>.<n_topics>_topics.model.<iterations>`
+        # so the naming is consistent with checkpointed runs and resume detection
+        # works correctly. It might overwrite the last Mallet checkpoint file.
+        final_mallet_model_checkpoint_file = f"{output_model_prefix}.{iterations}"
+        if os.path.exists(model_output_prefix_for_run):
+            os.rename(
+                model_output_prefix_for_run,
+                final_mallet_model_checkpoint_file,
+            )
+            logger.info(
+                f'Renamed final Mallet model file "{model_output_prefix_for_run}" to '
+                f'"{final_mallet_model_checkpoint_file}".'
+            )
 
         # Convert cell-topic probabilities text version to parquet.
         logger.info(
