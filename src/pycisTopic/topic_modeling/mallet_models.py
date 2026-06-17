@@ -781,22 +781,15 @@ class LDAMallet:
             model_output_prefix_for_run,
         ]
 
-        # When output_model_interval > 0, also pass `--output-model-interval` so that:
-        #   - Mallet writes intermediate Mallet model checkpoints as:
-        #       `<output_prefix>.<n_topics>_topics.model.<iteration>`
-        # When output_model_interval == 0, we omit `--output-model-interval` entirely:
-        #   - Mallet then writes a single Mallet model file at:
-        #       `<output_prefix>.<n_topics>_topics.model` (no iteration suffix)
-        #   - After training completes, we rename it to:
-        #       `<output_prefix>.<n_topics>_topics.model.<iterations>`
         if output_model_interval > 0:
             cmd += ["--output-model-interval", str(output_model_interval)]
 
-        # If resuming from a checkpoint, insert `--input-model` right after
-        # `"train-topics"`.
+        # If resuming from a Mallet model checkpoint, replace
+        # `--input mallet_corpus_filename` with `--input-model input_model_path`
+        # in Mallet `train-topics` commandline invocation.
         if resumed_from_iteration > 0:
             input_model_path = f"{output_model_prefix}.{resumed_from_iteration}"
-            cmd = cmd[:2] + ["--input-model", input_model_path] + cmd[2:]
+            cmd[2:4] = ["--input-model", input_model_path]
 
         start_time = time.time()
         logger.info(f"Train topics with Mallet LDA: {' '.join(cmd)}")
