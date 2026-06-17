@@ -87,6 +87,8 @@ def run_create_count_matrix(args):
             cb_end_to_remove=args.cb_end_to_remove,
             cb_sample_separator=args.cb_sample_separator,
             fragment_matrix_type=args.fragment_matrix_type,
+            bed_parser_engine=args.bed_parser_engine,
+            intersection_engine=args.intersection_engine,
         )
         print(f"Generated fragment matrix with shape: {fragment_matrix.shape}")
         fragment_matrices.append(fragment_matrix)
@@ -215,6 +217,34 @@ def add_parser_count_matrix(subparsers):
         required=False,
         default="binary",
         help='Create "binary" or "count" fragment matrix. Default: "binary".',
+    )
+    parser_count_matrix.add_argument(
+        "--bed_parser_engine",
+        dest="bed_parser_engine",
+        action="store",
+        type=str,
+        choices=["polars_lazy", "polars", "pyarrow"],
+        required=False,
+        default="polars_lazy",
+        help="""
+                BED parsing bed_parser_engine to use to read (gzipped) BED/fragment files. 
+                Options: "polars_lazy" (fastest, low memory usage), "polars" (slightly slower, 
+                highest memory usage) or "pyarrow" (slowest, high memory usage). Default: "polars_lazy".
+                """,
+    )
+    parser_count_matrix.add_argument(
+        "--intersection_engine",
+        dest="intersection_engine",
+        action="store",
+        type=str,
+        choices=["ncls", "ruranges"],
+        required=False,
+        default="ncls",
+        help="""
+                Engine to use to calculate intersections/overlaps between fragments and regions.
+                Options: "ncls" or "ruranges" (faster).
+                Default: "ncls".
+                """,
     )
     parser_count_matrix.set_defaults(
         func=run_create_count_matrix,
