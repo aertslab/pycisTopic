@@ -27,7 +27,7 @@ def read_mapping(filename: str, key: str, value: str, separator: str) -> dict[st
 
     Returns
     -------
-    Dictionary mapping keys to values
+    Dictionary mapping keys to values.
 
     """
     # check headers of definition files, by reading the first line
@@ -72,7 +72,7 @@ def run_create_count_matrix(args):
                 f"{sample} was not present in {args.sample_to_cell_barcodes} aborting."
             )
 
-    print("Reading fragments files and creating count matrix")
+    print("Reading fragments files and creating fragment matrix ...")
     fragment_matrices: list[sparse.csr_matrix] = []
     cell_names: list[str] = []
     region_names: list[str] = []
@@ -103,13 +103,15 @@ def run_create_count_matrix(args):
     cbs_out = args.out_cell_barcodes
     mat_out = args.out_matrix
     print("Writing:")
-    print(f"\tBinary matrix: {mat_out}")
-    print(f"\tregion names: {region_out}")
-    print(f"\tcell names: {cbs_out}")
-    sp_io.mmwrite(mat_out, binary_matrix_merged)
+    print(f'  - fragment matrix: "{mat_out}"')
+    sp_io.mmwrite(mat_out, fragment_matrix_merged)
+
+    print(f'  - region names: "{region_out}"')
     with open(cbs_out, "w") as f:
         for cb in cell_names:
             _ = f.write(f"{cb}\n")
+
+    print(f'  - cell names: "{cbs_out}"')
     with open(region_out, "w") as f:
         for region in region_names:
             _ = f.write(f"{region}\n")
@@ -119,8 +121,8 @@ def add_parser_count_matrix(subparsers):
     """Creates an ArgumentParser to read the options for this script."""
     parser_count_matrix = subparsers.add_parser(
         "count_matrix",
-        help="Generate binary fragment count matrix for multiple samples.",
-        description="Generate binary fragment count matrix for multiple samples.",
+        help="Generate (binary) fragment count matrix for multiple samples.",
+        description="Generate (binary) fragment count matrix for multiple samples.",
     )
 
     parser_count_matrix.add_argument(
@@ -130,7 +132,8 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to sample_to_fragment tsv file, containing mapping between sample ids and fragment files (tab-separated).",
+        help="Path to `sample_to_fragment` TSV file, containing mapping between sample "
+        "ids and fragment files (tab-separated).",
     )
     parser_count_matrix.add_argument(
         "-c",
@@ -139,7 +142,8 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to sample_to_cell_barcode tsv file, containing mapping between sample ids and cell barcodes to keep per sample id (tab-separated).",
+        help="Path to `sample_to_cell_barcode` TSV file, containing mapping between "
+        "sample ids and cell barcodes to keep per sample id (tab-separated).",
     )
     parser_count_matrix.add_argument(
         "-r",
@@ -148,7 +152,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to bed file containing regions to generate count matrix on.",
+        help="Path to BED file containing regions to generate count matrix on.",
     )
     parser_count_matrix.add_argument(
         "--out_region_names",
@@ -156,7 +160,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to output region names .txt file.",
+        help="Path to output region names `.txt` file.",
     )
     parser_count_matrix.add_argument(
         "--out_cell_barcodes",
@@ -164,7 +168,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to output cell barcodes names .txt file.",
+        help="Path to output cell barcodes names `.txt` file.",
     )
     parser_count_matrix.add_argument(
         "--out_matrix",
@@ -172,7 +176,7 @@ def add_parser_count_matrix(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Path to output matrix .mtx file.",
+        help="Path to output matrix `.mtx` file.",
     )
     parser_count_matrix.add_argument(
         "-b",
@@ -181,7 +185,7 @@ def add_parser_count_matrix(subparsers):
         type=str,
         action="store",
         required=False,
-        help="Path to blacklist bed file.",
+        help="Path to blacklist BED file.",
         default=None,
     )
     parser_count_matrix.add_argument(
@@ -191,7 +195,7 @@ def add_parser_count_matrix(subparsers):
         required=False,
         type=str,
         action="store",
-        help="Barcode suffix to remove (e.g., -1)",
+        help='Barcode suffix to remove (e.g., "-1"). Default: None.',
         default=None,
     )
     parser_count_matrix.add_argument(
