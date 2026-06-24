@@ -18,6 +18,7 @@ class LDAMallet:
     def convert_binary_matrix_to_mallet_corpus_file_with_malletjson(
         binary_accessibility_matrix: scipy.sparse.csr,
         mallet_corpus_filename: str,
+        memory_in_gb: int = 10,
         malletjson_jar: str = "mallet-json-1.0.0-fat-21.jar",
     ) -> None:
         """
@@ -36,6 +37,9 @@ class LDAMallet:
             Binary accessibility matrix (region IDs vs cell barcodes).
         mallet_corpus_filename
             Mallet serialized corpus filename (output path, no `.json` suffix).
+        memory_in_gb
+            Amount of memory in GB MalletJSON is allowed to use during Mallet corpus creation.
+            Default: 10.
         malletjson_jar
             Path to the `MalletJSON` fat JAR (https://github.com/mimno/MalletJSON/releases/latest).
             Default: `mallet-json-1.0.0-fat-21.jar`.
@@ -172,6 +176,7 @@ class LDAMallet:
 
         mallet_json_import_cmd = [
             "java",
+            f"-Xmx{memory_in_gb}G",
             "-jar",
             malletjson_jar,
             "from-json",
@@ -202,6 +207,7 @@ class LDAMallet:
     def convert_binary_matrix_to_mallet_corpus_file_with_mallet(
         binary_accessibility_matrix: scipy.sparse.csr,
         mallet_corpus_filename: str,
+        memory_in_gb: int = 10,
         mallet_path: str = "mallet",
     ) -> None:
         """
@@ -213,6 +219,9 @@ class LDAMallet:
             Binary accessibility matrix (region IDs vs cell barcodes)
         mallet_corpus_filename
             Mallet serialized corpus filename
+        memory_in_gb
+            Amount of memory in GB Mallet is allowed to use during Mallet corpus creation.
+            Default: 10.
         mallet_path
             Path to Mallet binary.
 
@@ -268,6 +277,10 @@ class LDAMallet:
                 mallet_corpus_txt_fh.write(
                     f"{cell_barcode_idx}\t0\t{' '.join([str(x) for x in region_ids_idx])}\n"
                 )
+
+        # Set amount of memory that Mallet is allowed to use as an environment variable,
+        # So `mallet` script picks up that value.
+        os.environ["MALLET_MEMORY"] = f"{memory_in_gb}G"
 
         mallet_import_file_cmd = [
             mallet_path,
@@ -595,6 +608,7 @@ class LDAMallet:
         output_model_interval: int = 0,
         topic_threshold: float = 0.0,
         random_seed: int = 555,
+        memory_in_gb: int = 10,
         mallet_path: str = "mallet",
     ):
         """
@@ -649,6 +663,9 @@ class LDAMallet:
         random_seed
             Random seed to ensure consistent results, if 0 - use system clock.
             Default: 555.
+        memory_in_gb
+            Amount of memory in GB Mallet is allowed to use during topic modeling.
+            Default: 10.
         mallet_path
             Path to the mallet binary (e.g. /xxx/Mallet/bin/mallet). Default: "mallet".
 
@@ -749,6 +766,10 @@ class LDAMallet:
             model_output_prefix_for_run = (
                 f"{output_model_prefix}.resumed_from_iteration_{resumed_from_iteration}"
             )
+
+        # Set amount of memory that Mallet is allowed to use as an environment variable,
+        # So `mallet` script picks up that value.
+        os.environ["MALLET_MEMORY"] = f"{memory_in_gb}G"
 
         cmd = [
             mallet_path,

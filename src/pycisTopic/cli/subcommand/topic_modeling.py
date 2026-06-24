@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-import pickle
 import sys
-import tempfile
 from argparse import ArgumentTypeError
 from typing import TYPE_CHECKING
 
@@ -30,7 +28,7 @@ def run_topic_modeling_with_mallet(args):
     output_model_interval = args.output_model_interval
     n_threads = args.parallel
     random_seed = args.seed
-    memory_in_gb = f"{args.memory_in_gb}G"
+    memory_in_gb = args.memory_in_gb
     mallet_path = args.mallet_path
 
     if args.verbose:
@@ -53,10 +51,8 @@ def run_topic_modeling_with_mallet(args):
     print(f"  - Save model every N iterations (0=end only): {output_model_interval}")
     print(f"  - Number threads Mallet is allowed to use:    {n_threads}")
     print(f"  - Seed:                                       {random_seed}")
-    print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}")
+    print(f"  - Amount of memory Mallet is allowed to use:  {memory_in_gb}G")
     print(f"  - Mallet binary:                              {mallet_path}")
-
-    os.environ["MALLET_MEMORY"] = memory_in_gb
 
     for n_topics in n_topics_list:
         # Run models
@@ -78,6 +74,7 @@ def run_topic_modeling_with_mallet(args):
             output_model_interval=output_model_interval,
             topic_threshold=0.0,
             random_seed=random_seed,
+            memory_in_gb=memory_in_gb,
             mallet_path=mallet_path,
         )
 
@@ -96,7 +93,7 @@ def run_convert_binary_matrix_to_mallet_corpus_file_with_mallet(args):
     binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     mallet_corpus_filename = args.mallet_corpus_filename
     mallet_path = args.mallet_path
-    memory_in_gb = f"{args.memory_in_gb}G"
+    memory_in_gb = args.memory_in_gb
 
     if args.verbose:
         level = logging.INFO
@@ -109,14 +106,13 @@ def run_convert_binary_matrix_to_mallet_corpus_file_with_mallet(args):
     )
     binary_accessibility_matrix = scipy.io.mmread(binary_accessibility_matrix_filename)
 
-    os.environ["MALLET_MEMORY"] = memory_in_gb
-
     print(
         f'Convert binary accessibility matrix to Mallet serialized corpus file "{mallet_corpus_filename}".'
     )
     LDAMallet.convert_binary_matrix_to_mallet_corpus_file_with_mallet(
         binary_accessibility_matrix=binary_accessibility_matrix,
         mallet_corpus_filename=mallet_corpus_filename,
+        memory_in_gb=memory_in_gb,
         mallet_path=mallet_path,
     )
 
@@ -128,6 +124,7 @@ def run_convert_binary_matrix_to_mallet_corpus_file_with_malletjson(args):
 
     binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     mallet_corpus_filename = args.mallet_corpus_filename
+    memory_in_gb = args.memory_in_gb
     malletjson_jar = args.malletjson_jar
 
     if args.verbose:
@@ -147,6 +144,7 @@ def run_convert_binary_matrix_to_mallet_corpus_file_with_malletjson(args):
     LDAMallet.convert_binary_matrix_to_mallet_corpus_file_with_malletjson(
         binary_accessibility_matrix=binary_accessibility_matrix,
         mallet_corpus_filename=mallet_corpus_filename,
+        memory_in_gb=memory_in_gb,
         malletjson_jar=malletjson_jar,
     )
 
@@ -453,6 +451,15 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
         type=str,
         required=True,
         help="Mallet serialized corpus filename.",
+    )
+    parser_topic_modeling_mallet_create_corpus_with_malletjson.add_argument(
+        "-m",
+        "--memory",
+        dest="memory_in_gb",
+        type=int,
+        required=False,
+        default=10,
+        help='Amount of memory (in GB) MalletJSON is allowed to use. Default: "10".',
     )
     parser_topic_modeling_mallet_create_corpus_with_malletjson.add_argument(
         "-j",
