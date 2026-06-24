@@ -122,6 +122,8 @@ def run_convert_binary_matrix_to_mallet_corpus_file_with_malletjson(args):
 
     from pycisTopic.topic_modeling.mallet_models import LDAMallet
 
+    check_java_exists()
+
     binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     mallet_corpus_filename = args.mallet_corpus_filename
     memory_in_gb = args.memory_in_gb
