@@ -1107,6 +1107,7 @@ def create_fragment_matrix_from_fragments(
     sample_id: str | None = None,
     cb_end_to_remove: str | None = "-1",
     cb_sample_separator: str | None = "___",
+    fragment_matrix_type: str | Literal["binary", "count"] = "binary",
     bed_parser_engine: str
     | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
@@ -1132,6 +1133,8 @@ def create_fragment_matrix_from_fragments(
     cb_sample_separator
         Add this string to the cell barcode if `sample_id` is specified, after removing
         `cb_end_to_remove` and before appending `sample_id`.
+    fragment_matrix_type
+        Create "binary" or "count" fragment matrix.
     bed_parser_engine
         BED parsing bed_parser_engine to use to read (gzipped) BED/fragment files.
 
@@ -1273,7 +1276,7 @@ def create_fragment_matrix_from_fragments(
         .group_by(["RegionID", "CB"])
         .agg(
             # Get accessibility in binary form.
-            pl.lit(1).cast(pl.Int8).alias("accessible_binary"),
+            pl.lit(1).cast(pl.UInt8).alias("accessible_binary"),
             # Get accessibility in count form.
             pl.len().cast(pl.UInt32).alias("accessible_count"),
         )
@@ -1289,18 +1292,25 @@ def create_fragment_matrix_from_fragments(
             on="CB",
             how="left",
         )
+        .select(
+            pl.col("RegionID"),
+            pl.col("region_idx"),
+            pl.col("CB_idx"),
+            (
+                pl.col("accessible_count")
+                if fragment_matrix_type == "count"
+                else pl.col("accessible_binary")
+            ).alias("accessible"),
+        )
         .collect()
     )
 
-    # Construct binary accessibility matrix as a sparse matrix
+    # Construct binary or count accessibility matrix as a sparse matrix
     # (regions as rows and cells as columns).
-    counts_fragments_matrix = sp.sparse.csr_matrix(
+    fragments_matrix = sp.sparse.csr_matrix(
         (
-            # All data points are 1:
-            #   - same as: region_cb_df_pl.get_column("accessible_binary").to_numpy()
-            #   - for count matrix: region_cb_df_pl.get_column("accessible_count").to_numpy()
-            # np.ones(region_cb_df_pl.shape[0], dtype=np.int8),
-            region_cb_df_pl.get_column("accessible_count").to_numpy(),
+            # accessible binary (np.uint8) or accessible count (np.uint32).
+            region_cb_df_pl.get_column("accessible").to_numpy(),
             (
                 # Row indices:
                 region_cb_df_pl.get_column("region_idx").to_numpy(),
@@ -1315,7 +1325,7 @@ def create_fragment_matrix_from_fragments(
     )
 
     return (
-        counts_fragments_matrix,
+        fragments_matrix,
         cbs.to_list(),
         regions_df_pl.get_column("RegionID").to_list(),
     )
