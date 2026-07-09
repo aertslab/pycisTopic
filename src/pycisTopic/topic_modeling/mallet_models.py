@@ -190,14 +190,7 @@ class LDAMallet:
             f"Converting Mallet JSON corpus to Mallet serialised corpus with: {' '.join(mallet_json_import_cmd)}"
         )
 
-        try:
-            subprocess.check_output(
-                args=mallet_json_import_cmd, shell=False, stderr=subprocess.STDOUT
-            )
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(
-                f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
-            )
+        subprocess.run(args=mallet_json_import_cmd, shell=False, check=True)
 
         # Remove Mallet JSON corpus as only Mallet serialised corpus file is needed.
         if os.path.exists(mallet_corpus_json_filename):
@@ -299,14 +292,7 @@ class LDAMallet:
             f"Converting Mallet text corpus to Mallet serialised corpus with: {' '.join(mallet_import_file_cmd)}"
         )
 
-        try:
-            subprocess.check_output(
-                args=mallet_import_file_cmd, shell=False, stderr=subprocess.STDOUT
-            )
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(
-                f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
-            )
+        subprocess.run(args=mallet_import_file_cmd, shell=False, check=True)
 
         # Remove Mallet text corpus as only Mallet serialised corpus file is needed.
         if os.path.exists(mallet_corpus_txt_filename):
@@ -814,12 +800,8 @@ class LDAMallet:
 
         start_time = time.time()
         logger.info(f"Train topics with Mallet LDA: {' '.join(cmd)}")
-        try:
-            subprocess.check_output(args=cmd, shell=False, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(  # noqa: B904
-                f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
-            )
+
+        subprocess.run(args=cmd, shell=False, check=True)
 
         if resumed_from_iteration > 0:
             LDAMallet._rename_resumed_model_checkpoint_files(
