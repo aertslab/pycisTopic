@@ -343,8 +343,13 @@ def str_to_bool(v: str) -> bool:
 def check_java_exists():
     import subprocess
 
-    print("Checking whether Java exists.")
-    subprocess.run(["java", "--version"], shell=False, stdout=subprocess.DEVNULL)
+    print("Check whether `java` is found in PATH.")
+    subprocess.run(
+        ["java", "--version"],
+        shell=False,
+        stdout=subprocess.DEVNULL,
+        check=True,
+    )
 
 
 def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
