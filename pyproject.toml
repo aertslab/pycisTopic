@@ -30,12 +30,16 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
+    "anndata>=0.11.4",
+    "boltons>=25.0.0", # ctxcore dependency
+    "ctxcore",
     "ncls>=0.0.70",
     "polars>=1.31.0",
     "pyarrow>=20.0.0",
     "pybiomart>=0.2.0",
     "requests>=2.32.4",
     "scipy>=1.15.3",
+    "setuptools<81", # ctxcore dependency
     "tmtoolkit>=0.12.0",
 ]
 
@@ -126,3 +130,6 @@ ban-relative-imports = "all"
 [tool.mypy]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/stubs"
 plugins = ["numpy.typing.mypy_plugin"]
+
+[tool.uv.sources]
+ctxcore = { git = "https://github.com/aertslab/ctxcore.git" }
