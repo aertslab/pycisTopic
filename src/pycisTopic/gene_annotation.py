@@ -736,7 +736,7 @@ def get_chrom_sizes_and_alias_mapping_from_ucsc(
 
 def find_most_likely_chromosome_source_in_bed(
     chrom_sizes_and_alias_df_pl: pl.DataFrame, bed_df_pl: pl.DataFrame
-) -> (str, pl.DataFrame):
+) -> tuple[str, pl.DataFrame]:
     """
     Find which chromosome source is the most likely in the provided BED file entries.
 

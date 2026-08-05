@@ -1111,7 +1111,7 @@ def create_fragment_matrix_from_fragments(
     bed_parser_engine: str
     | Literal["polars_lazy", "polars", "pyarrow"] = "polars_lazy",
     intersection_engine: str | Literal["ncls", "ruranges"] = "ncls",
-):
+) -> tuple[sp.sparse.csr_matrix, list[str], list[str]]:
     """
     Create fragments matrix from a fragment file and BED file with regions.
 
