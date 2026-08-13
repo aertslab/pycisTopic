@@ -66,7 +66,7 @@ def add_parser_count_matrix(subparsers):
         required=True,
         help="""
         Output prefix for (binary) fragment count matrix file.
-        Generates: `OUTPUT_PREFIX.cell_barcodes.tsv` (cell identifiers), `OUTPUT_PREFIX.region_names.tsv` (genomic regions),
+        Generates: `OUTPUT_PREFIX.cell_barcodes.tsv` (cell identifiers), `OUTPUT_PREFIX.region_ids.tsv` (genomic regions),
         and `OUTPUT_PREFIX.matrix.mtx` (sparse count matrix in Matrix Market format).
         """,
     )

@@ -83,7 +83,7 @@ def create_count_matrix_from_fragment_files(
     output_prefix
         Output prefix for fragment count matrix files.
         Generates: ``OUTPUT_PREFIX.cell_barcodes.tsv`` (cell identifiers),
-        ``OUTPUT_PREFIX.region_names.tsv`` (genomic regions),
+        ``OUTPUT_PREFIX.region_ids.tsv`` (genomic regions),
         and ``OUTPUT_PREFIX.matrix.mtx`` (sparse count matrix in Matrix Market format).
     blacklist_bed_filename
         Path to blacklist BED file with blacklisted regions (Amemiya et al., 2019).
@@ -143,7 +143,7 @@ def create_count_matrix_from_fragment_files(
     print("Reading fragments files and creating fragment matrix ...")
     fragment_matrices: list[sparse.csr_matrix] = []
     cell_names: list[str] = []
-    region_names: list[str] = []
+    region_ids: list[str] = []
     for sample_id, path_to_fragments in sample_to_fragment_file.items():
         print(f"\t{sample_id}\t{path_to_fragments}")
         fragment_matrix, cbs, region_ids = create_fragment_matrix_from_fragments(
@@ -161,12 +161,11 @@ def create_count_matrix_from_fragment_files(
         print(f"Generated fragment matrix with shape: {fragment_matrix.shape}")
         fragment_matrices.append(fragment_matrix)
         cell_names.extend(cbs)
-        region_names = region_ids
 
     print("Merging fragment matrix...")
     fragment_matrix_merged = sparse.hstack(fragment_matrices)
 
-    region_out = f"{output_prefix}.region_names.tsv"
+    region_out = f"{output_prefix}.region_ids.tsv"
     cbs_out = f"{output_prefix}.cell_barcodes.tsv"
     mat_out = f"{output_prefix}.matrix.mtx"
     print("Writing:")
@@ -180,16 +179,16 @@ def create_count_matrix_from_fragment_files(
 
     print(f'  - cell names: "{cbs_out}"')
     with open(region_out, "w") as f:
-        for region in region_names:
-            _ = f.write(f"{region}\n")
+        for region_id in region_ids:
+            _ = f.write(f"{region_id}\n")
 
 
 def check_accessibility_matrix_files(binary_accessibility_matrix_filename: str) -> bool:
     """
     Check if all required accessibility matrix files exist.
 
-    Given a matrix.mtx filename, verifies that the corresponding cell barcodes
-    and region names files also exist.
+    Given a matrix.mtx filename, verifies that the corresponding cell barcodes TSV
+    and region IDs TSV files also exist.
 
     Args:
         binary_accessibility_matrix_filename: Path to the matrix.mtx file
@@ -211,7 +210,7 @@ def check_accessibility_matrix_files(binary_accessibility_matrix_filename: str) 
     required_files = [
         binary_accessibility_matrix_filename,
         f"{prefix}.cell_barcodes.tsv",
-        f"{prefix}.region_names.tsv",
+        f"{prefix}.region_ids.tsv",
     ]
 
     missing_files = [f for f in required_files if not Path(f).is_file()]
