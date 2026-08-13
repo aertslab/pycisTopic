@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 
 import polars as pl
@@ -181,3 +182,44 @@ def create_count_matrix_from_fragment_files(
     with open(region_out, "w") as f:
         for region in region_names:
             _ = f.write(f"{region}\n")
+
+
+def check_accessibility_matrix_files(binary_accessibility_matrix_filename: str) -> bool:
+    """
+    Check if all required accessibility matrix files exist.
+
+    Given a matrix.mtx filename, verifies that the corresponding cell barcodes
+    and region names files also exist.
+
+    Args:
+        binary_accessibility_matrix_filename: Path to the matrix.mtx file
+                                             (e.g., "/path/to/PREFIX.matrix.mtx")
+
+    Returns:
+        True if all three files exist, or raise FileNotFoundError if any of the
+        required files are missing.
+
+    """
+    # Extract the prefix by removing ".matrix.mtx"
+    if not binary_accessibility_matrix_filename.endswith(".matrix.mtx"):
+        raise ValueError(
+            f'Expected filename to end with ".matrix.mtx", got: "{binary_accessibility_matrix_filename}".'
+        )
+
+    prefix = binary_accessibility_matrix_filename[: -len(".matrix.mtx")]
+
+    required_files = [
+        binary_accessibility_matrix_filename,
+        f"{prefix}.cell_barcodes.tsv",
+        f"{prefix}.region_names.tsv",
+    ]
+
+    missing_files = [f for f in required_files if not Path(f).is_file()]
+
+    if missing_files:
+        raise FileNotFoundError(
+            "Missing accessibility matrix files:\n"
+            + "\n".join(f'  - "{f}"' for f in missing_files)
+        )
+
+    return True

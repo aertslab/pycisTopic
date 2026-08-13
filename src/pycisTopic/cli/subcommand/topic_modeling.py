@@ -3,54 +3,12 @@ from __future__ import annotations
 import logging
 import sys
 from argparse import ArgumentTypeError
-from pathlib import Path
 from typing import TYPE_CHECKING
+
+from pycisTopic.count_matrix import check_accessibility_matrix_files
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser, _SubParsersAction
-
-
-def check_accessibility_matrix_files(binary_accessibility_matrix_filename: str) -> bool:
-    """
-    Check if all required accessibility matrix files exist.
-
-    Given a matrix.mtx filename, verifies that the corresponding cell barcodes
-    and region names files also exist.
-
-    Args:
-        binary_accessibility_matrix_filename: Path to the matrix.mtx file
-                                             (e.g., "/path/to/PREFIX.matrix.mtx")
-
-    Returns:
-        True if all three files exist, False otherwise.
-
-    Raises:
-        FileNotFoundError: If any of the required files are missing.
-
-    """
-    # Extract the prefix by removing ".matrix.mtx"
-    if not binary_accessibility_matrix_filename.endswith(".matrix.mtx"):
-        raise ValueError(
-            f'Expected filename to end with ".matrix.mtx", got: "{binary_accessibility_matrix_filename}".'
-        )
-
-    prefix = binary_accessibility_matrix_filename[: -len(".matrix.mtx")]
-
-    required_files = [
-        binary_accessibility_matrix_filename,
-        f"{prefix}.cell_barcodes.tsv",
-        f"{prefix}.region_names.tsv",
-    ]
-
-    missing_files = [f for f in required_files if not Path(f).is_file()]
-
-    if missing_files:
-        raise FileNotFoundError(
-            "Missing accessibility matrix files:\n"
-            + "\n".join(f'  - "{f}"' for f in missing_files)
-        )
-
-    return True
 
 
 def run_topic_modeling_with_mallet(args):
