@@ -7,8 +7,8 @@ from pycisTopic.count_matrix import create_count_matrix_from_fragment_files
 
 def run_create_count_matrix_from_fragment_files(args):
     create_count_matrix_from_fragment_files(
-        sample_to_fragment_filenames=args.sample_to_fragment_filenames,
-        sample_to_cell_barcodes_filenames=args.sample_to_cell_barcodes_filenames,
+        sample_to_fragments_file_mapping_tsv_filename=args.sample_to_fragments_file_mapping_tsv_filename,
+        sample_to_cell_barcodes_file_mapping_tsv_filenames=args.sample_to_cell_barcodes_file_tsv_filenames,
         regions_bed_filename=args.regions_bed_filename,
         output_prefix=args.output_prefix,
         blacklist_bed_filename=args.blacklist_bed_filename,
@@ -31,22 +31,23 @@ def add_parser_count_matrix(subparsers):
     parser_count_matrix.add_argument(
         "-f",
         "--sample_fragment",
-        dest="sample_to_fragment_filenames",
+        dest="sample_to_fragments_file_mapping_tsv_filename",
         action="store",
         type=str,
         required=True,
-        help="Path to `sample_to_fragment_files` TSV file, containing mapping between sample "
-        "ids and fragment files (tab-separated).",
+        help="Path to TSV file mapping sample IDs to fragments files. "
+        "Format: tab-separated with columns `sample` and `fragments_filename`.",
     )
     parser_count_matrix.add_argument(
         "-c",
         "--sample_barcodes",
-        dest="sample_to_cell_barcodes_filenames",
+        dest="sample_to_cell_barcodes_file_mapping_tsv_filenames",
         action="store",
         type=str,
         required=True,
-        help="Path to `sample_to_cell_barcode_filenames` TSV file, containing mapping between "
-        "sample ids and cell barcode filenames to keep per sample id (tab-separated).",
+        help="Path to TSV file mapping sample IDs to cell barcode files. "
+        "Format: tab-separated with columns `sample` and `cell_barcodes_filename`. "
+        "Only cell barcodes listed in these files are retained in the output.",
     )
     parser_count_matrix.add_argument(
         "-r",

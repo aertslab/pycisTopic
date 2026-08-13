@@ -8,8 +8,8 @@ from scipy import sparse
 from pycisTopic.fragments import create_fragment_matrix_from_fragments
 
 COL_NAME_SAMPLE = "sample"
-COL_NAME_PATH_FRAGMENTS = "path_to_fragment_file"
-COL_NAME_PATH_TO_CBS = "barcode"
+COL_NAME_FRAGMENTS_FILENAME = "fragments_filename"
+COL_NAME_CELL_BARCODES_FILENAME = "cell_barcodes_filename"
 FIELD_SEP = "\t"
 
 
@@ -55,8 +55,8 @@ def read_mapping(filename: str, key: str, value: str, separator: str) -> dict[st
 
 
 def create_count_matrix_from_fragment_files(
-    sample_to_fragment_filenames: str,
-    sample_to_cell_barcodes_filenames: str,
+    sample_to_fragments_file_mapping_tsv_filename: str,
+    sample_to_cell_barcodes_file_mapping_tsv_filenames: str,
     regions_bed_filename: str,
     output_prefix: str,
     blacklist_bed_filename: str | None = None,
@@ -72,12 +72,13 @@ def create_count_matrix_from_fragment_files(
 
     Parameters
     ----------
-    sample_to_fragment_filenames
-        Path to `sample_to_fragment_filenames` TSV file, containing mapping between
-        sample IDs and fragment files (tab-separated).
-    sample_to_cell_barcodes_filenames
-        Path to `sample_to_cell_barcodes_filenames` TSV file, containing mapping between
-        sample IDs and cell barcodes to keep per sample ID (tab-separated).
+    sample_to_fragments_file_mapping_tsv_filename
+        Path to TSV file mapping sample IDs to fragments files.
+        Format: tab-separated with columns ``sample`` and ``fragments_filename``.
+    sample_to_cell_barcodes_file_mapping_tsv_filenames
+        Path to TSV file mapping sample IDs to cell barcode files.
+        Format: tab-separated with columns ``sample`` and ``cell_barcodes_filename``.
+        Only cell barcodes listed in these files are retained in the output.
     regions_bed_filename
         Path to BED file containing regions to generate count matrix on.
     output_prefix
@@ -119,37 +120,40 @@ def create_count_matrix_from_fragment_files(
           - ``ruranges`` (faster): Rust-based interval tree.
 
         Default: ``"ncls"``.
+
     """
-    sample_to_fragment_file = read_mapping(
-        filename=sample_to_fragment_filenames,
+    sample_to_fragments_filename_dict = read_mapping(
+        filename=sample_to_fragments_file_mapping_tsv_filename,
         key=COL_NAME_SAMPLE,
-        value=COL_NAME_PATH_FRAGMENTS,
+        value=COL_NAME_FRAGMENTS_FILENAME,
         separator=FIELD_SEP,
     )
-    sample_to_barcode_file = read_mapping(
-        filename=sample_to_cell_barcodes_filenames,
+    sample_to_cell_barcode_filename_dict = read_mapping(
+        filename=sample_to_cell_barcodes_file_mapping_tsv_filenames,
         key=COL_NAME_SAMPLE,
-        value=COL_NAME_PATH_TO_CBS,
+        value=COL_NAME_CELL_BARCODES_FILENAME,
         separator=FIELD_SEP,
     )
+
     print("Fragment matrix will be generated for following samples: ")
-    for sample in sample_to_fragment_file:
-        print(f"\t{sample}")
-        if sample not in sample_to_barcode_file:
+    for sample_id in sample_to_fragments_filename_dict:
+        print(f"\t{sample_id}")
+        if sample_id not in sample_to_cell_barcode_filename_dict:
             raise ValueError(
-                f"{sample} was not present in {sample_to_cell_barcodes_filenames} aborting."
+                f'Sample "{sample_id}" was not present in "{sample_to_cell_barcodes_file_mapping_tsv_filenames}".'
             )
 
     print("Reading fragments files and creating fragment matrix ...")
     fragment_matrices: list[sparse.csr_matrix] = []
-    cell_names: list[str] = []
+    cell_barcodes: list[str] = []
     region_ids: list[str] = []
-    for sample_id, path_to_fragments in sample_to_fragment_file.items():
-        print(f"\t{sample_id}\t{path_to_fragments}")
+
+    for sample_id, fragments_bed_filename in sample_to_fragments_filename_dict.items():
+        print(f"\t{sample_id}\t{fragments_bed_filename}")
         fragment_matrix, cbs, region_ids = create_fragment_matrix_from_fragments(
-            fragments_bed_filename=path_to_fragments,
+            fragments_bed_filename=fragments_bed_filename,
             regions_bed_filename=regions_bed_filename,
-            barcodes_tsv_filename=sample_to_barcode_file[sample_id],
+            barcodes_tsv_filename=sample_to_cell_barcode_filename_dict[sample_id],
             blacklist_bed_filename=blacklist_bed_filename,
             sample_id=sample_id,
             cb_end_to_remove=cb_end_to_remove,
@@ -160,7 +164,7 @@ def create_count_matrix_from_fragment_files(
         )
         print(f"Generated fragment matrix with shape: {fragment_matrix.shape}")
         fragment_matrices.append(fragment_matrix)
-        cell_names.extend(cbs)
+        cell_barcodes.extend(cbs)
 
     print("Merging fragment matrix...")
     fragment_matrix_merged = sparse.hstack(fragment_matrices)
@@ -172,12 +176,12 @@ def create_count_matrix_from_fragment_files(
     print(f'  - fragment matrix: "{mat_out}"')
     sp_io.mmwrite(mat_out, fragment_matrix_merged)
 
-    print(f'  - region names: "{region_out}"')
+    print(f'  - cell names: "{cbs_out}"')
     with open(cbs_out, "w") as f:
-        for cb in cell_names:
+        for cb in cell_barcodes:
             _ = f.write(f"{cb}\n")
 
-    print(f'  - cell names: "{cbs_out}"')
+    print(f'  - region names: "{region_out}"')
     with open(region_out, "w") as f:
         for region_id in region_ids:
             _ = f.write(f"{region_id}\n")
