@@ -9,9 +9,9 @@ def run_create_count_matrix_from_fragment_files(args):
     create_count_matrix_from_fragment_files(
         sample_to_fragment_filenames=args.sample_to_fragment_filenames,
         sample_to_cell_barcodes_filenames=args.sample_to_cell_barcodes_filenames,
-        region_ids_filename=args.region_ids_filename,
+        regions_bed_filename=args.regions_bed_filename,
         output_prefix=args.output_prefix,
-        blacklist=args.blacklist,
+        blacklist_bed_filename=args.blacklist_bed_filename,
         cb_end_to_remove=args.cb_end_to_remove,
         cb_sample_separator=args.cb_sample_separator,
         fragment_matrix_type=args.fragment_matrix_type,
@@ -51,7 +51,7 @@ def add_parser_count_matrix(subparsers):
     parser_count_matrix.add_argument(
         "-r",
         "--regions",
-        dest="region_ids_filename",
+        dest="regions_bed_filename",
         action="store",
         type=str,
         required=True,
@@ -73,7 +73,7 @@ def add_parser_count_matrix(subparsers):
     parser_count_matrix.add_argument(
         "-b",
         "--blacklist",
-        dest="blacklist",
+        dest="blacklist_bed_filename",
         type=str,
         action="store",
         required=False,

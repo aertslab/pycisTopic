@@ -57,9 +57,9 @@ def read_mapping(filename: str, key: str, value: str, separator: str) -> dict[st
 def create_count_matrix_from_fragment_files(
     sample_to_fragment_filenames: str,
     sample_to_cell_barcodes_filenames: str,
-    region_ids_filename: str,
+    regions_bed_filename: str,
     output_prefix: str,
-    blacklist: str | None = None,
+    blacklist_bed_filename: str | None = None,
     cb_end_to_remove: str | None = None,
     cb_sample_separator: str = "___",
     fragment_matrix_type: str | Literal["binary", "count"] = "binary",
@@ -78,14 +78,14 @@ def create_count_matrix_from_fragment_files(
     sample_to_cell_barcodes_filenames
         Path to `sample_to_cell_barcodes_filenames` TSV file, containing mapping between
         sample IDs and cell barcodes to keep per sample ID (tab-separated).
-    region_ids_filename
+    regions_bed_filename
         Path to BED file containing regions to generate count matrix on.
     output_prefix
         Output prefix for fragment count matrix files.
         Generates: ``OUTPUT_PREFIX.cell_barcodes.tsv`` (cell identifiers),
         ``OUTPUT_PREFIX.region_names.tsv`` (genomic regions),
         and ``OUTPUT_PREFIX.matrix.mtx`` (sparse count matrix in Matrix Market format).
-    blacklist
+    blacklist_bed_filename
         Path to blacklist BED file with blacklisted regions (Amemiya et al., 2019).
         Default: ``None``.
     cb_end_to_remove
@@ -148,9 +148,9 @@ def create_count_matrix_from_fragment_files(
         print(f"\t{sample_id}\t{path_to_fragments}")
         fragment_matrix, cbs, region_ids = create_fragment_matrix_from_fragments(
             fragments_bed_filename=path_to_fragments,
-            regions_bed_filename=region_ids_filename,
+            regions_bed_filename=regions_bed_filename,
             barcodes_tsv_filename=sample_to_barcode_file[sample_id],
-            blacklist_bed_filename=blacklist,
+            blacklist_bed_filename=blacklist_bed_filename,
             sample_id=sample_id,
             cb_end_to_remove=cb_end_to_remove,
             cb_sample_separator=cb_sample_separator,

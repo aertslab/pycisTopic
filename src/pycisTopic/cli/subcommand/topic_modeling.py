@@ -215,7 +215,7 @@ def binarize_cell_or_region_topic(args):
         )
     if target == "region" and region_ids_filename is None:
         raise ValueError(
-            "`region_ids_filename` using `--regions` should be provided when target is `region`"
+            "`regions_bed_filename` using `--regions` should be provided when target is `region`"
         )
 
     import os
@@ -815,7 +815,7 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     parser_topic_modeling_mallet_binarize.add_argument(
         "-r",
         "--regions",
-        dest="region_ids_filename",
+        dest="regions_bed_filename",
         action="store",
         type=str,
         required=False,
