@@ -36,7 +36,7 @@ def get_barcodes_passing_qc_for_sample(
     tss_enrichment_threshold: float | None = None,
     frip_threshold: float | None = None,
     use_automatic_thresholds: bool = True,
-) -> tuple[list[str], dict[str, float]]:
+) -> tuple[list[str], dict[str, int|float]]:
     """
     Get barcodes passing quality control (QC) for a sample.
 

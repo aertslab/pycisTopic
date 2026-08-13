@@ -16,7 +16,7 @@ class LDAMallet:
 
     @staticmethod
     def convert_binary_matrix_to_mallet_corpus_file_with_malletjson(
-        binary_accessibility_matrix: scipy.sparse.csr,
+        binary_accessibility_matrix: scipy.sparse.csr_matrix,
         mallet_corpus_filename: str,
         memory_in_gb: int = 10,
         malletjson_jar: str = "mallet-json-1.0.0-fat-21.jar",
@@ -198,7 +198,7 @@ class LDAMallet:
 
     @staticmethod
     def convert_binary_matrix_to_mallet_corpus_file_with_mallet(
-        binary_accessibility_matrix: scipy.sparse.csr,
+        binary_accessibility_matrix: scipy.sparse.csr_matrix,
         mallet_corpus_filename: str,
         memory_in_gb: int = 10,
         mallet_path: str = "mallet",

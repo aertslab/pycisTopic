@@ -279,7 +279,7 @@ def qc_filter_barcodes(
 
 
 def qc_plot(
-    sample_id: str | Path,
+    sample_id: str,
     pycistopic_qc_output_dir: str | Path,
     unique_fragments_threshold: int | None = None,
     tss_enrichment_threshold: float | None = None,

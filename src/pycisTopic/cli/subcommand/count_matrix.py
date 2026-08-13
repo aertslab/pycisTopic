@@ -98,9 +98,9 @@ def run_create_count_matrix(args):
     print("Merging fragment matrix...")
     fragment_matrix_merged = sparse.hstack(fragment_matrices)
 
-    region_out = args.out_region_names
-    cbs_out = args.out_cell_barcodes
-    mat_out = args.out_matrix
+    region_out = f"{args.output_prefix}.region_names.tsv"
+    cbs_out = f"{args.output_prefix}.cell_barcodes.tsv"
+    mat_out = f"{args.output_prefix}.matrix.mtx"
     print("Writing:")
     print(f'  - fragment matrix: "{mat_out}"')
     sp_io.mmwrite(mat_out, fragment_matrix_merged)
@@ -154,28 +154,17 @@ def add_parser_count_matrix(subparsers):
         help="Path to BED file containing regions to generate count matrix on.",
     )
     parser_count_matrix.add_argument(
-        "--out_region_names",
-        dest="out_region_names",
+        "-o",
+        "--output_prefix",
+        dest="output_prefix",
         action="store",
         type=str,
         required=True,
-        help="Path to output region names `.txt` file.",
-    )
-    parser_count_matrix.add_argument(
-        "--out_cell_barcodes",
-        dest="out_cell_barcodes",
-        action="store",
-        type=str,
-        required=True,
-        help="Path to output cell barcodes names `.txt` file.",
-    )
-    parser_count_matrix.add_argument(
-        "--out_matrix",
-        dest="out_matrix",
-        action="store",
-        type=str,
-        required=True,
-        help="Path to output matrix `.mtx` file.",
+        help="""
+        Output prefix for (binary) fragment count matrix file.
+        Generates: `OUTPUT_PREFIX.cell_barcodes.tsv` (cell identifiers), `OUTPUT_PREFIX.region_names.tsv` (genomic regions),
+        and `OUTPUT_PREFIX.matrix.mtx` (sparse count matrix in Matrix Market format).
+        """,
     )
     parser_count_matrix.add_argument(
         "-b",
