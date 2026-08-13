@@ -1,13 +1,56 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from argparse import ArgumentTypeError
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser, _SubParsersAction
+
+
+def check_accessibility_matrix_files(binary_accessibility_matrix_filename: str) -> bool:
+    """
+    Check if all required accessibility matrix files exist.
+
+    Given a matrix.mtx filename, verifies that the corresponding cell barcodes
+    and region names files also exist.
+
+    Args:
+        binary_accessibility_matrix_filename: Path to the matrix.mtx file
+                                             (e.g., "/path/to/PREFIX.matrix.mtx")
+
+    Returns:
+        True if all three files exist, False otherwise.
+
+    Raises:
+        FileNotFoundError: If any of the required files are missing.
+
+    """
+    # Extract the prefix by removing ".matrix.mtx"
+    if not binary_accessibility_matrix_filename.endswith(".matrix.mtx"):
+        raise ValueError(
+            f'Expected filename to end with ".matrix.mtx", got: "{binary_accessibility_matrix_filename}".'
+        )
+
+    prefix = binary_accessibility_matrix_filename[: -len(".matrix.mtx")]
+
+    required_files = [
+        binary_accessibility_matrix_filename,
+        f"{prefix}.cell_barcodes.tsv",
+        f"{prefix}.region_names.tsv",
+    ]
+
+    missing_files = [f for f in required_files if not Path(f).is_file()]
+
+    if missing_files:
+        raise FileNotFoundError(
+            "Missing accessibility matrix files:\n"
+            + "\n".join(f'  - "{f}"' for f in missing_files)
+        )
+
+    return True
 
 
 def run_topic_modeling_with_mallet(args):
@@ -101,6 +144,8 @@ def run_convert_binary_matrix_to_mallet_corpus_file_with_mallet(args):
         handlers = [logging.StreamHandler(stream=sys.stdout)]
         logging.basicConfig(level=level, format=log_format, handlers=handlers)
 
+    check_accessibility_matrix_files(binary_accessibility_matrix_filename)
+
     print(
         f'Read binary accessibility matrix from "{binary_accessibility_matrix_filename}" Matrix Market file.'
     )
@@ -135,6 +180,8 @@ def run_convert_binary_matrix_to_mallet_corpus_file_with_malletjson(args):
         handlers = [logging.StreamHandler(stream=sys.stdout)]
         logging.basicConfig(level=level, format=log_format, handlers=handlers)
 
+    check_accessibility_matrix_files(binary_accessibility_matrix_filename)
+
     print(
         f'Read binary accessibility matrix from "{binary_accessibility_matrix_filename}" Matrix Market file.'
     )
@@ -159,6 +206,8 @@ def run_mallet_calculate_model_evaluation_stats(args):
     binary_accessibility_matrix_filename = args.binary_accessibility_matrix_filename
     output_prefix = args.output_prefix
     n_topics_list = [args.topics] if isinstance(args.topics, int) else args.topics
+
+    check_accessibility_matrix_files(binary_accessibility_matrix_filename)
 
     print(
         f'Read binary accessibility matrix from "{binary_accessibility_matrix_filename}" Matrix Market file.'
