@@ -541,11 +541,12 @@ def add_parser_tss(subparsers: _SubParsersAction[ArgumentParser]):
     )
 
     subparser_tss = parser_tss.add_subparsers(
-        title="TSS",
-        dest="tss",
+        title="TSS SUBCOMMANDS",
+        dest="tss_subcommand",
         help="List of TSS subcommands.",
+        description="List of TSS subcommands.",
+        required=True,
     )
-    subparser_tss.required = True
 
     parser_tss_get_tss = subparser_tss.add_parser(
         "get_tss",

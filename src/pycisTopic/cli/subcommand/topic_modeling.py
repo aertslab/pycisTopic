@@ -367,11 +367,12 @@ def add_parser_topic_modeling(subparsers: _SubParsersAction[ArgumentParser]):
     )
 
     subparser_topic_modeling = parser_topic_modeling.add_subparsers(
-        title="Topic modeling",
-        dest="topic_modeling",
+        title="TOPIC MODELING SUBCOMMANDS",
+        dest="topic_modeling_subcommand",
         help="List of topic modeling subcommands.",
+        description="List of topic modeling subcommands.",
+        required=True,
     )
-    subparser_topic_modeling.required = True
 
     parser_topic_modeling_mallet = subparser_topic_modeling.add_parser(
         "mallet", help="Run LDA topic modeling with Mallet."

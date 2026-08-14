@@ -372,11 +372,12 @@ def add_parser_qc(subparsers: _SubParsersAction[ArgumentParser]):
         description="Run QC statistics on fragment file.",
     )
     subparser_qc = parser_qc.add_subparsers(
-        title="QC",
-        dest="qc",
+        title="QC SUBCOMMANDS",
+        dest="qc_subcommand",
         help="List of QC subcommands.",
+        description="List of QC subcommands.",
+        required=True,
     )
-    subparser_qc.required = True
 
     parser_qc_run = subparser_qc.add_parser(
         "run",
