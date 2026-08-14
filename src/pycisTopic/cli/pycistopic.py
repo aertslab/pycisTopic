@@ -6,6 +6,7 @@ from pycisTopic.cli.subcommand.count_matrix import add_parser_count_matrix
 from pycisTopic.cli.subcommand.qc import add_parser_qc
 from pycisTopic.cli.subcommand.topic_modeling import add_parser_topic_modeling
 from pycisTopic.cli.subcommand.tss import add_parser_tss
+from pycisTopic.cli.subcommand.dars import add_parser_dars
 
 
 def main():
@@ -23,6 +24,7 @@ def main():
     add_parser_topic_modeling(subparsers)
     add_parser_tss(subparsers)
     add_parser_count_matrix(subparsers)
+    add_parser_dars(subparsers)
 
     args = parser.parse_args()
     args.func(args)
