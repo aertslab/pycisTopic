@@ -226,3 +226,113 @@ def check_accessibility_matrix_files(binary_accessibility_matrix_filename: str) 
         )
 
     return True
+
+
+def subset_accessibility_matrix(
+    binary_accessibility_matrix_filename: str,
+    output_prefix: str,
+    cell_barcodes_to_keep: list[str] | None,
+    region_ids_to_keep: list[str] | None = None,
+) -> None:
+    """
+    Subset accessibility matrix to specified cell barcodes and region IDs.
+
+    Parameters
+    ----------
+    binary_accessibility_matrix_filename
+        Path to the input accessibility matrix in Matrix Market format.
+        The corresponding cell barcodes and region names files must also exist.
+    output_prefix
+        Output prefix for the subsetted accessibility matrix files.
+        Generates: ``OUTPUT_PREFIX.cell_barcodes.tsv``, ``OUTPUT_PREFIX.region_ids.tsv``,
+        and ``OUTPUT_PREFIX.matrix.mtx``.
+    cell_barcodes_to_keep
+        List of cell barcodes to retain in the subsetted matrix.
+        If set to `None`, all cell barcodes will be retained.
+    region_ids_to_keep
+        List of region IDs to retain in the subsetted matrix.
+        If set to `None`, all region IDs will be retained.
+
+    """
+    # Check if accessibility matrix and corresponding cell barcodes and region IDs
+    # files exist.
+    check_accessibility_matrix_files(binary_accessibility_matrix_filename)
+
+    # Load the original accessibility matrix and convert to CSC format for efficient
+    # subsetting by cell barcodes (as this should be the most common use case).
+    print(f"Loading accessibility matrix from: {binary_accessibility_matrix_filename}")
+    subsetted_accessibility_matrix = sp_io.mmread(
+        binary_accessibility_matrix_filename
+    ).tocsc()
+
+    # Load cell barcodes and region names.
+    prefix = binary_accessibility_matrix_filename[: -len(".matrix.mtx")]
+    cell_barcodes_filename = f"{prefix}.cell_barcodes.tsv"
+    region_ids_filename = f"{prefix}.region_ids.tsv"
+
+    with open(cell_barcodes_filename, "r") as f:
+        cell_barcodes = [line.strip() for line in f]
+
+    with open(region_ids_filename, "r") as f:
+        region_ids = [line.strip() for line in f]
+
+    # Get indices for cell barcodes and region IDs to keep from the full lists.
+    cell_barcode_idxs_to_keep: list[int] | None = None
+    if cell_barcodes_to_keep is not None:
+        cell_barcode_idxs_to_keep = []
+        for cb in cell_barcodes_to_keep:
+            if cb in cell_barcodes:
+                cell_barcode_idxs_to_keep.append(cell_barcodes.index(cb))
+            else:
+                raise ValueError(
+                    f'Cell barcode "{cb}" not found in "{cell_barcodes_filename}".'
+                )
+
+    region_id_idxs_to_keep: list[int] | None = None
+    if region_ids_to_keep is not None:
+        region_id_idxs_to_keep = []
+        for region_id in region_ids_to_keep:
+            if region_id in region_ids:
+                region_id_idxs_to_keep.append(region_ids.index(region_id))
+            else:
+                raise ValueError(
+                    f'Region ID "{region_id}" not found in "{region_ids_filename}".'
+                )
+
+    # Subset the accessibility matrix first for the specified cell barcodes
+    # (fast due CSC layout) and then for region IDs.
+    if cell_barcode_idxs_to_keep is not None:
+        subsetted_accessibility_matrix = subsetted_accessibility_matrix[
+            :, cell_barcode_idxs_to_keep
+        ]
+    if region_id_idxs_to_keep is not None:
+        subsetted_accessibility_matrix = subsetted_accessibility_matrix[
+            region_id_idxs_to_keep, :
+        ]
+        subsetted_accessibility_matrix.sort_indices()
+
+    # Write the subsetted matrix and corresponding barcodes/names to files
+    subset_cell_barcodes_filename = f"{output_prefix}.cell_barcodes.tsv"
+    subset_region_ids_filename = f"{output_prefix}.region_ids.tsv"
+    subset_matrix_filename = f"{output_prefix}.matrix.mtx"
+
+    print(f"Writing subsetted accessibility matrix to: {subset_matrix_filename}")
+    sp_io.mmwrite(subset_matrix_filename, subsetted_accessibility_matrix)
+
+    print(f"Writing subsetted cell barcodes to: {subset_cell_barcodes_filename}")
+    with open(subset_cell_barcodes_filename, "w") as f:
+        if cell_barcode_idxs_to_keep is not None:
+            for cell_barcode_idx in cell_barcode_idxs_to_keep:
+                f.write(f"{cell_barcodes[cell_barcode_idx]}\n")
+        else:
+            for cell_barcode in cell_barcodes:
+                f.write(f"{cell_barcode}\n")
+
+    print(f"Writing subsetted region IDs to: {subset_region_ids_filename}")
+    with open(subset_region_ids_filename, "w") as f:
+        if region_id_idxs_to_keep is not None:
+            for region_id_idx in region_id_idxs_to_keep:
+                f.write(f"{region_ids[region_id_idx]}\n")
+        else:
+            for region_id in region_ids:
+                f.write(f"{region_id}\n")
