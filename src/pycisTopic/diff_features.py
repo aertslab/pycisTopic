@@ -16,10 +16,7 @@ import polars as pl
 if TYPE_CHECKING:
     from pycisTopic.cistopic_class import CistopicObject
 
-from pycisTopic.utils import (
-    get_nonzero_row_indices,
-    non_zero_rows,
-)
+from scenicplus_core.algorithms import get_nonzero_row_indices
 
 
 def rank_imputed_accessibility(
@@ -1314,7 +1311,7 @@ def find_diff_accessible_regions(
 # TODO: Add these generic functions to another package
 def p_adjust_bh(p: npt.NDArray):
     """Benjamini-Hochberg p-value correction for multiple hypothesis testing."""
-    p = np.asfarray(p)
+    p = np.asarray(p, dtype='float')
     by_descend = p.argsort()[::-1]
     by_orig = by_descend.argsort()
     steps = float(len(p)) / np.arange(len(p), 0, -1)
